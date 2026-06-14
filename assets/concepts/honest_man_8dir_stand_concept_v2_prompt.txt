@@ -1,0 +1,21 @@
+﻿Create a single square retro pixel art concept sheet for a Japanese-style ARPG character.
+
+Subject: the same honest-man character already established for I’m OK Dungeon. He is short, chubby, cute chibi proportioned, with thick round multi-ring glasses, simple village-style bowl cut hair, a blue plaid short-sleeve shirt worn open, a white ribbed tank top, white shorts, and flip-flops. He should feel harmless, sincere, awkward, and comedic.
+
+Request: show exactly 8 standing directions in one image, arranged cleanly in a grid, and make sure all 8 are visually distinct. The sheet must include a true pure RIGHT-facing pose, not a right-back pose, not a right-front pose, and not a duplicate of the left-facing pose.
+
+Use this exact direction set:
+- front
+- back
+- left
+- right
+- front-left
+- front-right
+- back-left
+- back-right
+
+Style target: polished three-quarter top-down / isometric-feeling pixel art, similar volume and detail density to a high-quality retro ARPG sprite concept, strong readable silhouette, dark pixel outline, clear light and shadow, compact game-asset feel, not flat or painterly.
+
+Composition: each direction should be a full-body standing pose, same character identity, same scale, centered and evenly spaced, neutral plain background, tiny soft ground shadow only, and a small readable direction tag under each pose is allowed for verification only. No extra characters, no weapons, no environment scene.
+
+Important: keep the sprite readable at game scale and keep the clothing, glasses, body shape, and hairstyle consistent across all 8 directions.

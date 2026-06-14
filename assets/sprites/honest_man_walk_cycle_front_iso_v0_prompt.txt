@@ -1,0 +1,19 @@
+﻿Create a single square retro pixel art sprite-sheet concept for the character 老实人 in I’m OK Dungeon.
+
+Style anchor: match the existing accepted 8-direction baseline for 老实人. Keep the same short and chubby chibi proportions, thick round multi-ring glasses, bowl cut hair, blue plaid open shirt, white ribbed tank top, white shorts, and flip-flops. Preserve the same comedic, sincere, slightly awkward personality and polished retro ARPG pixel-art volume.
+
+Request: show a WALK CYCLE for one direction only, not 8 directions. Use a clean 4-frame cycle arranged left to right in one row. This is a concept sheet for walk animation timing and body motion.
+
+Direction: front-three-quarter / slightly facing camera, matching the current game camera feel.
+
+Frame guidance:
+- Frame 1: neutral contact pose
+- Frame 2: lift / weight shift
+- Frame 3: passing pose
+- Frame 4: opposite contact pose
+
+Style target: polished three-quarter top-down / isometric-feeling pixel art, strong readable silhouette, dark pixel outline, clear light and shadow, compact game-asset feel, visibly animated body and clothing motion, but still readable at small sprite scale.
+
+Composition: one row of 4 full-body frames, evenly spaced, same scale, neutral plain background, tiny soft ground shadow if needed, no text, no labels, no watermark, no extra characters, no weapons, no scenery.
+
+Important: the walking motion should feel slightly awkward and honest rather than cool or athletic. Clothing, glasses, hair, and flip-flops should all animate subtly but remain consistent.

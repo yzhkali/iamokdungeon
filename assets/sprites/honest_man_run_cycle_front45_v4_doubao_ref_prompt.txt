@@ -1,0 +1,62 @@
+Create a clean production sprite sheet for I’m OK Dungeon.
+
+Asset: 老实人 / Honest Man front-45-degree run cycle.
+
+Output format:
+- Exactly 8 full-body frames.
+- Arrange frames left to right in a single horizontal row.
+- Same character scale in every frame.
+- Plain flat light-gray background only.
+- No sky, no grass, no scenery, no labels, no text, no watermark.
+
+Character identity:
+- Short chubby cute Chinese chibi man.
+- Large head, compact heavy body, visible round belly covered by a white ribbed tank top.
+- Thick round multi-ring glasses, stable face, simple village-style bowl cut hair.
+- Open blue plaid short-sleeve shirt, white shorts, blue flip-flops.
+- Calm sincere small smile, awkward but lovable, not oily, not heroic, not clownish.
+
+Animation direction:
+- Front 45 degrees, three-quarter top-down ARPG view.
+- Not side-view platformer animation.
+- Not 8 directions.
+
+Motion target:
+The run should feel like a soft, heavy, cute chubby run from a professional game AI demo:
+- The torso leans forward consistently.
+- The belly leads slightly but stays covered by the tank top.
+- The head bobs less than the torso and keeps the same face.
+- Feet land with visible weight.
+- Flip-flops stay readable and remain on the feet.
+- The front foot plants firmly on contact frames.
+- The rear foot sweeps behind in a short soft arc.
+- Arms swing opposite the legs, with small fists close to the body.
+- The open blue plaid shirt flares backward and lags one beat behind the body.
+- The run is awkward-soft and grounded, not slapstick, not frantic, not a walk.
+
+8-frame pose plan:
+Frame 1: left/front foot contact, planted, body slightly low, right leg back.
+Frame 2: left down/compression, weight sinks, belly compresses softly, shirt flares outward.
+Frame 3: left push-off, torso rises, right knee passes under body, arms begin reversing.
+Frame 4: light flight/passing, body highest, feet briefly light, shirt trails behind.
+Frame 5: right/front foot contact, planted, opposite of frame 1 but same identity.
+Frame 6: right down/compression, weight sinks, belly compresses softly, shirt flares outward.
+Frame 7: right push-off, torso rises, left knee passes under body, arms begin reversing.
+Frame 8: light flight/loop return, left leg prepares to contact again and loops smoothly to frame 1.
+
+Style:
+- Polished retro Japanese ARPG pixel art.
+- Strong dark pixel outline.
+- Chunky readable pixel clusters.
+- Clean sprite readability, not a large illustration, not painterly.
+- Consistent clothing, glasses, hair, body shape, and facial identity across all frames.
+
+Critical constraints:
+- Do not expose the belly.
+- Do not change the face between frames.
+- Do not duplicate frames.
+- Do not create a fake 2-frame loop.
+- Do not make broken limbs, floating feet, or inconsistent sandals.
+- Do not make him muscular, handsome, oily, or heroic.
+- Do not make the shirt dominate the silhouette.
+- Do not add background scene or UI.

@@ -1,0 +1,31 @@
+﻿Create a single square retro pixel art sprite-sheet concept for 老实人 in I’m OK Dungeon.
+
+Style and identity: match the accepted 老实人 design. Short chubby cute chibi man, thick round multi-ring glasses, bowl cut hair with bangs, blue plaid short-sleeve shirt worn OPEN and unbuttoned, white ribbed tank top, white shorts, flip-flops. He has a relaxed natural tiny smile, not a big grin, not unhappy, not angry.
+
+Request: create a TRUE 6-FRAME RUN CYCLE animation sheet, one direction only, front-three-quarter / slightly facing camera, same top-down ARPG camera feel. Arrange exactly 6 full-body frames left to right in one row. No labels.
+
+Very important: all 6 frames must be different animation frames. Do not make frames 1,3,5,6 identical. Do not make a fake 2-frame animation. The left leg and right leg must alternate clearly across the full cycle.
+
+Frame-by-frame motion plan:
+Frame 1: LEFT foot forward contact, right foot back, body slightly low.
+Frame 2: push-off transition, left foot begins passing under body, right knee starts lifting, body rises.
+Frame 3: RIGHT foot forward contact, left foot back, body slightly low.
+Frame 4: push-off transition, right foot begins passing under body, left knee starts lifting, body rises.
+Frame 5: LEFT foot forward again but not identical to frame 1; shirt and hair offset differently, body mid-bounce.
+Frame 6: transition into loop; right foot preparing to swing forward, body returns toward frame 1 smoothly.
+
+Animation details:
+- Both legs must visibly alternate: left-forward, transition, right-forward, transition, left-forward variation, loop transition.
+- Arms swing opposite to legs.
+- Open blue plaid shirt flaps lightly because it is unbuttoned.
+- Shirt sides sway outward and inward across frames.
+- Belly and chest bounce subtly because he is fat, but keep the white tank top mostly down; do not expose too much belly.
+- Hair and bangs bounce subtly with each step; bangs can separate slightly during impact.
+- The run should feel slightly awkward, soft, and comedic, not heroic or athletic.
+- Keep the face relaxed with a small natural smile.
+
+Style target: polished three-quarter top-down / isometric-feeling pixel art, strong readable silhouette, dark pixel outline, clear light and shadow, compact game-asset feel, readable at sprite scale.
+
+Composition: one row of exactly 6 evenly spaced frames, same scale, neutral plain background, tiny soft ground shadows, no text, no watermark, no extra characters, no weapons, no scenery.
+
+Important consistency: same character identity, same glasses, same body shape, same hairstyle, same clothing colors. Preserve the accepted design. The animation must be a real 6-frame loop.

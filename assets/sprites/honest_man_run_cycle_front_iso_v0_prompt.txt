@@ -1,0 +1,21 @@
+﻿Create a single square retro pixel art sprite-sheet concept for the character 老实人 in I’m OK Dungeon.
+
+Style and identity: match the accepted 老实人 design: short chubby cute chibi man, thick round multi-ring glasses, bowl cut hair with bangs, blue plaid short-sleeve shirt worn OPEN and unbuttoned, white ribbed tank top, white shorts, flip-flops. He should have the same gentle small smile as the established design, not an unhappy or angry face.
+
+Request: create a RUN CYCLE animation sheet, one direction only, front-three-quarter / slightly facing camera, in the same top-down ARPG camera feel. Use 6 frames arranged left to right in one row. This must be a looping run cycle, not a walk cycle.
+
+Animation requirements:
+- Both legs must alternate clearly: left foot forward, transition, right foot forward, transition, repeating.
+- The pose should loop cleanly from frame 6 back to frame 1.
+- Arms swing opposite to legs.
+- The open blue plaid shirt should flap lightly from running wind and body motion.
+- The shirt is unbuttoned and open, so the two sides should sway outward and inward across frames.
+- The belly and chest should bounce slightly up and down because he is fat.
+- Hair and bangs should bounce with the running impact; bangs can separate slightly during the bounce.
+- Keep him cute, sincere, and comedic, not athletic or heroic.
+
+Style target: polished three-quarter top-down / isometric-feeling pixel art, strong readable silhouette, dark pixel outline, clear light and shadow, compact game-asset feel, detailed enough like the accepted concept but still readable at sprite scale.
+
+Composition: one row of exactly 6 full-body frames, evenly spaced, same scale, neutral plain background, tiny soft ground shadow if needed, no text, no labels, no watermark, no extra characters, no weapons, no scenery.
+
+Important: maintain consistent character identity, same clothing, same glasses, same body shape, same hairstyle, and smile across all 6 frames. Avoid making only one leg move; both legs must alternate visibly.

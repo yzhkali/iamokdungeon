@@ -1,0 +1,8 @@
+﻿Use case: stylized-concept
+Asset type: 8-direction character sprite concept sheet for a retro pixel ARPG game
+Primary request: Create a single sprite-sheet-style concept image showing the same chibi male character from 8 directions: up, down, left, right, up-left, up-right, down-left, down-right. No text labels.
+Subject: A funny honest-guy character for a Japanese retro RPG inspired pixel art ARPG. He is short and chubby, cute Q-version proportions, thick round multi-ring glasses, simple village-style bowl cut hair, a blue plaid short-sleeve shirt worn open, white ribbed tank top underneath, white shorts, and flip-flops. He should look harmless, sincere, slightly awkward, and comedic rather than cool.
+Style/medium: polished retro pixel art, 32-bit JRPG feeling, cute chibi game sprite, clean silhouette, readable at small size, consistent proportions across all 8 poses, similar to a game asset concept sheet rather than an illustration.
+Composition/framing: one square image containing 8 evenly spaced full-body standing sprites arranged in a clean grid, all views same scale, neutral flat background, generous padding, no shadows that obscure feet.
+Color palette: bright but restrained; blue plaid shirt, white tank top and shorts, skin tones, dark hair, black glasses, simple flip-flops.
+Constraints: same character identity in all 8 directions, no text, no labels, no watermark, no logo, no extra characters, no weapons, no complex background, no photorealism, no anime splash art, no 3D render.

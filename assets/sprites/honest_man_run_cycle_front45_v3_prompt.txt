@@ -1,0 +1,26 @@
+Create a single polished retro Japanese ARPG pixel art sprite sheet for I’m OK Dungeon.
+
+Subject: 老实人 / Honest Man, a short chubby cute chibi Chinese man. He has a large head, thick round multi-ring glasses, a simple village-style bowl cut, an open blue plaid short-sleeve shirt, a white ribbed tank top, white shorts, and flip-flops. He is sincere, awkward, calm, and slightly funny, but not clownish.
+
+Direction: front 45 degrees only, three-quarter top-down ARPG camera. Do not make an 8-direction sheet.
+
+Animation request: a true 8-frame run cycle, arranged left to right in one horizontal row. The 8 frames must form a seamless loop with real run mechanics:
+Frame 1 left foot contact, frame 2 left down/compression, frame 3 left push-off, frame 4 flight/transition, frame 5 right foot contact, frame 6 right down/compression, frame 7 right push-off, frame 8 flight/loop return.
+
+Motion requirements:
+- Feet clearly alternate left and right contact.
+- Contact feet must look planted, not floating.
+- Body dips on frames 2 and 6.
+- Body rises on frames 4 and 8.
+- Arms swing opposite the legs.
+- The head bobs less than the torso.
+- The belly stays heavy and readable in every frame.
+- The open blue plaid shirt sways and lags behind the body by one beat.
+- Flip-flops remain readable and stay on his feet.
+- The run should feel slightly awkward and soft because he is chubby, but still believable and usable in a game.
+
+Style target: polished 32-bit retro pixel art, strong dark outline, visible pixel clusters, clear light and shadow volume, readable silhouette, compact full-body game sprite, consistent scale and character identity across all 8 frames.
+
+Composition: exactly 8 full-body frames in one row, evenly spaced, same scale, plain neutral background, small simple ground shadow under each frame if needed, no text, no labels, no watermark, no extra characters, no weapons, no scenery.
+
+Avoid: walk cycle, bounce loop, two-frame fake animation, duplicated frames, broken limbs, floating feet, overextended heroic sprint, slapstick silly run, different character identity between frames, large illustration instead of sprite sheet.

@@ -1,0 +1,11 @@
+﻿Use case: stylized-concept
+Asset type: game sprite sheet for locomotion
+Primary request: Create a polished retro Japanese ARPG pixel art sprite sheet for I’m OK Dungeon. Subject is 老实人 / Honest Man, a short chubby cute chibi Chinese man with a large head, thick round multi-ring glasses, simple village-style bowl cut, open blue plaid short-sleeve shirt, white ribbed tank top, white shorts, and flip-flops. Make a true 8-frame run cycle in one horizontal row, front 45 degrees only, three-quarter top-down ARPG camera, seamless loop, frame 1 left contact, frame 2 left down/compression, frame 3 left push-off, frame 4 flight/transition, frame 5 right contact, frame 6 right down/compression, frame 7 right push-off, frame 8 flight/loop return.
+Scene/backdrop: plain neutral background only, small simple ground shadow under each frame if needed, no environment
+Style/medium: polished 32-bit retro pixel art, strong dark outline, visible pixel clusters, clear light and shadow volume, readable game silhouette
+Composition/framing: exactly 8 full-body frames in one row, evenly spaced, same scale, compact full-body sprite sheet
+Lighting/mood: comedic, expressive, slightly awkward but believable
+Color palette: blue plaid, white tank top, white shorts, warm skin tones
+Materials/textures: chunky pixel clusters, soft but readable cloth folds, readable flip-flops, heavy belly mass
+Constraints: keep identity consistent across all frames; feet clearly alternate left and right contact; planted feet, no floating; torso dips on contact frames and rises on flight frames; arms swing opposite legs; head bobs less than torso; shirt lags one beat behind body; the run must feel usable in a game, not like a walk, shuffle, bounce loop, or heroic sprint
+Avoid: 8-direction sheet, duplicate frames, broken limbs, floating feet, overextended poses, slapstick comedy, extra characters, text, labels, watermark, scenery, weapon, pose drift, different character identity between frames

@@ -1,0 +1,9 @@
+﻿Create a single front-facing three-quarter top-down pixel art character concept for a retro action RPG.
+
+Subject: a funny Chinese honest-man character, short and chubby, cute chibi proportions, harmless and sincere, slightly awkward. He has thick round multi-ring glasses, a plain village-style bowl cut, a blue plaid short-sleeve shirt worn open, a white ribbed tank top underneath, white shorts, and simple flip-flops.
+
+Style target: polished 32-bit Japanese retro RPG sprite concept, similar volume and detail level to a high-quality isometric ARPG character sprite: three-quarter top-down view, compact full-body game sprite, strong readable silhouette, dark pixel outline, detailed pixel clusters, clear light and shadow volume, small but expressive. Not flat icon art.
+
+Composition: one full-body character only, standing idle, front three-quarter view from slightly above, centered on a plain neutral background with a tiny soft ground shadow. No labels, no text, no watermark, no weapons, no extra characters, no background scene.
+
+Important: keep the character sprite-like and usable as a game concept, not a large anime illustration, not photorealistic, not 3D, not vector art.

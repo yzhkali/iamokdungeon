@@ -1,0 +1,10 @@
+Honest Man 8-direction 3-frame bouncy RUN v1
+
+Source identity image:
+D:\I am OK Dungeon\assets\concepts\honest_man_8dir_stand_concept_v3_user_adjusted.png
+
+Compared with v0, this version is intentionally more run-like: air frames are raised higher, body leans forward, shadow contracts, contact frame squashes lower, and alternating sandal/foot accents are exaggerated. It still preserves the source character by using the accepted 8-direction standing sheet as the base.
+
+Frame columns: left_run_air, contact_low, right_run_air.
+Suggested playback: 1 -> 2 -> 3 -> 2 at 90-100 ms per frame.
+Direction row order: front-left45, front, front-right45, right, left, back-left45, back, back-right45.

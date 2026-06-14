@@ -1,0 +1,21 @@
+﻿Create a practical game-ready 8-frame run animation sprite sheet, not a character illustration lineup.
+
+Subject: 老实人 / Honest Man from I’m OK Dungeon: short chubby cute chibi Chinese man, large head, thick round glasses, simple bowl cut hair, open blue plaid short-sleeve shirt, white ribbed tank top, white shorts, flip-flops, awkward sincere expression.
+
+Camera and style: front 45-degree three-quarter top-down ARPG camera, polished retro 32-bit pixel art, strong dark outline, chunky pixel clusters, readable sprite silhouette, compact game sprite proportions. Keep all 8 frames the exact same character and same scale.
+
+Layout: exactly 8 separate full-body frames in one horizontal row with clear equal spacing. Plain neutral background only. Small ground shadow is allowed. No text, no numbers, no labels, no scenery, no weapons.
+
+Animation mechanics: this must be a true 8-frame run loop. All 8 frames must be visibly different. Do not repeat frames 1-4 as frames 5-8. Feet and arms must alternate clearly.
+Frame 1: left foot planted forward contact, right leg trailing back, body slightly low.
+Frame 2: left down/compression, knee bent, belly and torso lower.
+Frame 3: left push-off, left foot leaving ground, right leg passing forward, torso rising.
+Frame 4: flight, both feet light/off ground, body highest.
+Frame 5: right foot planted forward contact, left leg trailing back, clearly the opposite of frame 1 while still facing front 45 degrees.
+Frame 6: right down/compression, knee bent, torso lower.
+Frame 7: right push-off, right foot leaving ground, left leg passing forward, torso rising.
+Frame 8: flight/return pose that loops smoothly into frame 1.
+
+Motion details: planted feet must touch the ground shadow, no floating contact feet. The belly has weight, the head bobs less than the torso, arms swing opposite the legs, the open blue plaid shirt lags behind the body by one beat. The run should feel chubby, soft, slightly awkward, but genuinely running and usable in a combat prototype.
+
+Avoid: duplicated frames, only four unique poses, walking cycle, bounce loop, shuffle, heroic sprint, slapstick run, broken limbs, overextended limbs, inconsistent face, inconsistent clothes, pure side view, pure front view, 8-direction sheet, text, watermark.
