@@ -1,0 +1,18 @@
+*.blend binary
+*.bin binary
+*.fbx binary
+*.glb binary
+*.jpg binary
+*.jpeg binary
+*.mtl text eol=lf
+*.obj text eol=lf
+*.png binary
+*.tga binary
+*.webp binary
+
+*.css text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
