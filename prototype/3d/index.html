@@ -565,7 +565,7 @@ makeDummy(-21.8,15.0,0.15);      // training yard main dummy
 makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
 
 const monsters=[];
-function makeMonsterTarget(x,z,name='呵呵'){
+function makeMonsterTarget(x,z,name='打我'){
   const root=new THREE.Group(); root.position.set(x,0,z); scene.add(root);
   registerMapFeature({type:'monster',name,x,z,w:1.6,d:1.6,rot:0});
   const fallback=new THREE.Group(); root.add(fallback);
@@ -587,7 +587,7 @@ function makeMonsterTarget(x,z,name='呵呵'){
   addCollider(x,z,0.8,0.8,terrainYAt(x,z),terrainYAt(x,z)+2.4);
   return mon;
 }
-makeMonsterTarget(22,15,'呵呵');
+makeMonsterTarget(22,15,'打我');
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
