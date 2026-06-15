@@ -172,7 +172,7 @@ const cameraRig={
   indoorDistance:11,
   currentDistance:43,
   minDistance:12,
-  indoorMinDistance:5,
+  indoorMinDistance:2.4,
   maxDistance:52,
   minPitch:THREE.MathUtils.degToRad(22),
   maxPitch:THREE.MathUtils.degToRad(68),
@@ -384,10 +384,12 @@ function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,
 }
 function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   const w=9.5,d=9.0,wallT=0.36,wallH=4.4,doorW=2.7,doorH=3.9;
+  const floorTop=top+0.13;
   const root=new THREE.Group(); root.position.set(x,top,z); root.rotation.y=rot; mapRoot.add(root);
   registerMapFeature({type:'building',name:'player-home',sign:'HOME',x,z,w,d,rot,top,roofColor:0x6c4738,enterable:true});
   const floor=new THREE.Mesh(new THREE.BoxGeometry(w,0.18,d),mat(0x7b6a52,0.92));
   floor.position.y=0.04; floor.receiveShadow=true; root.add(floor);
+  platforms.push({minx:x-w/2+wallT,maxx:x+w/2-wallT,minz:z-d/2+wallT,maxz:z+d/2-wallT,top:floorTop});
   const wallMaterial=mat(0xc8b07f,0.88);
   function wallSeg(lx,ly,lz,sw,sh,sd){
     const m=new THREE.Mesh(new THREE.BoxGeometry(sw,sh,sd),wallMaterial);
@@ -2500,7 +2502,7 @@ function isCameraBlockedAt(pos){
 }
 function cameraClearDistance(target, idealDistance, minDistance=cameraRig.minDistance){
   _camDir.copy(cameraOffset(1)).normalize();
-  const start=2.2, steps=28;
+  const start=currentInterior?0.8:2.2, steps=currentInterior?36:28;
   let clear=idealDistance;
   for(let i=0;i<=steps;i++){
     const d=start+(idealDistance-start)*(i/steps);
@@ -2525,7 +2527,7 @@ function updateCamera(dt){
   cameraRig.targetPitch=THREE.MathUtils.clamp(cameraRig.targetPitch,minPitch,maxPitch);
   cameraRig.yaw += angleDelta(cameraRig.yaw,cameraRig.targetYaw)*Math.min(1,dt*12);
   cameraRig.pitch = THREE.MathUtils.lerp(cameraRig.pitch,cameraRig.targetPitch,Math.min(1,dt*12));
-  const tgt=new THREE.Vector3(P.x,1.7+P.y*0.6,P.z);   // 跟随高度(站上柱子时抬一点)
+  const tgt=new THREE.Vector3(P.x,(indoor?2.25:1.7)+P.y*0.6,P.z);   // 跟随高度(室内看上半身，减少墙面糊屏)
   _camTarget.copy(tgt);
   const clearDist=cameraClearDistance(_camTarget,cameraRig.distance,indoor?cameraRig.indoorMinDistance:cameraRig.minDistance);
   cameraRig.currentDistance=THREE.MathUtils.lerp(cameraRig.currentDistance,clearDist,Math.min(1,dt*14));
