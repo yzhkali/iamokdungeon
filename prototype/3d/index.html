@@ -27,10 +27,35 @@
   #stamLabel { color:#9a8d80; font-size:11px; margin-bottom:3px; }
   #hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
     color:#7a6e62; font-size:12px; text-align:center; line-height:1.6; z-index:10; pointer-events:none; }
-  #padStatus { position:absolute; top:20px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; }
+  #padStatus { position:absolute; top:184px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; }
   #padStatus .on { color:#7ec97e; }
-  #state { position:absolute; top:46px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; font-family:monospace; }
+  #state { position:absolute; top:210px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; font-family:monospace; }
   #loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#8a7d70; font-size:15px; z-index:20; }
+  #miniMap { position:absolute; top:16px; right:16px; width:152px; height:152px; z-index:11;
+    border:2px solid #6e5b43; border-radius:50%; background:rgba(17,14,11,0.72);
+    box-shadow:0 0 0 3px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35); overflow:hidden; backdrop-filter:blur(4px); }
+  #miniMapCanvas { width:100%; height:100%; display:block; }
+  #miniMapMode { position:absolute; right:7px; bottom:7px; width:28px; height:28px; border-radius:50%;
+    border:1px solid rgba(255,211,90,0.75); color:#ffd35a; background:rgba(38,28,17,0.82);
+    font-size:12px; font-weight:700; cursor:pointer; }
+  #miniMapMode:hover,#mapDockBtn:hover,#closeWorldMap:hover { border-color:#ffe48a; color:#ffe48a; }
+  #compassLabel { position:absolute; top:5px; left:50%; transform:translateX(-50%);
+    color:#f0d68a; font-size:12px; font-weight:700; text-shadow:0 1px 2px #000; pointer-events:none; }
+  #mapDock { position:absolute; left:50%; bottom:58px; transform:translateX(-50%); z-index:12; }
+  #mapDockBtn { min-width:46px; height:38px; padding:0 13px; border-radius:6px;
+    border:1px solid #6e5b43; background:rgba(24,19,14,0.78); color:#d7c18a; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:7px; font-size:13px; backdrop-filter:blur(4px); }
+  #mapDockBtn svg { width:18px; height:18px; fill:currentColor; }
+  #worldMapOverlay { position:absolute; inset:0; display:none; place-items:center; z-index:18;
+    background:rgba(10,8,7,0.38); backdrop-filter:blur(2px); }
+  #worldMapOverlay.open { display:grid; }
+  #worldMapPanel { width:min(76vw,820px); height:min(72vh,620px); border:2px solid #7a6549; border-radius:8px;
+    background:rgba(23,18,13,0.94); box-shadow:0 18px 60px rgba(0,0,0,0.5); position:relative; padding:40px 18px 18px; }
+  #worldMapTitle { position:absolute; left:18px; top:12px; color:#f2d894; font-weight:700; font-size:15px; }
+  #closeWorldMap { position:absolute; right:12px; top:10px; width:30px; height:28px; border-radius:5px;
+    border:1px solid #6e5b43; background:rgba(42,31,20,0.82); color:#d7c18a; cursor:pointer; font-size:18px; line-height:1; }
+  #worldMapCanvas { width:100%; height:100%; display:block; border:1px solid rgba(215,193,138,0.3);
+    border-radius:5px; background:#2d291f; }
 </style>
 </head>
 <body>
@@ -49,9 +74,27 @@
 </div>
 <div id="padStatus">手柄: <span id="padState">未连接</span></div>
 <div id="state"></div>
+<div id="miniMap">
+  <canvas id="miniMapCanvas" width="304" height="304"></canvas>
+  <div id="compassLabel">N</div>
+  <button id="miniMapMode" title="切换地图旋转模式">N</button>
+</div>
 <div id="hud">
   <div id="stamLabel">体力</div>
   <div id="stamWrap"><div id="stamBar"></div></div>
+</div>
+<div id="mapDock">
+  <button id="mapDockBtn" title="展开区域地图">
+    <svg viewBox="0 0 24 24"><path d="M4 5.5 9 3l6 2.5L20 3v15.5L15 21l-6-2.5L4 21V5.5zm6-.2v11.4l4 1.7V7l-4-1.7zM6 6.7v11l2-1V5.7l-2 1zm10 .6v11l2-1V6.3l-2 1z"/></svg>
+    <span>地图</span>
+  </button>
+</div>
+<div id="worldMapOverlay">
+  <div id="worldMapPanel">
+    <div id="worldMapTitle">没事村地图</div>
+    <button id="closeWorldMap" title="关闭地图">×</button>
+    <canvas id="worldMapCanvas" width="1200" height="820"></canvas>
+  </div>
 </div>
 <div id="hint">
   WASD 移动 ・ Q/E 旋转镜头 ・ R/F 俯仰 ・ 左键 轻击 ・ <b>按住右键蓄力</b>重击 ・ 空格 跳跃 ・ Shift 闪避翻滚 ・ <b>T 推眼镜</b><br>
@@ -215,6 +258,8 @@ const wallMat=new THREE.MeshStandardMaterial({color:0x6b5a4a,roughness:0.9});
 function wall(x,z,w,d,h=2.6){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m); addCollider(x,z,w,d,0,h);}
 const ROOM=46;
 const mapRoot=new THREE.Group(); scene.add(mapRoot);
+const mapFeatures=[];
+function registerMapFeature(feature){ mapFeatures.push(feature); return feature; }
 
 const propMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
 const platforms=[];   // 可站立顶面: {minx,maxx,minz,maxz,top}
@@ -233,6 +278,7 @@ function addGroundPatch(x,z,w,d,top=0,color=0x5a5241){
   m.position.set(x,top-h/2,z); m.receiveShadow=true; mapRoot.add(m);
   terrainAreas.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
   if(top>0.03) platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  registerMapFeature({type:color===0x6d6049||color===0x766a58?'road':'terrain',x,z,w,d,rot:0,top,color});
   return m;
 }
 function terrainYAt(x,z){
@@ -245,12 +291,14 @@ function terrainYAt(x,z){
 function addLowWall(x,z,w,d,h=1.25,color=0x6b5a4a,top=terrainYAt(x,z)){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.86));
   m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
+  registerMapFeature({type:'wall',x,z,w,d,rot:0,top,color});
   addCollider(x,z,w,d,top,top+h); return m;
 }
 function addStep(x,z,w,d,top,color=0x756354){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,top,d),mat(color,0.88));
   m.position.set(x,top/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
   platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  registerMapFeature({type:'road',x,z,w,d,rot:0,top,color});
   return m;
 }
 function localPoint(x,z,dx,dz,rot=0){
@@ -285,6 +333,7 @@ function addSign(text,x,z,rot=0,top=terrainYAt(x,z)){
 }
 function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,roofColor=0x6d3a30,stone=false,tower=false,sign=''}){
   const root=new THREE.Group(); root.position.set(x,top,z); root.rotation.y=rot; mapRoot.add(root);
+  registerMapFeature({type:'building',name,sign,x,z,w,d,rot,top,roofColor,stone,tower});
   const bodyH=stone?3.6:3.2;
   const bodyMat=mat(stone?0xa99c89:wallColor,0.88);
   const bodyMesh=new THREE.Mesh(new THREE.BoxGeometry(w,bodyH,d),bodyMat);
@@ -413,6 +462,7 @@ function Mwood(c){return new THREE.MeshStandardMaterial({color:c,roughness:0.85}
 function woodBox(w,h,d,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),Mwood(c));m.castShadow=true;m.receiveShadow=true;return m;}
 function makeDummy(dx,dz,face){
   const root=new THREE.Group(); root.position.set(dx,0,dz); root.rotation.y=face; scene.add(root);
+  registerMapFeature({type:'training',name:'木桩',x:dx,z:dz,w:1.2,d:1.2,rot:face});
   // 地面底座(沙袋样的圆台)
   const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.4,16),Mwood(WOOD_D));
   base.position.y=0.2; base.castShadow=true; base.receiveShadow=true; root.add(base);
@@ -445,6 +495,7 @@ makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
 const monsters=[];
 function makeMonsterTarget(x,z,name='呵呵'){
   const root=new THREE.Group(); root.position.set(x,0,z); scene.add(root);
+  registerMapFeature({type:'monster',name,x,z,w:1.6,d:1.6,rot:0});
   const fallback=new THREE.Group(); root.add(fallback);
   const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.55,1.3,5,10),new THREE.MeshStandardMaterial({color:0x74616c,roughness:0.82}));
   body.position.y=1.05; body.castShadow=true; body.receiveShadow=true; fallback.add(body);
@@ -1991,6 +2042,145 @@ function update(dt){
   updateTrail(dt); updateBeams(dt); updateSpinRings(dt); updateSpaceSlash(dt); updateStomps(dt);
 }
 function angleDelta(a,b){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d;}
+
+// ============================================================
+//  自动地图：同一份场景登记数据生成小地图和展开地图
+// ============================================================
+const miniMapCanvas=document.getElementById('miniMapCanvas');
+const miniMapCtx=miniMapCanvas.getContext('2d');
+const miniMapModeBtn=document.getElementById('miniMapMode');
+const compassLabel=document.getElementById('compassLabel');
+const worldMapOverlay=document.getElementById('worldMapOverlay');
+const worldMapCanvas=document.getElementById('worldMapCanvas');
+const worldMapCtx=worldMapCanvas.getContext('2d');
+let miniMapFollowFacing=false;
+let mapFrame=0;
+miniMapModeBtn.onclick=()=>{
+  miniMapFollowFacing=!miniMapFollowFacing;
+  miniMapModeBtn.textContent=miniMapFollowFacing?'↑':'N';
+  miniMapModeBtn.title=miniMapFollowFacing?'角色朝向固定':'北向固定';
+  compassLabel.textContent=miniMapFollowFacing?'':'N';
+};
+document.getElementById('mapDockBtn').onclick=()=>{
+  worldMapOverlay.classList.add('open');
+  drawWorldMap();
+};
+document.getElementById('closeWorldMap').onclick=()=>worldMapOverlay.classList.remove('open');
+worldMapOverlay.addEventListener('click',e=>{ if(e.target===worldMapOverlay) worldMapOverlay.classList.remove('open'); });
+addEventListener('keydown',e=>{
+  if(e.code==='Escape' && worldMapOverlay.classList.contains('open')) worldMapOverlay.classList.remove('open');
+});
+
+function colorToCss(color,alpha=1){
+  const c=new THREE.Color(color);
+  return `rgba(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)},${alpha})`;
+}
+function worldToMapPoint(x,z,scale,view,canvas){
+  return {x:canvas.width/2+(x-view.x)*scale,y:canvas.height/2+(z-view.z)*scale};
+}
+function drawRotRect(ctx,feature,scale,view,canvas,fill,stroke,lineWidth=1){
+  const p=worldToMapPoint(feature.x,feature.z,scale,view,canvas);
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(feature.rot);
+  ctx.fillStyle=fill;
+  ctx.strokeStyle=stroke;
+  ctx.lineWidth=lineWidth;
+  ctx.fillRect(-feature.w*scale/2,-feature.d*scale/2,feature.w*scale,feature.d*scale);
+  if(stroke) ctx.strokeRect(-feature.w*scale/2,-feature.d*scale/2,feature.w*scale,feature.d*scale);
+  ctx.restore();
+}
+function drawPlayerMarker(ctx,scale,view,canvas,big=false){
+  const p=worldToMapPoint(P.x,P.z,scale,view,canvas);
+  const markerRot=miniMapFollowFacing && !big ? 0 : Math.PI-P.facing;
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(markerRot);
+  ctx.fillStyle='#fff0a6';
+  ctx.strokeStyle='#2a1a0c';
+  ctx.lineWidth=big?3:2;
+  ctx.beginPath();
+  ctx.moveTo(0,big?-13:-9);
+  ctx.lineTo(big?8:6,big?9:7);
+  ctx.lineTo(0,big?5:3);
+  ctx.lineTo(big?-8:-6,big?9:7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+function drawMap(ctx,canvas,{centerX=0,centerZ=0,scale=4,rot=0,big=false}={}){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const view={x:centerX,z:centerZ,rot};
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+  if(rot) ctx.rotate(rot);
+  ctx.translate(-canvas.width/2,-canvas.height/2);
+  ctx.fillStyle=big?'#302b20':'#2f2b20';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='rgba(229,204,142,0.14)';
+  ctx.lineWidth=1;
+  const gridStep=big?10:8;
+  for(let gx=-60;gx<=60;gx+=gridStep){
+    const a=worldToMapPoint(gx,-60,scale,view,canvas), b=worldToMapPoint(gx,60,scale,view,canvas);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for(let gz=-60;gz<=60;gz+=gridStep){
+    const a=worldToMapPoint(-60,gz,scale,view,canvas), b=worldToMapPoint(60,gz,scale,view,canvas);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for(const f of mapFeatures.filter(m=>m.type==='terrain')) drawRotRect(ctx,f,scale,view,canvas,colorToCss(f.color,0.86),'rgba(20,18,14,0.18)');
+  for(const f of mapFeatures.filter(m=>m.type==='road')) drawRotRect(ctx,f,scale,view,canvas,colorToCss(f.color,0.9),'rgba(245,221,160,0.18)');
+  for(const f of mapFeatures.filter(m=>m.type==='wall')) drawRotRect(ctx,f,scale,view,canvas,'rgba(88,70,47,0.92)','rgba(36,25,15,0.7)');
+  for(const f of mapFeatures.filter(m=>m.type==='building')){
+    const fill=f.tower?'#b8aea0':f.stone?'#a9a091':'#b99b6e';
+    drawRotRect(ctx,f,scale,view,canvas,fill,'rgba(60,36,20,0.9)',big?2:1);
+    if(big && (f.sign||f.name)){
+      const p=worldToMapPoint(f.x,f.z,scale,view,canvas);
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(-(view.rot||0));
+      ctx.fillStyle='#f3d995'; ctx.font='bold 14px Arial, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(f.sign||f.name,0,0);
+      ctx.restore();
+    }
+  }
+  for(const f of mapFeatures.filter(m=>m.type==='training'||m.type==='monster')){
+    const p=worldToMapPoint(f.x,f.z,scale,view,canvas);
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(-(view.rot||0));
+    ctx.fillStyle=f.type==='monster'?'#b45b7a':'#d49a4a';
+    ctx.strokeStyle='rgba(20,12,8,0.8)';
+    ctx.lineWidth=big?2:1;
+    ctx.beginPath(); ctx.arc(0,0,big?7:4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    if(big){ctx.fillStyle='#f0d68a'; ctx.font='12px Arial, sans-serif'; ctx.fillText(f.type==='monster'?'怪':'桩',0,4);}
+    ctx.restore();
+  }
+  ctx.restore();
+  drawPlayerMarker(ctx,scale,{x:centerX,z:centerZ,rot:0},canvas,big);
+  if(!big){
+    ctx.save();
+    ctx.globalCompositeOperation='destination-in';
+    ctx.beginPath(); ctx.arc(canvas.width/2,canvas.height/2,canvas.width/2-3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle='rgba(255,226,146,0.55)';
+    ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(canvas.width/2,canvas.height/2,canvas.width/2-4,0,Math.PI*2); ctx.stroke();
+  }
+}
+function drawMiniMap(){
+  const scale=3.15;
+  const rot=miniMapFollowFacing?P.facing-Math.PI:0;
+  drawMap(miniMapCtx,miniMapCanvas,{centerX:P.x,centerZ:P.z,scale,rot,big:false});
+}
+function drawWorldMap(){
+  const scale=Math.min((worldMapCanvas.width-90)/(ROOM*2),(worldMapCanvas.height-90)/(ROOM*2));
+  drawMap(worldMapCtx,worldMapCanvas,{centerX:0,centerZ:0,scale,rot:0,big:true});
+  worldMapCtx.save();
+  worldMapCtx.fillStyle='#f0d68a'; worldMapCtx.font='bold 18px Arial, sans-serif'; worldMapCtx.textAlign='center';
+  worldMapCtx.fillText('N',worldMapCanvas.width/2,34);
+  worldMapCtx.fillText('S',worldMapCanvas.width/2,worldMapCanvas.height-18);
+  worldMapCtx.fillText('W',28,worldMapCanvas.height/2);
+  worldMapCtx.fillText('E',worldMapCanvas.width-28,worldMapCanvas.height/2);
+  worldMapCtx.restore();
+}
 function updateFx(dt){
   // 刀光横扫（_from→_to 由招式指定方向）
   if(slashMesh.visible){
@@ -2273,6 +2463,9 @@ function updateHUD(){
   else if(P.moving) st='奔跑';
   else st='待机';
   stateEl.textContent='状态: '+st;
+  mapFrame++;
+  if(mapFrame%2===0) drawMiniMap();
+  if(worldMapOverlay.classList.contains('open') && mapFrame%6===0) drawWorldMap();
 }
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();padStatus();
