@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -68,11 +68,19 @@ const THREE_SOURCES = [
   "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
   "https://esm.sh/three@0.160.0",
 ];
+const GLTF_LOADER_SOURCES = [
+  "https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/loaders/GLTFLoader.js",
+  "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+  "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+  "https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+  "https://esm.run/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+  "https://cdn.skypack.dev/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+];
 const loadingEl = document.getElementById('loading');
 let THREE = null;
 for(let i=0;i<THREE_SOURCES.length;i++){
   try{
-    loadingEl.textContent = `加载 3D 引擎中…（源 ${i+1}/${THREE_SOURCES.length}）`;
+    loadingEl.textContent = `Loading 3D engine (${i+1}/${THREE_SOURCES.length})`;
     THREE = await import(THREE_SOURCES[i]);
     if(THREE && THREE.Scene) break;
   }catch(e){ /* 试下一个源 */ }
@@ -82,8 +90,19 @@ if(!THREE || !THREE.Scene){
   throw new Error('Three.js load failed');
 }
 
-main(THREE);
-function main(THREE){
+let GLTFLoader = null;
+for(let i=0;i<GLTF_LOADER_SOURCES.length;i++){
+  try{
+    loadingEl.textContent = `Loading model loader (${i+1}/${GLTF_LOADER_SOURCES.length})`;
+    const mod = await import(GLTF_LOADER_SOURCES[i]);
+    GLTFLoader = mod.GLTFLoader;
+    if(GLTFLoader) break;
+  }catch(e){ /* 试下一个源 */ }
+}
+if(!GLTFLoader) console.warn('GLTFLoader load failed; vendor models will be skipped.');
+
+main(THREE, GLTFLoader);
+function main(THREE, GLTFLoader){
 
 // ============================================================
 //  没事地下城 — 3D 火柴人原型 v0.3
@@ -97,17 +116,17 @@ renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x1c1714);
-scene.fog=new THREE.Fog(0x1c1714,32,80);
+scene.fog=new THREE.Fog(0x1c1714,42,130);
 
 const camera=new THREE.PerspectiveCamera(45,1,0.1,200);
-const CAM_OFFSET=new THREE.Vector3(0,20,19);
+const CAM_OFFSET=new THREE.Vector3(0,30,32);
 camera.position.copy(CAM_OFFSET); camera.lookAt(0,1.7,0);
 
 scene.add(new THREE.HemisphereLight(0xb9c6d6,0x4a3f36,0.75));
 const sun=new THREE.DirectionalLight(0xfff2d8,1.15);
 sun.position.set(12,26,10); sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.near=1; sun.shadow.camera.far=90;
-const sc=30; sun.shadow.camera.left=-sc; sun.shadow.camera.right=sc; sun.shadow.camera.top=sc; sun.shadow.camera.bottom=-sc;
+sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.near=1; sun.shadow.camera.far=140;
+const sc=60; sun.shadow.camera.left=-sc; sun.shadow.camera.right=sc; sun.shadow.camera.top=sc; sun.shadow.camera.bottom=-sc;
 sun.shadow.bias=-0.0005; scene.add(sun);
 
 // 地面（polygonOffset 防止脚底/阴影共面闪烁）
@@ -116,35 +135,251 @@ floorMat.polygonOffset=true; floorMat.polygonOffsetFactor=1; floorMat.polygonOff
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(140,140),floorMat);
 floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
 const grid=new THREE.GridHelper(140,70,0x5a4d42,0x3a332e); grid.position.y=0.02; scene.add(grid);
+grid.visible=false;
+
+const gltfLoader = GLTFLoader ? new GLTFLoader() : null;
+const modelCache = new Map();
+function prepModel(root){
+  root.traverse(o=>{
+    if(o.isMesh){
+      o.castShadow=true; o.receiveShadow=true;
+      if(o.material){
+        if(Array.isArray(o.material)) o.material.forEach(m=>{ if(m) m.roughness=Math.max(m.roughness??0.8,0.75); });
+        else o.material.roughness=Math.max(o.material.roughness??0.8,0.75);
+      }
+    }
+  });
+}
+function loadModel(path){
+  if(!gltfLoader) return Promise.resolve(null);
+  if(modelCache.has(path)) return modelCache.get(path);
+  const p = new Promise(resolve=>{
+    gltfLoader.load(path, gltf=>{
+      prepModel(gltf.scene);
+      resolve(gltf.scene);
+    }, undefined, err=>{
+      console.warn('Model load failed:', path, err);
+      resolve(null);
+    });
+  });
+  modelCache.set(path,p);
+  return p;
+}
+async function placeModel(path,x,z,{scale=1,rot=0,y=0,parent=scene,name='',groundCenter=false}={}){
+  const src=await loadModel(path);
+  if(!src) return null;
+  const obj=src.clone(true);
+  obj.rotation.y=rot; obj.scale.setScalar(scale);
+  if(groundCenter){
+    const box=new THREE.Box3().setFromObject(obj);
+    const c=box.getCenter(new THREE.Vector3());
+    obj.position.set(x-c.x,y-box.min.y,z-c.z);
+  } else {
+    obj.position.set(x,y,z);
+  }
+  if(name) obj.name=name;
+  parent.add(obj);
+  return obj;
+}
 
 // ============================================================
-//  房间 + 柱子（同时登记为碰撞体）
+//  Village blockout v1: player village + training yard + monster pen
 // ============================================================
 const colliders=[]; // AABB: {minx,maxx,minz,maxz}
 function addCollider(x,z,w,d){ colliders.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2}); }
 
 const wallMat=new THREE.MeshStandardMaterial({color:0x6b5a4a,roughness:0.9});
 function wall(x,z,w,d,h=2.6){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m); addCollider(x,z,w,d);}
-const ROOM=18;
-wall(0,-ROOM,ROOM*2+2,1); wall(0,ROOM,ROOM*2+2,1); wall(-ROOM,0,1,ROOM*2+2); wall(ROOM,0,1,ROOM*2+2);
+const ROOM=46;
+const mapRoot=new THREE.Group(); scene.add(mapRoot);
 
 const propMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
-// [x, z, 边长, 高度]  —— 高度做成阶梯，方便测试跳台(跳跃最高点≈2.8)
-const pillarDefs=[[7,6,1.6,1.2],[-8,-5,1.8,1.8],[9,-8,1.5,2.4],[-10,9,2.0,3.4]];
 const platforms=[];   // 可站立顶面: {minx,maxx,minz,maxz,top}
 const hittables=[];   // 可被攻击的物体
+const terrainAreas=[];
+const VILLAGE_TOPS = { ground:0, church:0.22, elder:0.48 };
+const groundMats=new Map();
+function mat(color,roughness=0.9){
+  const key=`${color}_${roughness}`;
+  if(!groundMats.has(key)) groundMats.set(key,new THREE.MeshStandardMaterial({color,roughness}));
+  return groundMats.get(key);
+}
+function addGroundPatch(x,z,w,d,top=0,color=0x5a5241){
+  const h=0.14;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.94));
+  m.position.set(x,top-h/2,z); m.receiveShadow=true; mapRoot.add(m);
+  terrainAreas.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  if(top>0.03) platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  return m;
+}
+function terrainYAt(x,z){
+  let top=0;
+  for(const a of terrainAreas){
+    if(x>=a.minx && x<=a.maxx && z>=a.minz && z<=a.maxz) top=Math.max(top,a.top);
+  }
+  return top;
+}
+function addLowWall(x,z,w,d,h=1.25,color=0x6b5a4a,top=terrainYAt(x,z)){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.86));
+  m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
+  addCollider(x,z,w,d); return m;
+}
+function addStep(x,z,w,d,top,color=0x756354){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,top,d),mat(color,0.88));
+  m.position.set(x,top/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
+  platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  return m;
+}
+function localPoint(x,z,dx,dz,rot=0){
+  const s=Math.sin(rot), c=Math.cos(rot);
+  return {x:x+dx*c+dz*s,z:z-dx*s+dz*c};
+}
+function makeGableRoof(w,d,h,color){
+  const hw=w/2, hd=d/2;
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+    -hw,0,-hd,  hw,0,-hd,  0,h,-hd,
+    -hw,0, hd,  hw,0, hd,  0,h, hd
+  ]),3));
+  geo.setIndex([0,1,2, 3,5,4, 0,3,4, 0,4,1, 0,2,5, 0,5,3, 1,4,5, 1,5,2]);
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo,mat(color,0.82));
+}
+function addSign(text,x,z,rot=0,top=terrainYAt(x,z)){
+  const g=new THREE.Group(); g.position.set(x,top,z); g.rotation.y=rot; mapRoot.add(g);
+  const post=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.15,0.12),mat(0x5a3a22,0.85));
+  post.position.y=0.58; post.castShadow=true; g.add(post);
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=96;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#5b3820'; ctx.fillRect(0,0,256,96);
+  ctx.strokeStyle='#c7954e'; ctx.lineWidth=8; ctx.strokeRect(8,8,240,80);
+  ctx.fillStyle='#f8e3ac'; ctx.font='bold 36px Arial, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text,128,50);
+  const tex=new THREE.CanvasTexture(cv);
+  const board=new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.68),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
+  board.position.set(0,1.45,0.04); board.castShadow=true; g.add(board);
+  return g;
+}
+function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,roofColor=0x6d3a30,stone=false,tower=false,sign=''}){
+  const root=new THREE.Group(); root.position.set(x,top,z); root.rotation.y=rot; mapRoot.add(root);
+  const bodyH=stone?3.6:3.2;
+  const bodyMat=mat(stone?0xa99c89:wallColor,0.88);
+  const bodyMesh=new THREE.Mesh(new THREE.BoxGeometry(w,bodyH,d),bodyMat);
+  bodyMesh.position.y=bodyH/2; bodyMesh.castShadow=true; bodyMesh.receiveShadow=true; root.add(bodyMesh);
+  const roof=makeGableRoof(w+1.2,d+1.1,stone?1.5:1.25,roofColor);
+  roof.position.y=bodyH; roof.castShadow=true; roof.receiveShadow=true; root.add(roof);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.25,1.85,0.12),mat(stone?0x4b3628:0x5b3721,0.78));
+  door.position.set(0,0.92,d/2+0.07); door.castShadow=true; root.add(door);
+  const step=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.18,0.8),mat(0x80684f,0.88));
+  step.position.set(0,0.09,d/2+0.48); step.receiveShadow=true; root.add(step);
+  for(const sx of [-w*0.28,w*0.28]){
+    const win=new THREE.Mesh(new THREE.BoxGeometry(0.72,0.72,0.1),mat(0xf5cf74,0.55));
+    win.position.set(sx,2.05,d/2+0.08); win.castShadow=true; root.add(win);
+    const frame=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.86,0.08),mat(0x4b2d1b,0.78));
+    frame.position.set(sx,2.05,d/2+0.04); frame.castShadow=true; root.add(frame);
+  }
+  if(tower){
+    const tw=new THREE.Mesh(new THREE.BoxGeometry(2.4,5.2,2.4),mat(0xa89d8e,0.9));
+    tw.position.set(w*0.35,2.6,-d*0.18); tw.castShadow=true; tw.receiveShadow=true; root.add(tw);
+    const tr=makeGableRoof(3.0,3.0,1.7,0x5b3230); tr.position.set(w*0.35,5.2,-d*0.18); tr.rotation.y=Math.PI/2; tr.castShadow=true; root.add(tr);
+    const crossA=new THREE.Mesh(new THREE.BoxGeometry(0.18,1.25,0.18),mat(0xe6d8a6,0.65));
+    crossA.position.set(w*0.35,7.0,-d*0.18); root.add(crossA);
+    const crossB=new THREE.Mesh(new THREE.BoxGeometry(0.88,0.16,0.16),mat(0xe6d8a6,0.65));
+    crossB.position.set(w*0.35,7.18,-d*0.18); root.add(crossB);
+  }
+  addCollider(x,z,w+0.8,d+0.8);
+  if(sign){
+    const p=localPoint(x,z,0,d/2+1.25,rot);
+    addSign(sign,p.x,p.z,rot,top);
+  }
+  return root;
+}
+function addTree(x,z,scale=1,path='Tree_2_B_Color1.gltf'){
+  placeGroundModel(FOREST+path,x,z,{scale,rot:Math.random()*Math.PI*2,groundCenter:true});
+}
+function placeGroundModel(path,x,z,opts={}){
+  return placeModel(path,x,z,{...opts,y:(opts.y??0)+terrainYAt(x,z),parent:opts.parent||mapRoot});
+}
+function addPrimitiveRock(x,z,s=1){
+  const m=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),mat(0x6b6b62,0.92));
+  m.position.set(x,terrainYAt(x,z)+s*0.5,z); m.scale.y=0.55; m.rotation.set(Math.random(),Math.random()*Math.PI,Math.random());
+  m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
+}
+
+// Ground plan: entrance, main road, square, elder terrace, church terrace, and two functional yards.
+addGroundPatch(0,4,58,52,0,0x4f5941);
+addGroundPatch(0,13,7,34,0.01,0x6d6049);
+addGroundPatch(0,1,20,15,0.02,0x766a58);
+addGroundPatch(-21,15,15,13,0.01,0x5e5245);
+addGroundPatch(22,15,15,13,0.01,0x564946);
+addGroundPatch(0,-23,23,12,VILLAGE_TOPS.elder,0x675c4d);
+addGroundPatch(19,-14,16,15,VILLAGE_TOPS.church,0x625f56);
+addStep(0,-16.5,7,1.2,0.18);
+addStep(0,-17.7,6,1.2,0.34);
+addStep(19,-5.8,6,1.2,0.12);
+addStep(19,-7.0,5,1.2,VILLAGE_TOPS.church);
+
+// Low walls and yard fences, with gaps left for entrances.
+for(const [x,z,w,d] of [
+  [-28,15,1,12],[-14,15,1,12],[-21,21.5,14,1],[-25.5,8.5,5,1],[-16.5,8.5,5,1],
+  [15,15,1,12],[29,15,1,12],[22,21.5,14,1],[18,8.5,5,1],[26,8.5,5,1],
+  [-10,-29,5,1],[10,-29,5,1],[-12,-23,1,11],[12,-23,1,11]
+]) addLowWall(x,z,w,d,1.25,0x5f4f3d);
+
+// Buildings: elder home, villagers, inn, smith, shop, church.
+addBuilding({name:'elder',x:0,z:-24,w:10,d:7,top:VILLAGE_TOPS.elder,wallColor:0xd2bc8f,roofColor:0x6b302c,sign:'ELDER'});
+addBuilding({name:'inn',x:-14,z:0,w:9,d:8,wallColor:0xc79f73,roofColor:0x7a3b2d,sign:'INN'});
+addBuilding({name:'smith',x:-16,z:11,w:8,d:7,wallColor:0xb69a74,roofColor:0x4f3a32,sign:'SMITH'});
+addBuilding({name:'shop',x:14,z:5,w:8,d:7,wallColor:0xd2b783,roofColor:0x5d693f,sign:'SHOP'});
+addBuilding({name:'chapel',x:19,z:-15,w:8,d:10,top:VILLAGE_TOPS.church,wallColor:0xb8ae9c,roofColor:0x5d3433,stone:true,tower:true,sign:'CHAPEL'});
+addBuilding({name:'home-a',x:-9,z:-11,w:6,d:6,wallColor:0xc8b07f,roofColor:0x704436,sign:'HOME'});
+addBuilding({name:'home-b',x:8,z:-8,w:6,d:6,wallColor:0xc5ab83,roofColor:0x684334,sign:'HOME'});
+addBuilding({name:'home-c',x:-6,z:18,w:6,d:6,wallColor:0xd1b88b,roofColor:0x75412f,sign:'HOME'});
+addBuilding({name:'home-d',x:7,z:19,w:6,d:6,wallColor:0xbfa57d,roofColor:0x6c4738,sign:'HOME'});
+
+// Gameplay props and set dressing. Primitive shapes keep the layout readable if a model fails.
+const DUN='assets/vendor/kaykit_dungeon/';
+const MV='assets/vendor/medieval_village/';
+const PROP='assets/vendor/fantasy_props/';
+const FOREST='assets/vendor/kaykit_forest/';
+const SKEL='assets/vendor/kaykit_skeletons/';
+for(const z of [23,18,13,8,3,-2,-7,-12,-17]) placeGroundModel(MV+'Floor_Brick.gltf',0,z,{scale:1.5,rot:Math.PI/2,groundCenter:true});
+for(const [x,z,s,p] of [
+  [-31,-3,1.35,'Tree_3_A_Color1.gltf'],[-28,25,1.25,'Tree_2_B_Color1.gltf'],[-28,-24,1.5,'Tree_4_A_Color1.gltf'],
+  [30,-28,1.45,'Tree_3_A_Color1.gltf'],[32,5,1.25,'Tree_2_B_Color1.gltf'],[29,27,1.15,'Tree_1_A_Color1.gltf'],
+  [-2,-33,1.2,'Tree_2_B_Color1.gltf'],[25,-4,1.0,'Tree_1_A_Color1.gltf'],[-25,2,1.0,'Tree_1_A_Color1.gltf']
+]) addTree(x,z,s,p);
+for(const [x,z,s] of [[-30,10,0.8],[30,11,0.7],[-22,-6,0.6],[24,-25,0.75],[2,27,0.6]]) addPrimitiveRock(x,z,s);
+for(const [x,z,p] of [[-18,23,'Bush_3_A_Color1.gltf'],[-25,22,'Bush_4_A_Color1.gltf'],[19,24,'Bush_2_A_Color1.gltf'],[28,22,'Bush_4_A_Color1.gltf'],[-2,-16,'Bush_1_A_Color1.gltf'],[24,-7,'Bush_3_A_Color1.gltf']]){
+  placeGroundModel(FOREST+p,x,z,{scale:1.2,rot:Math.random()*Math.PI*2,groundCenter:true});
+}
+for(const [x,z,r] of [[-18,14,0],[-14,13,0],[-15,8,0.3]]) placeGroundModel(PROP+'Workbench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
+placeGroundModel(PROP+'Anvil.gltf',-20,12,{scale:1.0,rot:-0.4,groundCenter:true});
+placeGroundModel(PROP+'WeaponStand.gltf',-12.3,11.7,{scale:1.0,rot:Math.PI/2,groundCenter:true});
+placeGroundModel(PROP+'Stall_Empty.gltf',12.5,10,{scale:1.05,rot:Math.PI,groundCenter:true});
+placeGroundModel(PROP+'Stall_Cart_Empty.gltf',17,10,{scale:1.05,rot:-Math.PI/2,groundCenter:true});
+placeGroundModel(PROP+'Shelf_Small_Bottles.gltf',16,3,{scale:1.0,rot:-Math.PI/2,groundCenter:true});
+for(const [x,z,p] of [[11,12,'FarmCrate_Apple.gltf'],[14,12,'FarmCrate_Carrot.gltf'],[18,7,'Crate_Wooden.gltf'],[11,7,'Barrel_Apples.gltf']]) placeGroundModel(PROP+p,x,z,{scale:1.0,rot:Math.random(),groundCenter:true});
+placeGroundModel(PROP+'Table_Large.gltf',-14,5,{scale:1.0,rot:0.2,groundCenter:true});
+for(const [x,z,r] of [[-17,4.5,Math.PI/2],[-11,4.5,-Math.PI/2],[-14,7.5,0]]) placeGroundModel(PROP+'Bench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
+for(const [x,z] of [[17,-11],[21,-11],[17,-18],[21,-18]]) placeGroundModel(PROP+'CandleStick_Stand.gltf',x,z,{scale:0.9,groundCenter:true});
+placeGroundModel(PROP+'Bookcase_2.gltf',15.5,-16,{scale:1.0,rot:Math.PI/2,groundCenter:true});
+placeGroundModel(PROP+'Chest_Wood.gltf',-2,-20,{scale:0.9,rot:0.4,groundCenter:true});
+for(const [x,z] of [[-3,1],[3,1],[-3,23],[3,23],[-24,9],[15,9]]) placeGroundModel(DUN+'torch_lit.gltf',x,z,{scale:1.05,groundCenter:true});
+
+const pillarDefs=[[-4,1.2,1.15,0.85],[4,1.2,1.15,0.85],[-24,17,1.2,1.0],[25,17,1.2,1.0]];
 pillarDefs.forEach(([x,z,s,h])=>{
-  const mat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
-  const m=new THREE.Mesh(new THREE.BoxGeometry(s,h,s),mat);
-  m.position.set(x,h/2,z); m.castShadow=true; m.receiveShadow=true; scene.add(m);
-  // 顶盖（深色石板，凸出一点，像可落脚的平台）
+  const top=terrainYAt(x,z);
+  const pMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
+  const m=new THREE.Mesh(new THREE.BoxGeometry(s,h,s),pMat);
+  m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
   const capH=0.18, capW=s+0.18;
   const cap=new THREE.Mesh(new THREE.BoxGeometry(capW,capH,capW), new THREE.MeshStandardMaterial({color:0x8a7358,roughness:0.8}));
-  cap.position.set(x,h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; scene.add(cap);
-  const top=h+capH;
+  cap.position.set(x,top+h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; mapRoot.add(cap);
+  const platformTop=top+h+capH;
   addCollider(x,z,s,s);
-  platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top});
-  hittables.push({mesh:m,mat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top,shakeT:0,flashT:0,baseX:x,baseZ:z});
+  platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top:platformTop});
+  hittables.push({mesh:m,mat:pMat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top:platformTop,shakeT:0,flashT:0,baseX:x,baseZ:z});
 });
 
 // ============================================================
@@ -181,8 +416,37 @@ function makeDummy(dx,dz,face){
   dummies.push(dummy);
 }
 const dummies=[];
-makeDummy(0,-7,0);      // 正前方放一个
-makeDummy(5,2,-0.8);    // 侧前方再放一个
+makeDummy(-21.8,15.0,0.15);      // training yard main dummy
+makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
+
+const monsters=[];
+function makeMonsterTarget(x,z,name='呵呵'){
+  const root=new THREE.Group(); root.position.set(x,0,z); scene.add(root);
+  const fallback=new THREE.Group(); root.add(fallback);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.55,1.3,5,10),new THREE.MeshStandardMaterial({color:0x74616c,roughness:0.82}));
+  body.position.y=1.05; body.castShadow=true; body.receiveShadow=true; fallback.add(body);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.55,0.7),new THREE.MeshStandardMaterial({color:0xd8c6a6,roughness:0.8}));
+  head.position.y=2.0; head.castShadow=true; fallback.add(head);
+  const label=document.createElement('canvas');
+  label.width=128; label.height=48;
+  const lctx=label.getContext('2d');
+  lctx.fillStyle='rgba(20,12,12,0.82)'; lctx.fillRect(0,0,128,48);
+  lctx.strokeStyle='#ffcf5a'; lctx.lineWidth=4; lctx.strokeRect(3,3,122,42);
+  lctx.fillStyle='#ffffff'; lctx.font='bold 28px "Microsoft YaHei", sans-serif'; lctx.textAlign='center'; lctx.textBaseline='middle'; lctx.fillText(name,64,25);
+  const tex=new THREE.CanvasTexture(label);
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+  const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.0,0); sprite.scale.set(2.2,0.82,1); root.add(sprite);
+  const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
+  monsters.push(mon);
+  addCollider(x,z,0.8,0.8);
+  placeModel(SKEL+'Skeleton_Minion.glb',0,0,{scale:1.6,rot:Math.PI,y:0.02,parent:root,name:'skeleton-minion',groundCenter:true}).then(obj=>{
+    if(!obj) return;
+    mon.model=obj;
+    obj.traverse(o=>{ if(o.isMesh && o.material) mon.mats.push(...(Array.isArray(o.material)?o.material:[o.material])); });
+  });
+  return mon;
+}
+makeMonsterTarget(22,15,'呵呵');
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
@@ -1310,6 +1574,14 @@ function tryHitObjects(hitR){
       onHitTarget(d.x,1.6,d.z);
     }
   }
+  for(const m of monsters){
+    const dx=hx-m.x, dz=hz-m.z;
+    if(dx*dx+dz*dz < (m.r+hitR)*(m.r+hitR)){
+      m.flashT=0.22; m.tiltVel+=6.5;
+      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
+      onHitTarget(m.x,1.6,m.z);
+    }
+  }
 }
 // 剑气命中：跟随弹道移动判定，宽度1格，每个目标对同一道剑气只命中一次
 function beamHitByBeam(b){
@@ -1321,6 +1593,14 @@ function beamHitByBeam(b){
     const dx=d.x-bx, dz=d.z-bz;
     if(dx*dx+dz*dz < (halfW+d.r)*(halfW+d.r)){
       b.hitSet.add(d); d.flashT=0.25; d.tiltVel+=9;
+      hitstop=Math.max(hitstop,0.03); shake=Math.max(shake,0.12);
+    }
+  }
+  for(const m of monsters){
+    if(b.hitSet.has(m)) continue;
+    const dx=m.x-bx, dz=m.z-bz;
+    if(dx*dx+dz*dz < (halfW+m.r)*(halfW+m.r)){
+      b.hitSet.add(m); m.flashT=0.25; m.tiltVel+=8;
       hitstop=Math.max(hitstop,0.03); shake=Math.max(shake,0.12);
     }
   }
@@ -1339,6 +1619,13 @@ function beamHitDummies(bx,bz){
     if(dx*dx+dz*dz < (d.r+0.4)*(d.r+0.4)){
       if(d._beamCd>0) continue;
       d._beamCd=0.2; d.flashT=0.25; d.tiltVel+=9;
+    }
+  }
+  for(const m of monsters){
+    const dx=bx-m.x, dz=bz-m.z;
+    if(dx*dx+dz*dz < (m.r+0.4)*(m.r+0.4)){
+      if(m._beamCd>0) continue;
+      m._beamCd=0.2; m.flashT=0.25; m.tiltVel+=8;
     }
   }
 }
@@ -1362,6 +1649,14 @@ function tryThrustHit(){
       onHitTarget(d.x,1.6,d.z);
     }
   }
+  for(const m of monsters){
+    if(inThrustBox(m.x,m.z,m.r)){
+      if(m._thrustCd>0) continue;
+      m._thrustCd=0.25; m.flashT=0.22; m.tiltVel+=8;
+      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
+      onHitTarget(m.x,1.6,m.z);
+    }
+  }
 }
 // 大风车判定：跟随剑旋转角度的扫掠命中
 const SPIN_RADIUS=2.8;
@@ -1377,6 +1672,13 @@ function tryRingHit(){
       hitstop=Math.max(hitstop,0.05); shake=Math.max(shake,0.18);
     }
   }
+  for(const m of monsters){
+    const dx=m.x-P.x, dz=m.z-P.z;
+    if(Math.hypot(dx,dz) < SPIN_RADIUS+m.r){
+      m.flashT=0.25; m.tiltVel+=8;
+      hitstop=Math.max(hitstop,0.05); shake=Math.max(shake,0.18);
+    }
+  }
 }
 // 大风车扫掠判定：只命中"剑当前扫到的角度扇区"内的目标，每个目标一次
 function trySweepHit(){
@@ -1384,7 +1686,7 @@ function trySweepHit(){
   const swordAng = P.facing + Math.PI/2 - P.spin*Math.PI*2;   // 当前剑角度
   const ARC=0.6;   // 扇区半角(弧度)~34°
   if(!P._spinHit) P._spinHit=new Set();
-  const checkList=[...hittables,...dummies];
+  const checkList=[...hittables,...dummies,...monsters];
   for(const o of checkList){
     if(P._spinHit.has(o)) continue;
     const dx=o.x-P.x, dz=o.z-P.z;
@@ -1694,6 +1996,20 @@ function updateFx(dt){
       for(const m of d.mats){ m.emissive.setHex(0xff3020); m.emissiveIntensity=k*1.2; }
     } else { for(const m of d.mats) m.emissiveIntensity=0; }
   }
+  // 小怪：占位受击反馈，先做红闪+轻微后仰，后续再接AI/血条/死亡
+  for(const m of monsters){
+    m.tiltVel += (-30*m.tilt - 5*m.tiltVel)*dt;
+    m.tilt += m.tiltVel*dt;
+    m.root.rotation.x = m.tilt*0.08;
+    if(m._beamCd>0) m._beamCd-=dt;
+    if(m._thrustCd>0) m._thrustCd-=dt;
+    if(m.flashT>0){
+      m.flashT-=dt; const k=Math.max(0,m.flashT/0.25);
+      for(const mat of m.mats){ if(mat?.emissive){ mat.emissive.setHex(0xff3020); mat.emissiveIntensity=k*1.25; } }
+    } else {
+      for(const mat of m.mats){ if(mat?.emissive) mat.emissiveIntensity=0; }
+    }
+  }
 }
 // 生成一个残影快照
 function spawnGhost(){
@@ -1889,3 +2205,4 @@ loop();
 </script>
 </body>
 </html>
+
