@@ -168,11 +168,16 @@ const cameraRig={
   targetYaw:0,
   targetPitch:THREE.MathUtils.degToRad(43),
   distance:43,
+  outdoorDistance:43,
+  indoorDistance:11,
   currentDistance:43,
   minDistance:12,
+  indoorMinDistance:5,
   maxDistance:52,
   minPitch:THREE.MathUtils.degToRad(22),
   maxPitch:THREE.MathUtils.degToRad(68),
+  indoorMinPitch:THREE.MathUtils.degToRad(16),
+  indoorMaxPitch:THREE.MathUtils.degToRad(48),
   yawSpeed:1.55,
   pitchSpeed:1.05,
   stickX:0,
@@ -260,6 +265,13 @@ const ROOM=46;
 const mapRoot=new THREE.Group(); scene.add(mapRoot);
 const mapFeatures=[];
 function registerMapFeature(feature){ mapFeatures.push(feature); return feature; }
+const interiors=[];
+function pointInRotRect(px,pz,area,pad=0){
+  const dx=px-area.x, dz=pz-area.z;
+  const s=Math.sin(area.rot||0), c=Math.cos(area.rot||0);
+  const lx=dx*c-dz*s, lz=dx*s+dz*c;
+  return Math.abs(lx)<=area.w/2+pad && Math.abs(lz)<=area.d/2+pad;
+}
 
 const propMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
 const platforms=[];   // 可站立顶面: {minx,maxx,minz,maxz,top}
@@ -390,6 +402,7 @@ function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   const roof=makeGableRoof(w+1.1,d+1.0,1.55,0x6c4738);
   roof.position.y=wallH; roof.castShadow=true; roof.receiveShadow=true;
   root.add(roof);
+  interiors.push({name:'player-home',x,z,w:w-wallT*2,d:d-wallT*2,rot,roof,inside:false});
   const porch=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.2,1.4),mat(0x80684f,0.88));
   porch.position.set(0,0.1,d/2+0.72); porch.castShadow=true; porch.receiveShadow=true; root.add(porch);
   const doorFrameMat=mat(0x4d2f1d,0.78);
@@ -2470,6 +2483,17 @@ function poseCharacter(dt){
 
 // 相机/HUD/渲染
 const _camTarget=new THREE.Vector3(), _camIdeal=new THREE.Vector3(), _camDir=new THREE.Vector3(), _camPos=new THREE.Vector3();
+let currentInterior=null;
+function updateInteriorState(){
+  let active=null;
+  for(const area of interiors){
+    const inside=pointInRotRect(P.x,P.z,area,-0.35);
+    area.inside=inside;
+    if(area.roof) area.roof.visible=!inside;
+    if(inside) active=area;
+  }
+  currentInterior=active;
+}
 function isCameraBlockedAt(pos){
   const pad=0.18;
   for(const c of colliders){
@@ -2479,7 +2503,7 @@ function isCameraBlockedAt(pos){
   }
   return false;
 }
-function cameraClearDistance(target, idealDistance){
+function cameraClearDistance(target, idealDistance, minDistance=cameraRig.minDistance){
   _camDir.copy(cameraOffset(1)).normalize();
   const start=2.2, steps=28;
   let clear=idealDistance;
@@ -2487,22 +2511,28 @@ function cameraClearDistance(target, idealDistance){
     const d=start+(idealDistance-start)*(i/steps);
     _camPos.copy(target).addScaledVector(_camDir,d);
     if(_camPos.y<0.55) _camPos.y=0.55;
-    if(isCameraBlockedAt(_camPos)){ clear=Math.max(cameraRig.minDistance,d-1.6); break; }
+    if(isCameraBlockedAt(_camPos)){ clear=Math.max(minDistance,d-1.6); break; }
   }
   return clear;
 }
 function updateCamera(dt){
+  updateInteriorState();
+  const indoor=!!currentInterior;
+  cameraRig.distance=THREE.MathUtils.lerp(cameraRig.distance,indoor?cameraRig.indoorDistance:cameraRig.outdoorDistance,Math.min(1,dt*4));
+  const minPitch=indoor?cameraRig.indoorMinPitch:cameraRig.minPitch;
+  const maxPitch=indoor?cameraRig.indoorMaxPitch:cameraRig.maxPitch;
   cameraRig.targetYaw += cameraRig.stickX*cameraRig.yawSpeed*dt;
   cameraRig.targetPitch = THREE.MathUtils.clamp(
     cameraRig.targetPitch + cameraRig.stickY*cameraRig.pitchSpeed*dt,
-    cameraRig.minPitch,
-    cameraRig.maxPitch
+    minPitch,
+    maxPitch
   );
+  cameraRig.targetPitch=THREE.MathUtils.clamp(cameraRig.targetPitch,minPitch,maxPitch);
   cameraRig.yaw += angleDelta(cameraRig.yaw,cameraRig.targetYaw)*Math.min(1,dt*12);
   cameraRig.pitch = THREE.MathUtils.lerp(cameraRig.pitch,cameraRig.targetPitch,Math.min(1,dt*12));
   const tgt=new THREE.Vector3(P.x,1.7+P.y*0.6,P.z);   // 跟随高度(站上柱子时抬一点)
   _camTarget.copy(tgt);
-  const clearDist=cameraClearDistance(_camTarget,cameraRig.distance);
+  const clearDist=cameraClearDistance(_camTarget,cameraRig.distance,indoor?cameraRig.indoorMinDistance:cameraRig.minDistance);
   cameraRig.currentDistance=THREE.MathUtils.lerp(cameraRig.currentDistance,clearDist,Math.min(1,dt*14));
   _camIdeal.copy(_camTarget).add(cameraOffset(cameraRig.currentDistance));
   _camIdeal.y=Math.max(_camIdeal.y,0.65);
