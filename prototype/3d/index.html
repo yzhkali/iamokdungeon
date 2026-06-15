@@ -54,8 +54,8 @@
   <div id="stamWrap"><div id="stamBar"></div></div>
 </div>
 <div id="hint">
-  WASD 移动 ・ 左键 轻击 ・ <b>按住右键蓄力</b>重击 ・ 空格 跳跃 ・ Shift 闪避翻滚 ・ <b>T 推眼镜</b><br>
-  手柄：左摇杆 移动 ・ X 轻击 ・ 按住Y蓄力重击 ・ A 跳 ・ B 闪避
+  WASD 移动 ・ Q/E 旋转镜头 ・ R/F 俯仰 ・ 左键 轻击 ・ <b>按住右键蓄力</b>重击 ・ 空格 跳跃 ・ Shift 闪避翻滚 ・ <b>T 推眼镜</b><br>
+  手柄：左摇杆 移动 ・ 右摇杆 镜头 ・ X 轻击 ・ 按住Y蓄力重击 ・ A 跳 ・ B 闪避
 </div>
 
 <script type="module">
@@ -1367,6 +1367,13 @@ function stickDeadzone(v,dz=0.25){
   const n=(a-dz)/(1-dz);
   return Math.sign(v)*n*n;
 }
+const worldMove={x:0,z:0};
+function toCameraRelativeMove(mx,mz,out=worldMove){
+  const s=Math.sin(cameraRig.yaw), c=Math.cos(cameraRig.yaw);
+  out.x=mx*c + mz*s;
+  out.z=-mx*s + mz*c;
+  return out;
+}
 function pollInput(){
   let mx=0,mz=0,aAtk=false,aHeavy=false,aJump=false,aDodge=false,aTaunt=false;
   cameraRig.stickX=0; cameraRig.stickY=0;
@@ -1738,10 +1745,12 @@ function trySweepHit(){
 
 const clock=new THREE.Clock();
 function update(dt){
-  pollInput();autoPad();
+  autoPad();pollInput();
   if(hitstop>0){hitstop-=dt;updateFx(dt);return;}
   if(P.iframe>0)P.iframe-=dt;
-  const inX=Actions.moveX,inZ=Actions.moveZ,inLen=Math.hypot(inX,inZ);
+  const rawX=Actions.moveX,rawZ=Actions.moveZ,inLen=Math.hypot(rawX,rawZ);
+  const camMove=toCameraRelativeMove(rawX,rawZ);
+  const inX=camMove.x,inZ=camMove.z;
 
   // 闪避（破僵直/空中可用；空中保留高度自然下落）
   if(Actions.dodge && P.state!=='dodge' && P.stamina>=DODGE_COST){
