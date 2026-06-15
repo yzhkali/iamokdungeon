@@ -119,8 +119,31 @@ scene.background=new THREE.Color(0x1c1714);
 scene.fog=new THREE.Fog(0x1c1714,42,130);
 
 const camera=new THREE.PerspectiveCamera(45,1,0.1,200);
-const CAM_OFFSET=new THREE.Vector3(0,30,32);
-camera.position.copy(CAM_OFFSET); camera.lookAt(0,1.7,0);
+const cameraRig={
+  yaw:0,
+  pitch:THREE.MathUtils.degToRad(43),
+  targetYaw:0,
+  targetPitch:THREE.MathUtils.degToRad(43),
+  distance:43,
+  currentDistance:43,
+  minDistance:12,
+  maxDistance:52,
+  minPitch:THREE.MathUtils.degToRad(22),
+  maxPitch:THREE.MathUtils.degToRad(68),
+  yawSpeed:2.65,
+  pitchSpeed:1.65,
+  stickX:0,
+  stickY:0
+};
+function cameraOffset(distance=cameraRig.currentDistance){
+  const cp=Math.cos(cameraRig.pitch);
+  return new THREE.Vector3(
+    Math.sin(cameraRig.yaw)*cp*distance,
+    Math.sin(cameraRig.pitch)*distance,
+    Math.cos(cameraRig.yaw)*cp*distance
+  );
+}
+camera.position.copy(cameraOffset(cameraRig.distance)); camera.lookAt(0,1.7,0);
 
 scene.add(new THREE.HemisphereLight(0xb9c6d6,0x4a3f36,0.75));
 const sun=new THREE.DirectionalLight(0xfff2d8,1.15);
@@ -185,11 +208,11 @@ async function placeModel(path,x,z,{scale=1,rot=0,y=0,parent=scene,name='',groun
 // ============================================================
 //  Village blockout v1: player village + training yard + monster pen
 // ============================================================
-const colliders=[]; // AABB: {minx,maxx,minz,maxz}
-function addCollider(x,z,w,d){ colliders.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2}); }
+const colliders=[]; // AABB: {minx,maxx,minz,maxz,bottom,top}
+function addCollider(x,z,w,d,bottom=0,top=3.2){ colliders.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,bottom,top}); }
 
 const wallMat=new THREE.MeshStandardMaterial({color:0x6b5a4a,roughness:0.9});
-function wall(x,z,w,d,h=2.6){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m); addCollider(x,z,w,d);}
+function wall(x,z,w,d,h=2.6){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m); addCollider(x,z,w,d,0,h);}
 const ROOM=46;
 const mapRoot=new THREE.Group(); scene.add(mapRoot);
 
@@ -222,7 +245,7 @@ function terrainYAt(x,z){
 function addLowWall(x,z,w,d,h=1.25,color=0x6b5a4a,top=terrainYAt(x,z)){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.86));
   m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
-  addCollider(x,z,w,d); return m;
+  addCollider(x,z,w,d,top,top+h); return m;
 }
 function addStep(x,z,w,d,top,color=0x756354){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,top,d),mat(color,0.88));
@@ -287,7 +310,7 @@ function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,
     const crossB=new THREE.Mesh(new THREE.BoxGeometry(0.88,0.16,0.16),mat(0xe6d8a6,0.65));
     crossB.position.set(w*0.35,7.18,-d*0.18); root.add(crossB);
   }
-  addCollider(x,z,w+0.8,d+0.8);
+  addCollider(x,z,w+0.8,d+0.8,top,top+bodyH+(stone?1.9:1.55));
   if(sign){
     const p=localPoint(x,z,0,d/2+1.25,rot);
     addSign(sign,p.x,p.z,rot,top);
@@ -377,7 +400,7 @@ pillarDefs.forEach(([x,z,s,h])=>{
   const cap=new THREE.Mesh(new THREE.BoxGeometry(capW,capH,capW), new THREE.MeshStandardMaterial({color:0x8a7358,roughness:0.8}));
   cap.position.set(x,top+h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; mapRoot.add(cap);
   const platformTop=top+h+capH;
-  addCollider(x,z,s,s);
+  addCollider(x,z,s,s,top,platformTop);
   platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top:platformTop});
   hittables.push({mesh:m,mat:pMat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top:platformTop,shakeT:0,flashT:0,baseX:x,baseZ:z});
 });
@@ -410,7 +433,7 @@ function makeDummy(dx,dz,face){
   // 一条朝前的中臂
   const armMid=woodBox(0.2,0.2,0.9,WOOD); armMid.position.set(0,1.15,0.45); pivot.add(reg(armMid));
 
-  addCollider(dx,dz,0.6,0.6);   // 立柱碰撞
+  addCollider(dx,dz,0.6,0.6,terrainYAt(dx,dz),terrainYAt(dx,dz)+3.0);   // 立柱碰撞
   const dummy={root,pivot,mats, x:dx,z:dz, r:1.2, face,
     flashT:0, tilt:0, tiltVel:0};   // tilt: 后仰角(物理回弹)
   dummies.push(dummy);
@@ -438,7 +461,7 @@ function makeMonsterTarget(x,z,name='呵呵'){
   const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.0,0); sprite.scale.set(2.2,0.82,1); root.add(sprite);
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
-  addCollider(x,z,0.8,0.8);
+  addCollider(x,z,0.8,0.8,terrainYAt(x,z),terrainYAt(x,z)+2.4);
   placeModel(SKEL+'Skeleton_Minion.glb',0,0,{scale:1.6,rot:Math.PI,y:0.02,parent:root,name:'skeleton-minion',groundCenter:true}).then(obj=>{
     if(!obj) return;
     mon.model=obj;
@@ -1338,14 +1361,25 @@ const btnKb=document.getElementById('btnKeyboard'),btnGp=document.getElementById
 function setMode(m){inputMode=m;btnKb.classList.toggle('active',m==='keyboard');btnGp.classList.toggle('active',m==='gamepad');}
 btnKb.onclick=()=>setMode('keyboard'); btnGp.onclick=()=>setMode('gamepad');
 
+function stickDeadzone(v,dz=0.25){
+  const a=Math.abs(v);
+  if(a<dz) return 0;
+  const n=(a-dz)/(1-dz);
+  return Math.sign(v)*n*n;
+}
 function pollInput(){
   let mx=0,mz=0,aAtk=false,aHeavy=false,aJump=false,aDodge=false,aTaunt=false;
+  cameraRig.stickX=0; cameraRig.stickY=0;
   if(inputMode==='keyboard'){
     if(keys['KeyA'])mx-=1;if(keys['KeyD'])mx+=1;if(keys['KeyW'])mz-=1;if(keys['KeyS'])mz+=1;
     aAtk=mouse.left;aHeavy=mouse.right;aJump=!!keys['Space'];aDodge=!!(keys['ShiftLeft']||keys['ShiftRight']);aTaunt=!!keys['KeyT'];
+    if(keys['KeyQ'])cameraRig.stickX-=0.75;if(keys['KeyE'])cameraRig.stickX+=0.75;
+    if(keys['KeyR'])cameraRig.stickY-=0.75;if(keys['KeyF'])cameraRig.stickY+=0.75;
   } else {
     const gp=gpIndex!==null?navigator.getGamepads()[gpIndex]:null;
-    if(gp){const dz=0.25;let lx=gp.axes[0]||0,ly=gp.axes[1]||0;if(Math.abs(lx)<dz)lx=0;if(Math.abs(ly)<dz)ly=0;mx=lx;mz=ly;
+    if(gp){let lx=stickDeadzone(gp.axes[0]||0),ly=stickDeadzone(gp.axes[1]||0);mx=lx;mz=ly;
+      cameraRig.stickX=stickDeadzone(gp.axes[2]||0,0.18);
+      cameraRig.stickY=stickDeadzone(gp.axes[3]||0,0.18);
       if(gp.buttons[14]?.pressed)mx-=1;if(gp.buttons[15]?.pressed)mx+=1;if(gp.buttons[12]?.pressed)mz-=1;if(gp.buttons[13]?.pressed)mz+=1;
       aJump=gp.buttons[0]?.pressed;aDodge=gp.buttons[1]?.pressed;aAtk=gp.buttons[2]?.pressed;aHeavy=gp.buttons[3]?.pressed;aTaunt=gp.buttons[5]?.pressed;}
   }
@@ -1355,7 +1389,7 @@ function pollInput(){
   Actions.heavyHeld=aHeavy;Actions.heavyReleased=(!aHeavy)&&prev.heavy;
   prev.attack=aAtk;prev.jump=aJump;prev.dodge=aDodge;prev.heavy=aHeavy;prev.taunt=aTaunt;
 }
-function autoPad(){if(gpIndex===null)return;const gp=navigator.getGamepads()[gpIndex];if(!gp)return;if((gp.buttons.some(b=>b.pressed)||gp.axes.some(a=>Math.abs(a)>0.5))&&inputMode!=='gamepad')setMode('gamepad');}
+function autoPad(){if(gpIndex===null)return;const gp=navigator.getGamepads()[gpIndex];if(!gp)return;if((gp.buttons.some(b=>b.pressed)||gp.axes.some(a=>Math.abs(a)>0.35))&&inputMode!=='gamepad')setMode('gamepad');}
 
 // ============================================================
 //  玩家状态
@@ -2177,9 +2211,44 @@ function poseCharacter(dt){
 }
 
 // 相机/HUD/渲染
-function updateCamera(){
+const _camTarget=new THREE.Vector3(), _camIdeal=new THREE.Vector3(), _camDir=new THREE.Vector3(), _camPos=new THREE.Vector3();
+function isCameraBlockedAt(pos){
+  const pad=0.18;
+  for(const c of colliders){
+    const top=c.top??4.2, bottom=c.bottom??0;
+    if(pos.y<bottom || pos.y>top) continue;
+    if(pos.x>=c.minx-pad && pos.x<=c.maxx+pad && pos.z>=c.minz-pad && pos.z<=c.maxz+pad) return true;
+  }
+  return false;
+}
+function cameraClearDistance(target, idealDistance){
+  _camDir.copy(cameraOffset(1)).normalize();
+  const start=2.2, steps=28;
+  let clear=idealDistance;
+  for(let i=0;i<=steps;i++){
+    const d=start+(idealDistance-start)*(i/steps);
+    _camPos.copy(target).addScaledVector(_camDir,d);
+    if(_camPos.y<0.55) _camPos.y=0.55;
+    if(isCameraBlockedAt(_camPos)){ clear=Math.max(cameraRig.minDistance,d-1.6); break; }
+  }
+  return clear;
+}
+function updateCamera(dt){
+  cameraRig.targetYaw += cameraRig.stickX*cameraRig.yawSpeed*dt;
+  cameraRig.targetPitch = THREE.MathUtils.clamp(
+    cameraRig.targetPitch + cameraRig.stickY*cameraRig.pitchSpeed*dt,
+    cameraRig.minPitch,
+    cameraRig.maxPitch
+  );
+  cameraRig.yaw += angleDelta(cameraRig.yaw,cameraRig.targetYaw)*Math.min(1,dt*12);
+  cameraRig.pitch = THREE.MathUtils.lerp(cameraRig.pitch,cameraRig.targetPitch,Math.min(1,dt*12));
   const tgt=new THREE.Vector3(P.x,1.7+P.y*0.6,P.z);   // 跟随高度(站上柱子时抬一点)
-  camera.position.lerp(tgt.clone().add(CAM_OFFSET),0.12);
+  _camTarget.copy(tgt);
+  const clearDist=cameraClearDistance(_camTarget,cameraRig.distance);
+  cameraRig.currentDistance=THREE.MathUtils.lerp(cameraRig.currentDistance,clearDist,Math.min(1,dt*14));
+  _camIdeal.copy(_camTarget).add(cameraOffset(cameraRig.currentDistance));
+  _camIdeal.y=Math.max(_camIdeal.y,0.65);
+  camera.position.lerp(_camIdeal,Math.min(1,dt*12));
   if(shake>0){camera.position.x+=(Math.random()-0.5)*shake;camera.position.y+=(Math.random()-0.5)*shake;}
   camera.lookAt(tgt);
 }
@@ -2199,7 +2268,7 @@ function updateHUD(){
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();padStatus();
 document.getElementById('loading').style.display='none';
-function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateCamera();updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
+function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();
 } // end main(THREE)
 </script>
