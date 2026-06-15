@@ -464,6 +464,14 @@ makeDummy(-21.8,15.0,0.15);      // training yard main dummy
 makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
 
 const monsters=[];
+function collectMonsterMaterials(root, out){
+  root.traverse(o=>{
+    if(o.isMesh && o.material){
+      const mats=Array.isArray(o.material)?o.material:[o.material];
+      for(const mat of mats) if(mat && !out.includes(mat)) out.push(mat);
+    }
+  });
+}
 function makeMonsterTarget(x,z,name='打我'){
   const root=new THREE.Group(); root.position.set(x,0,z); scene.add(root);
   registerMapFeature({type:'monster',name,x,z,w:1.6,d:1.6,rot:0});
@@ -483,6 +491,18 @@ function makeMonsterTarget(x,z,name='打我'){
   const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.0,0); sprite.scale.set(2.2,0.82,1); root.add(sprite);
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
+  loadModel(SKEL+'Skeleton_Minion.glb').then(src=>{
+    if(!src) return;
+    const model=src.clone(true);
+    model.scale.setScalar(1.55);
+    model.rotation.y=Math.PI;
+    const box=new THREE.Box3().setFromObject(model);
+    model.position.y=-box.min.y;
+    collectMonsterMaterials(model,mon.mats);
+    fallback.visible=false;
+    mon.model=model;
+    root.add(model);
+  });
   addCollider(x,z,0.8,0.8,terrainYAt(x,z),terrainYAt(x,z)+2.4);
   return mon;
 }
@@ -2456,4 +2476,3 @@ document.getElementById('loading').style.display='none';
 function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();
 } // end main(THREE)
-
