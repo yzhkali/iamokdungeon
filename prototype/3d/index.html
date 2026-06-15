@@ -305,6 +305,10 @@ function localPoint(x,z,dx,dz,rot=0){
   const s=Math.sin(rot), c=Math.cos(rot);
   return {x:x+dx*c+dz*s,z:z-dx*s+dz*c};
 }
+function addLocalCollider(x,z,lx,lz,w,d,rot=0,bottom=0,top=3.2){
+  const p=localPoint(x,z,lx,lz,rot);
+  addCollider(p.x,p.z,w,d,bottom,top);
+}
 function makeGableRoof(w,d,h,color){
   const hw=w/2, hd=d/2;
   const geo=new THREE.BufferGeometry();
@@ -366,6 +370,61 @@ function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,
   }
   return root;
 }
+function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
+  const w=9.5,d=9.0,wallT=0.36,wallH=4.4,doorW=2.7,doorH=3.9;
+  const root=new THREE.Group(); root.position.set(x,top,z); root.rotation.y=rot; mapRoot.add(root);
+  registerMapFeature({type:'building',name:'player-home',sign:'HOME',x,z,w,d,rot,top,roofColor:0x6c4738,enterable:true});
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(w,0.18,d),mat(0x7b6a52,0.92));
+  floor.position.y=0.04; floor.receiveShadow=true; root.add(floor);
+  const wallMaterial=mat(0xc8b07f,0.88);
+  function wallSeg(lx,ly,lz,sw,sh,sd){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(sw,sh,sd),wallMaterial);
+    m.position.set(lx,ly,lz); m.castShadow=true; m.receiveShadow=true; root.add(m); return m;
+  }
+  wallSeg(0,wallH/2,-d/2, w,wallH,wallT);                        // back
+  wallSeg(-w/2,wallH/2,0, wallT,wallH,d);                         // left
+  wallSeg(w/2,wallH/2,0, wallT,wallH,d);                          // right
+  wallSeg(-(w+doorW)/4,wallH/2,d/2, (w-doorW)/2,wallH,wallT);      // front left
+  wallSeg((w+doorW)/4,wallH/2,d/2, (w-doorW)/2,wallH,wallT);       // front right
+  wallSeg(0,doorH+(wallH-doorH)/2,d/2, doorW,wallH-doorH,wallT);   // lintel
+  const roof=makeGableRoof(w+1.1,d+1.0,1.55,0x6c4738);
+  roof.position.y=wallH; roof.castShadow=true; roof.receiveShadow=true;
+  roof.material=roof.material.clone(); roof.material.transparent=true; roof.material.opacity=0.58; roof.material.depthWrite=false;
+  root.add(roof);
+  const porch=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.2,1.4),mat(0x80684f,0.88));
+  porch.position.set(0,0.1,d/2+0.72); porch.castShadow=true; porch.receiveShadow=true; root.add(porch);
+  const doorFrameMat=mat(0x4d2f1d,0.78);
+  for(const sx of [-doorW/2,doorW/2]){
+    const post=new THREE.Mesh(new THREE.BoxGeometry(0.16,doorH,0.18),doorFrameMat);
+    post.position.set(sx,doorH/2,d/2+0.12); post.castShadow=true; root.add(post);
+  }
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(doorW+0.25,0.16,0.18),doorFrameMat);
+  lintel.position.set(0,doorH,d/2+0.12); lintel.castShadow=true; root.add(lintel);
+  for(const [lx,lz] of [[-2.6,-2.4],[2.6,-2.4]]){
+    const rug=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.05,1.2),mat(lx<0?0x704436:0x5d693f,0.9));
+    rug.position.set(lx,0.14,lz); rug.receiveShadow=true; root.add(rug);
+  }
+  const table=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.22,1.1),mat(0x6b4326,0.82));
+  table.position.set(-2.4,0.95,-1.0); table.castShadow=true; root.add(table);
+  for(const [lx,lz] of [[-3.0,-1.6],[-1.8,-1.6],[-3.0,-0.4],[-1.8,-0.4]]){
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.82,0.16),mat(0x4a2d1b,0.82));
+    leg.position.set(lx,0.52,lz); leg.castShadow=true; root.add(leg);
+  }
+  const bed=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.55,3.0),mat(0x9f8f78,0.88));
+  bed.position.set(2.7,0.35,-2.3); bed.castShadow=true; bed.receiveShadow=true; root.add(bed);
+  const blanket=new THREE.Mesh(new THREE.BoxGeometry(2.25,0.18,1.9),mat(0x6b302c,0.86));
+  blanket.position.set(2.7,0.76,-1.95); blanket.castShadow=true; root.add(blanket);
+  const shelf=new THREE.Mesh(new THREE.BoxGeometry(0.42,2.3,2.0),mat(0x5a3a22,0.82));
+  shelf.position.set(-w/2+0.45,1.15,2.0); shelf.castShadow=true; root.add(shelf);
+  addLocalCollider(x,z,0,-d/2,w,wallT,rot,top,top+wallH);
+  addLocalCollider(x,z,-w/2,0,wallT,d,rot,top,top+wallH);
+  addLocalCollider(x,z,w/2,0,wallT,d,rot,top,top+wallH);
+  addLocalCollider(x,z,-(doorW+w)/4,d/2,(w-doorW)/2,wallT,rot,top,top+wallH);
+  addLocalCollider(x,z,(doorW+w)/4,d/2,(w-doorW)/2,wallT,rot,top,top+wallH);
+  const p=localPoint(x,z,0,d/2+1.45,rot);
+  addSign('HOME',p.x,p.z,rot,top);
+  return root;
+}
 function addTree(x,z,scale=1,path='Tree_2_B_Color1.gltf'){
   placeGroundModel(FOREST+path,x,z,{scale,rot:Math.random()*Math.PI*2,groundCenter:true});
 }
@@ -406,7 +465,7 @@ addBuilding({name:'shop',x:14,z:5,w:8,d:7,wallColor:0xd2b783,roofColor:0x5d693f,
 addBuilding({name:'chapel',x:19,z:-15,w:8,d:10,top:VILLAGE_TOPS.church,wallColor:0xb8ae9c,roofColor:0x5d3433,stone:true,tower:true,sign:'CHAPEL'});
 addBuilding({name:'home-a',x:-9,z:-11,w:6,d:6,wallColor:0xc8b07f,roofColor:0x704436,sign:'HOME'});
 addBuilding({name:'home-b',x:8,z:-8,w:6,d:6,wallColor:0xc5ab83,roofColor:0x684334,sign:'HOME'});
-addBuilding({name:'home-c',x:-6,z:18,w:6,d:6,wallColor:0xd1b88b,roofColor:0x75412f,sign:'HOME'});
+addPlayerHome({x:-6,z:18,rot:0.28});
 addBuilding({name:'home-d',x:7,z:19,w:6,d:6,wallColor:0xbfa57d,roofColor:0x6c4738,sign:'HOME'});
 
 // Gameplay props and set dressing. Primitive shapes keep the layout readable if a model fails.
