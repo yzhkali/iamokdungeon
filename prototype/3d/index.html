@@ -130,8 +130,8 @@ const cameraRig={
   maxDistance:52,
   minPitch:THREE.MathUtils.degToRad(22),
   maxPitch:THREE.MathUtils.degToRad(68),
-  yawSpeed:2.65,
-  pitchSpeed:1.65,
+  yawSpeed:1.55,
+  pitchSpeed:1.05,
   stickX:0,
   stickY:0
 };
@@ -1414,7 +1414,7 @@ const P={x:0,z:0,y:0,vy:0,facing:0,jumping:false,
   spin:0,                // 空中旋转砸的角度进度
   stamina:100,staminaMax:100, runPhase:0,moving:false,speed:0};
 
-const MOVE_SPEED=8.0, TURN_LERP=20, JUMP_V=15.5, GRAVITY=43;
+const MOVE_SPEED=9.2, TURN_LERP=20, JUMP_V=15.5, GRAVITY=43;
 // 跳跃最高点≈2.8单位(高过2.7的柱子)，空中时间≈0.72s，上升/下落都更快一点
 const LIGHT_LUNGE=2.5, HEAVY_LUNGE=4.0, CHARGE_MAX=1.1, CHARGE_MOVE=0.38, CHARGE_AUTO=1.0;
 const HEAVY_CHARGE_TIME=1.5;      // 蓄满需要1.5秒
