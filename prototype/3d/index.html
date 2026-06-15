@@ -365,7 +365,7 @@ function addBuilding({name,x,z,w,d,top=terrainYAt(x,z),rot=0,wallColor=0xc9b487,
   }
   addCollider(x,z,w+0.8,d+0.8,top,top+bodyH+(stone?1.9:1.55));
   if(sign){
-    const p=localPoint(x,z,0,d/2+1.25,rot);
+    const p=localPoint(x,z,w*0.32,d/2+1.0,rot);
     addSign(sign,p.x,p.z,rot,top);
   }
   return root;
@@ -421,7 +421,7 @@ function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   addLocalCollider(x,z,w/2,0,wallT,d,rot,top,top+wallH);
   addLocalCollider(x,z,-(doorW+w)/4,d/2,(w-doorW)/2,wallT,rot,top,top+wallH);
   addLocalCollider(x,z,(doorW+w)/4,d/2,(w-doorW)/2,wallT,rot,top,top+wallH);
-  const p=localPoint(x,z,0,d/2+1.45,rot);
+  const p=localPoint(x,z,doorW*0.85,d/2+1.0,rot);
   addSign('HOME',p.x,p.z,rot,top);
   return root;
 }
