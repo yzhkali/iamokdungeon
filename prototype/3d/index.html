@@ -27,20 +27,20 @@
   #stamLabel { color:#9a8d80; font-size:11px; margin-bottom:3px; }
   #hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
     color:#7a6e62; font-size:12px; text-align:center; line-height:1.6; z-index:10; pointer-events:none; }
-  #padStatus { position:absolute; top:184px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; }
+  #padStatus { position:absolute; top:494px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; }
   #padStatus .on { color:#7ec97e; }
-  #state { position:absolute; top:210px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; font-family:monospace; }
+  #state { position:absolute; top:520px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; font-family:monospace; }
   #loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#8a7d70; font-size:15px; z-index:20; }
-  #miniMap { position:absolute; top:16px; right:16px; width:152px; height:152px; z-index:11;
+  #miniMap { position:absolute; top:16px; right:16px; width:456px; height:456px; z-index:11;
     border:2px solid #6e5b43; border-radius:50%; background:rgba(17,14,11,0.72);
-    box-shadow:0 0 0 3px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35); overflow:hidden; backdrop-filter:blur(4px); }
-  #miniMapCanvas { width:100%; height:100%; display:block; }
-  #miniMapMode { position:absolute; right:7px; bottom:7px; width:28px; height:28px; border-radius:50%;
+    box-shadow:0 0 0 3px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35); overflow:visible; backdrop-filter:blur(4px); }
+  #miniMapCanvas { width:100%; height:100%; display:block; border-radius:50%; overflow:hidden; }
+  #miniMapMode { position:absolute; right:47px; bottom:47px; width:40px; height:40px; border-radius:50%;
     border:1px solid rgba(255,211,90,0.75); color:#ffd35a; background:rgba(38,28,17,0.82);
-    font-size:12px; font-weight:700; cursor:pointer; }
+    font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.35); }
   #miniMapMode:hover,#mapDockBtn:hover,#closeWorldMap:hover { border-color:#ffe48a; color:#ffe48a; }
-  #compassLabel { position:absolute; top:5px; left:50%; transform:translateX(-50%);
-    color:#f0d68a; font-size:12px; font-weight:700; text-shadow:0 1px 2px #000; pointer-events:none; }
+  #compassLabel { position:absolute; top:13px; left:50%; transform:translateX(-50%);
+    color:#f0d68a; font-size:16px; font-weight:700; text-shadow:0 1px 2px #000; pointer-events:none; }
   #mapDock { position:absolute; left:50%; bottom:58px; transform:translateX(-50%); z-index:12; }
   #mapDockBtn { min-width:46px; height:38px; padding:0 13px; border-radius:6px;
     border:1px solid #6e5b43; background:rgba(24,19,14,0.78); color:#d7c18a; cursor:pointer;
@@ -75,7 +75,7 @@
 <div id="padStatus">手柄: <span id="padState">未连接</span></div>
 <div id="state"></div>
 <div id="miniMap">
-  <canvas id="miniMapCanvas" width="304" height="304"></canvas>
+  <canvas id="miniMapCanvas" width="912" height="912"></canvas>
   <div id="compassLabel">N</div>
   <button id="miniMapMode" title="切换地图旋转模式">N</button>
 </div>
@@ -2166,7 +2166,7 @@ function drawMap(ctx,canvas,{centerX=0,centerZ=0,scale=4,rot=0,big=false}={}){
   }
 }
 function drawMiniMap(){
-  const scale=3.15;
+  const scale=9.45;
   const rot=miniMapFollowFacing?P.facing-Math.PI:0;
   drawMap(miniMapCtx,miniMapCanvas,{centerX:P.x,centerZ:P.z,scale,rot,big:false});
 }
