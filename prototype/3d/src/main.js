@@ -473,7 +473,8 @@ function collectMonsterMaterials(root, out){
   });
 }
 function makeMonsterTarget(x,z,name='打我'){
-  const root=new THREE.Group(); root.position.set(x,0,z); scene.add(root);
+  const top=terrainYAt(x,z);
+  const root=new THREE.Group(); root.position.set(x,top,z); scene.add(root);
   registerMapFeature({type:'monster',name,x,z,w:1.6,d:1.6,rot:0});
   const fallback=new THREE.Group(); root.add(fallback);
   const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.55,1.3,5,10),new THREE.MeshStandardMaterial({color:0x74616c,roughness:0.82}));
@@ -488,7 +489,10 @@ function makeMonsterTarget(x,z,name='打我'){
   lctx.fillStyle='#ffffff'; lctx.font='bold 28px "Microsoft YaHei", sans-serif'; lctx.textAlign='center'; lctx.textBaseline='middle'; lctx.fillText(name,64,25);
   const tex=new THREE.CanvasTexture(label);
   const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
-  const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.0,0); sprite.scale.set(2.2,0.82,1); root.add(sprite);
+  const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.4,0); sprite.scale.set(2.6,0.96,1); root.add(sprite);
+  const markerMat=new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false});
+  const marker=new THREE.Mesh(new THREE.RingGeometry(1.55,1.78,48),markerMat);
+  marker.rotation.x=-Math.PI/2; marker.position.y=0.04; root.add(marker);
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
   loadModel(SKEL+'Skeleton_Minion.glb').then(src=>{
@@ -503,10 +507,10 @@ function makeMonsterTarget(x,z,name='打我'){
     mon.model=model;
     root.add(model);
   });
-  addCollider(x,z,0.8,0.8,terrainYAt(x,z),terrainYAt(x,z)+2.4);
+  addCollider(x,z,0.8,0.8,top,top+2.4);
   return mon;
 }
-makeMonsterTarget(22,15,'打我');
+makeMonsterTarget(0,-6,'打我');
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
