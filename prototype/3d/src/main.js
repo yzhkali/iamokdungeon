@@ -132,6 +132,18 @@ function loadModel(path){
   modelCache.set(path,p);
   return p;
 }
+function loadFreshModel(path){
+  if(!gltfLoader) return Promise.resolve(null);
+  return new Promise(resolve=>{
+    gltfLoader.load(path, gltf=>{
+      prepModel(gltf.scene);
+      resolve(gltf.scene);
+    }, undefined, err=>{
+      console.warn('Model load failed:', path, err);
+      resolve(null);
+    });
+  });
+}
 async function placeModel(path,x,z,{scale=1,rot=0,y=0,parent=scene,name='',groundCenter=false}={}){
   const src=await loadModel(path);
   if(!src) return null;
@@ -489,19 +501,19 @@ function makeMonsterTarget(x,z,name='打我'){
   lctx.fillStyle='#ffffff'; lctx.font='bold 28px "Microsoft YaHei", sans-serif'; lctx.textAlign='center'; lctx.textBaseline='middle'; lctx.fillText(name,64,25);
   const tex=new THREE.CanvasTexture(label);
   const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
-  const sprite=new THREE.Sprite(mat); sprite.position.set(0,3.4,0); sprite.scale.set(2.6,0.96,1); root.add(sprite);
+  const sprite=new THREE.Sprite(mat); sprite.position.set(0,4.0,0); sprite.scale.set(2.6,0.96,1); root.add(sprite);
   const markerMat=new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false});
   const marker=new THREE.Mesh(new THREE.RingGeometry(1.55,1.78,48),markerMat);
   marker.rotation.x=-Math.PI/2; marker.position.y=0.04; root.add(marker);
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
-  loadModel(SKEL+'Skeleton_Minion.glb').then(src=>{
-    if(!src) return;
-    const model=src.clone(true);
+  loadFreshModel(SKEL+'Skeleton_Minion.glb').then(model=>{
+    if(!model) return;
     model.scale.setScalar(1.55);
     model.rotation.y=Math.PI;
     const box=new THREE.Box3().setFromObject(model);
-    model.position.y=-box.min.y;
+    const center=box.getCenter(new THREE.Vector3());
+    model.position.set(-center.x,-box.min.y,-center.z);
     collectMonsterMaterials(model,mon.mats);
     fallback.visible=false;
     mon.model=model;
