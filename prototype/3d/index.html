@@ -585,11 +585,6 @@ function makeMonsterTarget(x,z,name='呵呵'){
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
   addCollider(x,z,0.8,0.8,terrainYAt(x,z),terrainYAt(x,z)+2.4);
-  placeModel(SKEL+'Skeleton_Minion.glb',0,0,{scale:1.6,rot:Math.PI,y:0.02,parent:root,name:'skeleton-minion',groundCenter:true}).then(obj=>{
-    if(!obj) return;
-    mon.model=obj;
-    obj.traverse(o=>{ if(o.isMesh && o.material) mon.mats.push(...(Array.isArray(o.material)?o.material:[o.material])); });
-  });
   return mon;
 }
 makeMonsterTarget(22,15,'呵呵');
