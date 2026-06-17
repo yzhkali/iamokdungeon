@@ -1,0 +1,126 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>骷髅人 + KayKit 动画 Demo</title>
+<style>:root{color-scheme:light;}*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#141010;
+font-family:-apple-system,"Microsoft YaHei",sans-serif;user-select:none;}
+#c{display:block;width:100%;height:100%;}
+#ui{position:absolute;top:16px;left:16px;z-index:10;background:rgba(16,10,8,.88);
+border:1px solid #5a3a2a;border-radius:10px;padding:12px 16px;color:#d7c18a;max-width:300px;}
+#ui h2{font-size:14px;color:#ffd35a;margin-bottom:8px;}
+#animList{font-size:12px;line-height:1.8;}
+.aBtn{cursor:pointer;padding:2px 8px;border-radius:4px;display:inline-block;}
+.aBtn:hover{background:rgba(255,211,90,.15);}
+.aBtn.on{background:rgba(255,211,90,.25);color:#ffd35a;}
+#hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+color:#6e5b43;font-size:12px;z-index:10;text-align:center;}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+color:#c8a870;font-size:16px;z-index:20;}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="loading">加载中…</div>
+<div id="ui"><h2>🦴 骷髅人 + KayKit动画</h2><div id="animList">加载中…</div></div>
+<div id="hint">WASD 移动 · 鼠标拖动旋转镜头 · 点击动画名切换</div>
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/loaders/GLTFLoader.js":"./lib/GLTFLoader.js"}}</script>
+<script type="module">
+const loadingEl=document.getElementById('loading');
+let THREE=null;
+for(const s of["three","https://unpkg.com/three@0.160.0/build/three.module.js"]){try{THREE=await import(s);if(THREE?.Scene)break;}catch(e){}}
+if(!THREE){loadingEl.textContent='引擎加载失败';throw 0;}
+let GLTFLoader=null;
+for(const s of["three/addons/loaders/GLTFLoader.js","https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"]){try{const m=await import(s);GLTFLoader=m.GLTFLoader;if(GLTFLoader)break;}catch(e){}}
+
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x141010);
+scene.fog=new THREE.Fog(0x141010,20,60);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,100);
+camera.position.set(0,1.8,6);
+scene.add(new THREE.HemisphereLight(0xb0c0d8,0x3a2a1a,.9));
+const dl=new THREE.DirectionalLight(0xfff0d0,1.2);dl.position.set(6,12,8);dl.castShadow=true;scene.add(dl);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x2a1a14,roughness:.95}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+
+const loader=new GLTFLoader();
+const load=url=>new Promise((res,rej)=>loader.load(url,g=>res(g),undefined,rej));
+
+// 加载骷髅模型 + 两套动画
+const BASE='./assets/vendor/kaykit_adventurers/';
+const [skelGltf,genGltf,movGltf]=await Promise.all([
+  load(BASE+'Skeleton_Warrior.glb'),
+  load(BASE+'Rig_Medium_General.glb'),
+  load(BASE+'Rig_Medium_MovementBasic.glb'),
+]);
+
+const model=skelGltf.scene;
+// 自动缩放到2.2高
+const box=new THREE.Box3().setFromObject(model);
+const h=box.getSize(new THREE.Vector3()).y;
+model.scale.setScalar(2.2/h);
+new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3()).y;
+const b2=new THREE.Box3().setFromObject(model);
+model.position.y=-b2.min.y;
+model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+scene.add(model);
+
+const mixer=new THREE.AnimationMixer(model);
+// 收集两套动画的 clips,用骨骼名匹配
+const clips=[...genGltf.animations,...movGltf.animations];
+let curAction=null;
+function playClip(clip){
+  if(curAction)curAction.fadeOut(.3);
+  curAction=mixer.clipAction(clip);
+  curAction.reset().fadeIn(.3).play();
+}
+
+// 渲染动画列表
+const list=document.getElementById('animList');
+list.innerHTML='';
+clips.forEach((clip,i)=>{
+  const d=document.createElement('div');
+  d.innerHTML=`<span class="aBtn" id="ab${i}">${clip.name} <small style="color:#6e5b43">${clip.duration.toFixed(1)}s</small></span>`;
+  d.firstChild.addEventListener('click',()=>{
+    document.querySelectorAll('.aBtn').forEach(b=>b.classList.remove('on'));
+    document.getElementById('ab'+i).classList.add('on');
+    playClip(clip);
+  });
+  list.appendChild(d);
+});
+// 默认播 Idle
+const idleClip=clips.find(c=>c.name.includes('Idle'))||clips[0];
+const idleIdx=clips.indexOf(idleClip);
+if(idleIdx>=0)document.getElementById('ab'+idleIdx)?.classList.add('on');
+if(idleClip)playClip(idleClip);
+
+// 镜头控制
+let yaw=0,pitch=.18,dist=6,drag=false,lx=0,ly=0;
+canvas.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+addEventListener('mouseup',()=>drag=false);
+addEventListener('mousemove',e=>{if(drag){yaw-=(e.clientX-lx)*.006;pitch-=(e.clientY-ly)*.006;pitch=Math.max(-.3,Math.min(1.2,pitch));lx=e.clientX;ly=e.clientY;}});
+canvas.addEventListener('wheel',e=>{dist=Math.max(2,Math.min(14,dist+e.deltaY*.005));e.preventDefault();},{passive:false});
+
+// WASD 移动
+const keys={};addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
+const target=new THREE.Vector3(0,1.1,0);
+const clock=new THREE.Clock();
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+loadingEl.style.display='none';
+function loop(){
+  const dt=Math.min(clock.getDelta(),.05);
+  mixer.update(dt);
+  const spd=4*dt;
+  if(keys['KeyW'])target.z-=Math.cos(yaw)*spd, target.x-=Math.sin(yaw)*spd;
+  if(keys['KeyS'])target.z+=Math.cos(yaw)*spd, target.x+=Math.sin(yaw)*spd;
+  if(keys['KeyA'])target.x-=Math.cos(yaw)*spd, target.z+=Math.sin(yaw)*spd;
+  if(keys['KeyD'])target.x+=Math.cos(yaw)*spd, target.z-=Math.sin(yaw)*spd;
+  model.position.x=target.x; model.position.z=target.z;
+  const cx=target.x+Math.sin(yaw)*Math.cos(pitch)*dist;
+  const cy=target.y+Math.sin(pitch)*dist;
+  const cz=target.z+Math.cos(yaw)*Math.cos(pitch)*dist;
+  camera.position.set(cx,cy,cz); camera.lookAt(target);
+  renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+loop();
+</script></body></html>

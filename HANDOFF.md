@@ -1,17 +1,33 @@
 # I'm OK Dungeon（没事地下城）— 项目交接日志
 
-> 给下一个 Claude 会话：先读这份文件，再读 `prototype/3d/index.html`（这就是完整的可玩游戏）。
+> 给下一个 Claude 会话：先读这份文件，再读 `prototype/3d/src/main.js`（游戏主逻辑都在这里；index.html 只是入口+UI）。
 > 用户不写代码，但极懂动作游戏、描述需求非常精准。配合方式：用户出创意+精准反馈，你负责把它落地成代码。
 
 ## 一句话项目
-复古风 3D 动作游戏原型。主角"老实人"（火柴人/方块人，程序化骨骼驱动），俯视45°第三人称。
+复古风 3D 动作游戏原型。主角"老实人"（火柴人/方块人，程序化骨骼驱动），第三人称可旋转视角。
 讽刺中国式亲密关系/婚恋压力的轻肉鸽 ARPG，敌人是"没事/随便/呵呵"等阴阳怪气词怪。
-**当前阶段：纯打磨战斗手感和动作，还没做敌人AI和数值系统。**
+**当前阶段：方向已定——继续以程序化火柴人为主角，完善动作手感，做出有趣的战斗系统（血量/伤害/僵直）。不追求视觉写实，追求手感有趣。Quaternius动画库当参考帧辅助手K。**
 
-## 关键文件
-- `prototype/3d/index.html` —— **唯一的主游戏文件**（3D版，约1500行，纯Three.js，单文件）
+## 最近进度（2026-06-16，火柴人手感打磨）
+- **本地运行**：双击 `prototype/3d/START-GAME.bat`（全英文名,避开中文编码坑）→ 浏览器开 `http://127.0.0.1:8099/index.html`。index.html 引 main.js 带 `?v=时间戳`防缓存,**每次改完main.js都更新这个版本号**。
+- **Three.js已本地化**：`prototype/3d/lib/`,importmap指向它,离线可跑。
+- 闪避轻击(飞踹dKick)：加 `slide:8` 惯性滑行（已认可）。
+- 普通三连轻击改进(进行中):gL1/gL2已按Q的节奏优化(加速/加深弓步/增大幅度/前倾)。gL3大劈待继续。
+  gL1:dur=0.50s(原0.62),trailSegs:8,弓步更深,前倾加大,左臂展开弯肘。
+  gL2:dur=0.53s(原0.62),弓步更深,前倾+chestX,手臂幅度拉满。
+- 闪避重击(升龙dRise)✅已验收：①`chargeSlide:10`蓄力下蹲往前滑 ②蓄力武士拔刀向左拧身`DRISE_COIL=-0.7`(负=左) ③起跳往右转一圈多(`body.rotation.y=-DRISE_COIL-k*(2π-DRISE_COIL)`,精确抵消拧身使结尾脸朝正面) ④起跳后左右腿互换 ⑤闪避→升龙补间0.13→0.22减卡顿。
+- 闪避冲刺(dodge,~line2400)✅已验收:左右腿互换成左腿大跨+对侧交叉摆臂(左腿前跨配左臂前探=此坐标系下的交叉)。
+- 三连"Q同款"试过已还原,原版备份`prototype/3d/三连原版备份.txt`。Q剑三连节奏=慢蓄→75%爆发;帅转身=骨盆与上胸反向对拧。
+- **⚠️Write/Edit大文件会静默截断**(见独立记忆),改完必须数行数+看结尾+`sed 's/await import/x/g'`后node --check,修复用git或bash补结尾。
+
+## 关键文件（2026-06 已拆分，注意！）
+- `prototype/3d/index.html` —— **入口+UI/CSS**（约107行）。只放 DOM 和样式，末尾用 `<script type="module" src="./src/main.js">` 引主逻辑。
+- `prototype/3d/src/main.js` —— **主游戏逻辑**（约2494行，纯Three.js，单文件 IIFE：顶部多CDN加载Three+GLTFLoader，然后 `main(THREE,GLTFLoader){...}` 包裹全部代码）。**这才是改游戏逻辑的地方。**
+- `prototype/3d/assets/vendor/` —— 导入的 CC0 模型包（KayKit 系列）：`fantasy_props/`(家具道具gltf) `kaykit_skeletons/`(骷髅glb) `kaykit_dungeon/` `kaykit_forest/`(树/灌木) `medieval_village/`(地砖)。代码里用 `ASSET_VENDOR` + 子目录常量(PROP/SKEL/DUN/FOREST/MV)引用。
 - `prototype/index.html` —— 早期2D版（已弃用，不用管）
-- `assets/` —— 美术资源（用户PS调过的8方向像素图等，3D版没用到，先留着）
+- `assets/`（仓库根，非3d目录下）—— 早期美术资源（PS调过的8方向像素图等，3D版没用到，先留着）
+
+> 注：拆分由 Codex 在断网期间完成，已验证：语法通过、DOM id 全部对得上、模型路径全部存在、原有角色/动画/连招完整保留，没翻车。
 
 ## 技术栈 & 重要约定
 - 纯网页 + Three.js（从CDN多源加载，需要联网；代码顶部有多CDN回退）
@@ -26,7 +42,7 @@
 - 动画通道：joint的x/y/z旋转；特殊通道 chestX/chestY/chestZ(腰)、bodyY(下沉)、bodyLean(前倾)、gripMode(握剑姿势0斜握/1枪式)。
 
 ## 操作
-WASD移动 / 左键轻击 / 右键重击 / 空格跳 / Shift闪避 / T推眼镜彩蛋。支持Xbox手柄(左上角UI切换)。
+WASD移动 / Q/E旋转镜头 / R/F俯仰 / 左键轻击 / 按住右键蓄力重击 / 空格跳 / Shift闪避 / T推眼镜彩蛋 / 地图按钮看世界地图。支持Xbox手柄(左上角UI切换：左摇杆移动/右摇杆镜头/X轻击/按住Y蓄力/A跳/B闪避)。
 
 ## 已完成的战斗内容（都打磨过，手感被用户认可）
 - **移动**：跑(对侧协调,伪跑动)、马里奥式跳跃(能跳上阶梯柱子)、弓步冲刺闪避+残影
@@ -55,7 +71,20 @@ WASD移动 / 左键轻击 / 右键重击 / 空格跳 / Shift闪避 / T推眼镜�
 - 跑步调整：`MOVE_SPEED=8.0`(原6.6,更快)；步频 `runPhase+=...*1.9`(原2.9,腿摆放慢)
 - 自检修过3个bug：HUD蓄力%用HEAVY_CHARGE_TIME、phase==='hold'判断、闪避重置chargeFull
 
-## 明确的待办/方向（用户提过的）
+## 2026-06 新增：场景 / 视角 / 地图（Codex 断网期间做的，已验证可跑）
+- **开放村庄场景**（main.js 约380-425行）：长老屋/客栈/铁匠铺/商店/教堂/民居/玩家家(addBuilding/addPlayerHome)，加树木(addTree)、灌木、石头、火把、铁匠铺工具(铁砧/武器架/工作台)、市集摊位、家具道具——全用 KayKit gltf 模型，加载失败时回退到基础几何体。地砖 medieval_village/Floor_Brick。
+- **可旋转开放视角**（`cameraRig` 约60-90行）：不再是固定俯视45°。yaw可转(Q/E或右摇杆)、pitch可俯仰(R/F)，有室内/室外两套距离和俯仰范围(进屋自动拉近)。`cameraOffset()` 按 yaw/pitch 算位置。
+- **地图系统**：小地图(miniMap，圆形罗盘，右上角，可切N朝上/朝向模式) + 世界地图大图(worldMap 弹窗，点"地图"按钮)。场景物体通过 `registerMapFeature({type,name,x,z,...})` 注册到地图上。地形高度查询 `terrainYAt(x,z)`。
+- **碰撞系统**：`addCollider(x,z,w,d,yMin,yMax)` 注册碰撞盒，`resolveCollision` 处理。建筑/木桩/柱子/道具都注册了碰撞。
+
+## 战斗/伤害系统现状（下一步重点，目前≈零）
+**重要：现在攻击只有"视觉反馈"，没有任何数值。要从这里往下搭。**
+- **攻击目标**有两类：
+  - 木人桩 `makeDummy`(约446行)：纯几何体木桩，2个在训练场(-21.8,15)和(-24.5,17.8)。被打=红闪(flashT)+后仰回弹(tilt/tiltVel弹簧物理)。
+  - 怪物靶子 `makeMonsterTarget`(约487行)：KayKit 骷髅小兵(Skeleton_Minion.glb)，1个在(0,-6)，挂"打我"文字标签+红色地圈。被打=红闪+顿帧。**会动会追的真敌人还没做，这只是不还手的靶子。**
+- **命中判定管道已铺好**：三处命中点 `tryHitObjects`(约1652行,挥砍) / `tryThrustHit`(约1737行,突刺) / `trySweepHit`(约1684行,大风车剑气) 命中后都调 `onHitTarget(x,y,z)`。
+- **`onHitTarget`(约679行) 目前只干一件事**：检查空间斩标记→放空间斩动画。**没有 hp、没有 takeDamage、没有伤害数值、打不死。** 做血量系统就是给 dummy/monster 加 hp 字段 + 血条UI + 在 onHitTarget(或命中点)扣血 + 死亡处理。
+
 - **继续做连招**（用户当前想推进的方向）
 - **真正的敌人**：会动会追、有攻击前摇、能被打硬直的"词怪"(呵呵/随便/你猜)。现在只有不还手的木桩。
 - **血量/伤害数值系统**：木桩/敌人加血条，攻击有数值

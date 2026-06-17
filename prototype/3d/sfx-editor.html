@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="UTF-8"><title>SFX Editor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1c1714;color:#ccc;font:13px monospace;display:flex;flex-direction:column;height:100vh}
+header{background:#111;padding:8px 12px;color:#f90;font-size:14px;border-bottom:1px solid #333}
+#main{display:flex;flex:1;overflow:hidden}
+#bank{width:195px;background:#111;overflow-y:auto;padding:8px;border-right:1px solid #333;flex-shrink:0}
+#bank h3,#slots h3{font-size:10px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+.bi{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.bi span{font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+#slots{flex:1;overflow-y:auto;padding:12px}
+.slot{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;padding:8px;background:#222;border-radius:4px;border-left:3px solid #444}
+.sk{width:60px;color:#f90;font-size:12px;font-weight:bold;padding-top:2px}
+.sd{width:58px;font-size:10px;color:#666;padding-top:3px}
+.vs{flex:1}.vr{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+select{background:#2a2a2a;border:1px solid #444;color:#ccc;padding:2px 4px;font:11px monospace;border-radius:2px;flex:1;max-width:175px}
+input[type=range]{accent-color:#f90}
+.vl{font-size:10px;color:#888;width:26px}
+.pb{background:#2a3a2a;border:1px solid #3a5a3a;color:#6f6;padding:1px 5px;cursor:pointer;border-radius:2px;font:10px monospace}
+.pb:hover{background:#3a5a3a}
+.xb{background:none;border:none;color:#444;cursor:pointer;font-size:13px;padding:0 2px}.xb:hover{color:#f55}
+.ab{background:#252525;border:1px solid #444;color:#666;padding:2px 8px;cursor:pointer;font:10px monospace;border-radius:2px;margin-top:2px}.ab:hover{color:#fff}
+#fig-wrap{float:right;margin:0 0 10px 12px;background:#111;border:1px solid #333;border-radius:4px;padding:4px}
+#fig-label{font-size:10px;color:#555;text-align:center;margin-top:2px}
+#combo-area{clear:both;margin-top:14px;padding-top:12px;border-top:1px solid #333}
+#combo-area h3{margin-bottom:8px}
+#combo-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cs{background:#2a2a2a;border:1px solid #444;color:#ccc;padding:2px 4px;font:11px monospace;border-radius:2px}
+#cgap{width:55px;accent-color:#f90;vertical-align:middle}
+.cpb{background:#1a3a4a;border:1px solid #2a6a8a;color:#4af;padding:4px 14px;cursor:pointer;font:bold 12px monospace;border-radius:3px}.cpb:hover{background:#2a5a7a}
+#foot{background:#111;padding:10px 12px;border-top:1px solid #333;display:flex;gap:10px;align-items:flex-start}
+#exp{background:#f90;color:#111;border:none;padding:6px 18px;cursor:pointer;font:bold 13px monospace;border-radius:3px;flex-shrink:0}
+#exp:hover{background:#ffb300}
+#out{flex:1;background:#0a0a0a;border:1px solid #333;color:#4f4;font:11px monospace;padding:8px;height:90px;resize:none}
+</style></head><body>
+<header>&#x1F50A; SFX Editor</header>
+<div id="main">
+  <div id="bank"><h3>&#x97F3;&#x6548;&#x5E93;</h3><div id="bl"></div></div>
+  <div id="slots">
+    <div id="fig-wrap"><canvas id="fig" width="120" height="140"></canvas><div id="fig-label">idle</div></div>
+    <h3>&#x52A8;&#x4F5C;&#x97F3;&#x6548;&#x5206;&#x914D;</h3>
+    <div id="sl"></div>
+    <div id="combo-area">
+      <h3>&#x8FDE;&#x62DB;&#x9884;&#x89C8;</h3>
+      <div id="combo-row">
+        <span style="color:#888;font-size:11px">&#x62DB;&#x5F0F;:</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="foot">
+  <button id="exp" onclick="doExport()">&#x5BFC;&#x51FA;&#x914D;&#x7F6E; &rarr;</button>
+  <textarea id="out" readonly>&#x5BFC;&#x51FA;&#x540E;&#x5C06;JS&#x4EE3;&#x7801;&#x590D;&#x5236;&#x7ED9;Kiro&#x56FA;&#x5B9A;</textarea>
+</div>
+<script>
+const P='./assets/sounds/';
+const FILES=[
+  'swing_1','swing_2','swing_3','spin',
+  'stomp','stomp2','chop','thrust','thrust2',
+  'dodge','dodge2','clash_1','clash_2','clash_3',
+  'hit_bone','hit_bone2','hit_bone3','hit_wood','hit_flesh','hit_flesh2',
+  ...[...Array(43)].map((_,i)=>'swoshes/swosh-'+String(i+1).padStart(2,'0'))
+];
+const ACTIONS=[
+  {key:'swing',desc:'轻击挥剑',vs:[{f:'swing_1',v:0.55},{f:'swing_2',v:0.55},{f:'swing_3',v:0.55}]},
+  {key:'spin', desc:'大风车',  vs:[{f:'swoshes/swosh-23',v:0.6}]},
+  {key:'rise', desc:'升龙剑',  vs:[{f:'swing_1',v:0.5},{f:'swing_2',v:0.5}]},
+  {key:'thrust',desc:'刺击',       vs:[{f:'thrust',v:0.6},{f:'thrust2',v:0.6}]},
+  {key:'kick', desc:'踢腿',        vs:[{f:'clash_1',v:0.6}]},
+  {key:'stomp',desc:'落地',        vs:[{f:'stomp',v:0.85},{f:'stomp2',v:0.4}]},
+  {key:'dodge',desc:'闪避',        vs:[{f:'dodge',v:0.4},{f:'dodge2',v:0.4}]},
+  {key:'drill',desc:'展头落地',vs:[{f:'stomp',v:0.9}]},
+  {key:'chop', desc:'劈砍',        vs:[{f:'chop',v:0.7}]},
+];
+
+// --- Audio ---
+let ac=null,cache={};
+function gAC(){if(!ac)ac=new AudioContext();ac.resume();return ac;}
+function playF(f,v=0.7){
+  const url=P+f+'.ogg';
+  if(cache[url]){_p(cache[url],v);return;}
+  fetch(url).then(r=>r.arrayBuffer()).then(b=>gAC().decodeAudioData(b)).then(buf=>{cache[url]=buf;_p(buf,v);}).catch(()=>{});
+}
+function _p(buf,v){const a=gAC(),s=a.createBufferSource(),g=a.createGain();s.buffer=buf;g.gain.value=v;s.connect(g);g.connect(a.destination);s.start();}
+
+// --- Stick figure animation ---
+// Pose: h=head, n=neck, hp=hips, rh=right-hand, lh=left-hand, rf=right-foot, lf=left-foot
+const IDLE={h:[60,18],n:[60,30],hp:[60,72],rh:[78,56],lh:[42,56],rf:[68,128],lf:[52,128]};
+const ANIMS={
+  swing:[
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[88,14],lh:[44,44],rf:[68,128],lf:[52,128],d:0.13},
+    {h:[58,20],n:[58,32],hp:[58,74],rh:[24,50],lh:[40,32],rf:[68,128],lf:[52,128],d:0.18},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[20,65],lh:[42,52],rf:[68,128],lf:[52,128],d:0.14},
+  ],
+  spin:[
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[105,40],lh:[15,40],rf:[65,124],lf:[55,124],d:0.25},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[15,40],lh:[105,40],rf:[55,124],lf:[65,124],d:0.25},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[105,40],lh:[15,40],rf:[65,124],lf:[55,124],d:0.25},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[15,40],lh:[105,40],rf:[55,124],lf:[65,124],d:0.25},
+  ],
+  rise:[
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[70,68],lh:[48,56],rf:[68,128],lf:[52,128],d:0.10},
+    {h:[60,10],n:[60,22],hp:[60,65],rh:[65,4], lh:[46,34],rf:[66,128],lf:[54,128],d:0.22},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[78,22],lh:[44,40],rf:[68,128],lf:[52,128],d:0.14},
+  ],
+  thrust:[
+    {h:[64,20],n:[64,32],hp:[62,74],rh:[108,32],lh:[48,46],rf:[72,128],lf:[50,122],d:0.18},
+    {h:[66,20],n:[66,32],hp:[63,74],rh:[118,30],lh:[50,44],rf:[74,128],lf:[48,122],d:0.14},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[82,30], lh:[44,44],rf:[68,128],lf:[52,128],d:0.14},
+  ],
+  kick:[
+    {h:[58,18],n:[58,30],hp:[58,70],rh:[76,50],lh:[36,42],rf:[90,50],lf:[52,128],d:0.22},
+    {h:[58,20],n:[58,32],hp:[58,72],rh:[74,50],lh:[36,42],rf:[98,44],lf:[52,128],d:0.18},
+  ],
+  stomp:[
+    {h:[60,16],n:[60,28],hp:[60,64],rh:[82,44],lh:[38,44],rf:[68,106],lf:[52,106],d:0.18},
+    {h:[60,20],n:[60,32],hp:[60,74],rh:[82,52],lh:[38,52],rf:[68,128],lf:[52,128],d:0.14},
+  ],
+  dodge:[
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[78,56],lh:[42,56],rf:[68,128],lf:[52,128],d:0.08},
+    {h:[78,20],n:[78,32],hp:[76,74],rh:[104,36],lh:[60,48],rf:[86,128],lf:[70,126],d:0.18},
+  ],
+  drill:[
+    {h:[60,16],n:[60,28],hp:[60,68],rh:[98,16],lh:[22,16],rf:[66,108],lf:[54,108],d:0.18},
+    {h:[60,18],n:[60,30],hp:[60,72],rh:[22,20],lh:[98,20],rf:[68,128],lf:[52,128],d:0.18},
+    {h:[60,16],n:[60,28],hp:[60,68],rh:[98,16],lh:[22,16],rf:[66,108],lf:[54,108],d:0.18},
+  ],
+  chop:[
+    {h:[60,16],n:[60,28],hp:[60,70],rh:[68,6], lh:[44,44],rf:[68,128],lf:[52,128],d:0.14},
+    {h:[62,20],n:[62,32],hp:[62,74],rh:[76,78],lh:[44,48],rf:[68,128],lf:[52,128],d:0.18},
+  ],
+};
+
+const cvs=document.getElementById('fig'),ctx=cvs.getContext('2d');
+const lbl=document.getElementById('fig-label');
+let anim={frames:[],fi:0,t:0,playing:false},lastRaf=0;
+
+function lerp(a,b,t){return a+(b-a)*t;}
+function lp(a,b,t){const ks=['h','n','hp','rh','lh','rf','lf'],r={};ks.forEach(k=>r[k]=[lerp(a[k][0],b[k][0],t),lerp(a[k][1],b[k][1],t)]);return r;}
+function draw(p){
+  ctx.clearRect(0,0,120,140);
+  ctx.strokeStyle='#4a8a4a';ctx.lineWidth=2;ctx.lineCap='round';
+  [[p.n,p.hp],[p.n,p.rh],[p.n,p.lh],[p.hp,p.rf],[p.hp,p.lf]].forEach(([a,b])=>{
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+  });
+  ctx.beginPath();ctx.arc(p.h[0],p.h[1],8,0,Math.PI*2);
+  ctx.strokeStyle='#f90';ctx.stroke();
+}
+function rafLoop(ts){
+  const dt=(ts-lastRaf)/1000;lastRaf=ts;
+  if(!anim.playing){draw(IDLE);return;}
+  anim.t+=dt;
+  const fr=anim.frames[anim.fi],nfi=(anim.fi+1)%anim.frames.length;
+  const frac=Math.min(anim.t/fr.d,1);
+  draw(lp(fr,anim.frames[nfi],frac));
+  if(frac>=1){anim.fi=nfi;anim.t=0;if(nfi===0){anim.playing=false;lbl.textContent='idle';}}
+  if(anim.playing)requestAnimationFrame(rafLoop);
+}
+function triggerAnim(key){
+  anim={frames:ANIMS[key]||ANIMS.swing,fi:0,t:0,playing:true};
+  lbl.textContent=key;
+  requestAnimationFrame(ts=>{lastRaf=ts;rafLoop(ts);});
+}
+draw(IDLE);
+
+// --- Bank ---
+const bl=document.getElementById('bl');
+FILES.forEach(f=>{
+  const d=document.createElement('div');d.className='bi';
+  d.innerHTML='<button class="pb" onclick="playF(\''+f+'\')">&#x25B6;</button><span title="'+f+'">'+f.replace('swoshes/','')+'</span>';
+  bl.appendChild(d);
+});
+
+// --- Slots ---
+const OPTS='<option value="none">-none-</option>'+FILES.map(f=>'<option value="'+f+'">'+f.replace('swoshes/','')+'</option>').join('');
+function build(){
+  const sl=document.getElementById('sl');sl.innerHTML='';
+  ACTIONS.forEach((act,ai)=>{
+    const div=document.createElement('div');div.className='slot';
+    div.innerHTML='<div class="sk">'+act.key+'</div><div class="sd">'+act.desc+'</div><div class="vs" id="v'+ai+'"></div>';
+    sl.appendChild(div);const ve=div.querySelector('#v'+ai);
+    act.vs.forEach((v,vi)=>addV(ve,ai,vi,v));
+    const ab=document.createElement('button');ab.className='ab';ab.textContent='+ 变体';
+    ab.onclick=()=>{act.vs.push({f:'swing_1',v:0.5});build();};ve.appendChild(ab);
+  });
+  buildCombo();
+}
+function addV(ve,ai,vi,v){
+  const d=document.createElement('div');d.className='vr';
+  const sel=document.createElement('select');
+  sel.innerHTML='<option value="'+v.f+'">'+v.f.replace('swoshes/','')+'</option>'+
+    FILES.filter(f=>f!==v.f).map(f=>'<option value="'+f+'">'+f.replace('swoshes/','')+'</option>').join('');
+  sel.value=v.f;sel.onchange=e=>ACTIONS[ai].vs[vi].f=e.target.value;
+  const rng=document.createElement('input');rng.type='range';rng.min=0.05;rng.max=1.5;rng.step=0.05;rng.value=v.v;rng.style.width='52px';
+  const lbl2=document.createElement('span');lbl2.className='vl';lbl2.textContent=v.v.toFixed(2);
+  rng.oninput=e=>{ACTIONS[ai].vs[vi].v=+e.target.value;lbl2.textContent=(+e.target.value).toFixed(2);};
+  const pb=document.createElement('button');pb.className='pb';pb.textContent='▶';
+  pb.onclick=()=>{playF(ACTIONS[ai].vs[vi].f,ACTIONS[ai].vs[vi].v);triggerAnim(ACTIONS[ai].key);};
+  const xb=document.createElement('button');xb.className='xb';xb.textContent='✕';
+  xb.onclick=()=>{if(ACTIONS[ai].vs.length<=1)return;ACTIONS[ai].vs.splice(vi,1);build();};
+  d.append(sel,rng,lbl2,pb,xb);ve.appendChild(d);
+}
+
+// --- Combo ---
+const COMBO_SLOTS=5;
+function buildCombo(){
+  const row=document.getElementById('combo-row');
+  row.innerHTML='<span style="color:#888;font-size:11px">招式:</span>';
+  const actOpts='<option value="none">-</option>'+ACTIONS.map(a=>'<option value="'+a.key+'">'+a.key+'</option>').join('');
+  for(let i=0;i<COMBO_SLOTS;i++){
+    const s=document.createElement('select');s.className='cs';s.id='cs'+i;s.innerHTML=actOpts;
+    if(i<ACTIONS.length)s.value=ACTIONS[i<3?i:0].key;
+    row.appendChild(s);
+    if(i<COMBO_SLOTS-1){const sp=document.createElement('span');sp.style.cssText='color:#555;font-size:14px';sp.textContent='→';row.appendChild(sp);}
+  }
+  const gWrap=document.createElement('span');gWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-left:8px';
+  gWrap.innerHTML='<input type="range" id="cgap" min="0.2" max="1.5" step="0.1" value="0.5" style="width:55px;accent-color:#f90"><span id="cgap-lbl" style="font-size:10px;color:#888;width:28px">0.5s</span>';
+  row.appendChild(gWrap);
+  document.getElementById('cgap').oninput=e=>document.getElementById('cgap-lbl').textContent=e.target.value+'s';
+  const btn=document.createElement('button');btn.className='cpb';btn.textContent='▶▶ 连招';
+  btn.onclick=playCombo;row.appendChild(btn);
+}
+function playCombo(){
+  const gap=+document.getElementById('cgap').value;
+  const keys=[...Array(COMBO_SLOTS)].map((_,i)=>document.getElementById('cs'+i)?.value).filter(v=>v&&v!=='none');
+  keys.forEach((key,i)=>{
+    setTimeout(()=>{
+      const act=ACTIONS.find(a=>a.key===key);
+      if(act)act.vs.forEach(v=>playF(v.f,v.v));
+      triggerAnim(key);
+    },i*gap*1000);
+  });
+}
+
+// --- Export ---
+function doExport(){
+  const lines=ACTIONS.map(act=>{
+    const vs=act.vs;let body;
+    if(vs.length===1)body="play(P+'"+vs[0].f+".ogg',"+vs[0].v+")";
+    else if(act.key==='swing'||act.key==='rise')
+      body="{const _ff=["+vs.map(v=>"'"+v.f+"'").join(',')+"],_vv=["+vs.map(v=>v.v).join(',')+"];const i=_si++%"+vs.length+";play(P+_ff[i]+'.ogg',_vv[i]);}";
+    else
+      body="{const r=Math.floor(Math.random()*"+vs.length+"),_ff=["+vs.map(v=>"'"+v.f+"'").join(',')+"],_vv=["+vs.map(v=>v.v).join(',')+"]; play(P+_ff[r]+'.ogg',_vv[r]);}";
+    return "    "+act.key+"(){ "+body+"; },";
+  }).join('\n');
+  document.getElementById('out').value="// 替换 main.js SFX对象里对应的方法：\n"+lines;
+}
+build();
+</script></body></html>

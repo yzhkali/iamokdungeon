@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>没事地下城 — 3D火柴人原型 v0.3（关节修正 + 腰 + 碰撞）</title>
+<style>
+  :root { color-scheme: light; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0e0c0b;
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; user-select:none; }
+  #c { display:block; width:100%; height:100%; }
+  #inputUI { position:absolute; top:16px; left:16px; display:flex; gap:10px; z-index:10; }
+  .modeBtn { width:56px; height:56px; border-radius:12px; background:rgba(20,16,14,0.6);
+    border:2px solid #5a4d42; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:all .15s; backdrop-filter:blur(4px); position:relative; }
+  .modeBtn svg { width:30px; height:30px; fill:#8a7d70; transition:fill .15s; }
+  .modeBtn:hover { border-color:#8a7d72; }
+  .modeBtn.active { border-color:#ffd35a; background:rgba(70,55,20,0.8); box-shadow:0 0 16px rgba(255,211,90,0.5); }
+  .modeBtn.active svg { fill:#ffd35a; }
+  .modeBtn .label { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%);
+    font-size:10px; color:#8a7d70; white-space:nowrap; }
+  .modeBtn.active .label { color:#ffd35a; }
+  #hud { position:absolute; bottom:14px; left:16px; z-index:10; }
+  #stamWrap { width:220px; height:14px; background:rgba(0,0,0,0.45); border:2px solid #6b5a4a; border-radius:3px; overflow:hidden; }
+  #stamBar { height:100%; width:100%; background:#5bc0de; }
+  #stamLabel { color:#9a8d80; font-size:11px; margin-bottom:3px; }
+  #hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+    color:#7a6e62; font-size:12px; text-align:center; line-height:1.6; z-index:10; pointer-events:none; }
+  #padStatus { position:absolute; top:342px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; }
+  #padStatus .on { color:#7ec97e; }
+  #state { position:absolute; top:368px; right:16px; color:#7a6e62; font-size:11px; text-align:right; z-index:10; font-family:monospace; }
+  #loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#8a7d70; font-size:15px; z-index:20; }
+  #miniMap { position:absolute; top:16px; right:16px; width:304px; height:304px; z-index:11;
+    border:2px solid #6e5b43; border-radius:50%; background:rgba(17,14,11,0.72);
+    box-shadow:0 0 0 3px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35); overflow:visible; backdrop-filter:blur(4px); }
+  #miniMapCanvas { width:100%; height:100%; display:block; border-radius:50%; overflow:hidden; }
+  #miniMapMode { position:absolute; right:28px; bottom:28px; width:36px; height:36px; border-radius:50%;
+    border:1px solid rgba(255,211,90,0.75); color:#ffd35a; background:rgba(38,28,17,0.82);
+    font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.35); }
+  #miniMapMode:hover,#mapDockBtn:hover,#closeWorldMap:hover { border-color:#ffe48a; color:#ffe48a; }
+  #compassLabel { position:absolute; top:9px; left:50%; transform:translateX(-50%);
+    color:#f0d68a; font-size:14px; font-weight:700; text-shadow:0 1px 2px #000; pointer-events:none; }
+  #mapDock { position:absolute; left:50%; bottom:58px; transform:translateX(-50%); z-index:12; }
+  #mapDockBtn { min-width:46px; height:38px; padding:0 13px; border-radius:6px;
+    border:1px solid #6e5b43; background:rgba(24,19,14,0.78); color:#d7c18a; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:7px; font-size:13px; backdrop-filter:blur(4px); }
+  #mapDockBtn svg { width:18px; height:18px; fill:currentColor; }
+  #worldMapOverlay { position:absolute; inset:0; display:none; place-items:center; z-index:18;
+    background:rgba(10,8,7,0.38); backdrop-filter:blur(2px); }
+  #worldMapOverlay.open { display:grid; }
+  #worldMapPanel { width:min(76vw,820px); height:min(72vh,620px); border:2px solid #7a6549; border-radius:8px;
+    background:rgba(23,18,13,0.94); box-shadow:0 18px 60px rgba(0,0,0,0.5); position:relative; padding:40px 18px 18px; }
+  #worldMapTitle { position:absolute; left:18px; top:12px; color:#f2d894; font-weight:700; font-size:15px; }
+  #closeWorldMap { position:absolute; right:12px; top:10px; width:30px; height:28px; border-radius:5px;
+    border:1px solid #6e5b43; background:rgba(42,31,20,0.82); color:#d7c18a; cursor:pointer; font-size:18px; line-height:1; }
+  #worldMapCanvas { width:100%; height:100%; display:block; border:1px solid rgba(215,193,138,0.3);
+    border-radius:5px; background:#2d291f; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">加载 3D 引擎中…</div>
+
+<div id="inputUI">
+  <div class="modeBtn active" id="btnKeyboard" title="键盘 / 鼠标">
+    <svg viewBox="0 0 24 24"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm1 3v2h2V8H5zm3 0v2h2V8H8zm3 0v2h2V8h-2zm3 0v2h2V8h-2zm3 0v2h2V8h-2zM5 11v2h2v-2H5zm3 0v2h2v-2H8zm3 0v2h2v-2h-2zm3 0v2h2v-2h-2zm3 0v2h2v-2h-2zM8 14v2h8v-2H8z"/></svg>
+    <span class="label">键盘</span>
+  </div>
+  <div class="modeBtn" id="btnGamepad" title="Xbox 手柄">
+    <svg viewBox="0 0 24 24"><path d="M7.5 6h9a5.5 5.5 0 0 1 5.5 5.5c0 .9-.1 1.8-.4 2.6l-1.2 3.4a2.4 2.4 0 0 1-4.3.5L14.5 16h-5l-1.6 2A2.4 2.4 0 0 1 3.6 17.5L2.4 14.1A8 8 0 0 1 2 11.5 5.5 5.5 0 0 1 7.5 6zM7 9v2H5v2h2v2h2v-2h2v-2H9V9H7zm9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm2.5 2.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+    <span class="label">手柄</span>
+  </div>
+</div>
+<div id="padStatus">手柄: <span id="padState">未连接</span></div>
+<div id="state"></div>
+<div id="miniMap">
+  <canvas id="miniMapCanvas" width="608" height="608"></canvas>
+  <div id="compassLabel">N</div>
+  <button id="miniMapMode" title="切换地图旋转模式">N</button>
+</div>
+<div id="hud">
+  <div id="stamLabel">体力</div>
+  <div id="stamWrap"><div id="stamBar"></div></div>
+</div>
+<div id="mapDock">
+  <button id="mapDockBtn" title="展开区域地图">
+    <svg viewBox="0 0 24 24"><path d="M4 5.5 9 3l6 2.5L20 3v15.5L15 21l-6-2.5L4 21V5.5zm6-.2v11.4l4 1.7V7l-4-1.7zM6 6.7v11l2-1V5.7l-2 1zm10 .6v11l2-1V6.3l-2 1z"/></svg>
+    <span>地图</span>
+  </button>
+</div>
+<div id="worldMapOverlay">
+  <div id="worldMapPanel">
+    <div id="worldMapTitle">没事村地图</div>
+    <button id="closeWorldMap" title="关闭地图">×</button>
+    <canvas id="worldMapCanvas" width="1200" height="820"></canvas>
+  </div>
+</div>
+<div id="hint">
+  WASD 移动 ・ Q/E 旋转镜头 ・ R/F 俯仰 ・ 左键 轻击 ・ <b>按住右键蓄力</b>重击 ・ 空格 跳跃 ・ Shift 闪避翻滚 ・ <b>T 推眼镜</b><br>
+  手柄：左摇杆 移动 ・ 右摇杆 镜头 ・ X 轻击 ・ 按住Y蓄力重击 ・ A 跳 ・ B 闪避
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js",
+    "three/addons/loaders/GLTFLoader.js": "./lib/GLTFLoader.js"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

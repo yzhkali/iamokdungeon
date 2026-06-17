@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>姿势调节器</title>
+<style>
+:root{color-scheme:light;}*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#141010;font-family:-apple-system,"Microsoft YaHei",sans-serif;user-select:none;}
+#c{display:block;width:100%;height:100%;}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c8a870;font-size:16px;z-index:20;}
+#panel{position:absolute;top:0;right:0;width:280px;height:100%;background:rgba(16,12,10,.94);border-left:1px solid #5a3a2a;overflow-y:auto;z-index:10;padding:8px;}
+#panel h2{color:#ffd35a;font-size:13px;padding:6px 0 4px;border-bottom:1px solid #3a2a1a;margin-bottom:4px;}
+.grp{margin-bottom:8px;}
+.grp h3{color:#c8a870;font-size:11px;padding:3px 0;text-transform:uppercase;letter-spacing:1px;}
+.row{display:flex;align-items:center;gap:4px;margin:2px 0;}
+.row label{color:#9a8d80;font-size:10px;width:28px;text-align:right;flex-shrink:0;}
+.row input[type=range]{flex:1;height:14px;accent-color:#ffd35a;}
+.row span{color:#ffd35a;font-size:10px;width:36px;text-align:right;font-family:monospace;}
+#output{position:absolute;bottom:0;right:0;width:280px;background:rgba(10,8,6,.95);border-top:1px solid #5a3a2a;padding:8px;z-index:11;}
+#output h3{color:#5bd6c0;font-size:11px;margin-bottom:4px;}
+#outText{color:#aef0c0;font-size:10px;font-family:monospace;white-space:pre-wrap;max-height:120px;overflow-y:auto;}
+#copyBtn{margin-top:4px;background:#2a4a3a;border:1px solid #3a6a5a;color:#5bd6c0;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
+#hint{position:absolute;bottom:8px;left:8px;color:#5a4a3a;font-size:11px;z-index:10;}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="loading">加载中…</div>
+<div id="panel">
+  <h2>🦴 姿势调节器 (拖滑块摆姿势)</h2>
+</div>
+<div id="output">
+  <h3>📋 当前数值(复制给Claude)</h3>
+  <div id="outText">-</div>
+  <button id="copyBtn">复制</button>
+</div>
+<div id="hint">鼠标拖动旋转镜头 · 滚轮缩放</div>
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/loaders/GLTFLoader.js":"./lib/GLTFLoader.js"}}</script>
+<script type="module">
+const loadingEl=document.getElementById('loading');
+let THREE=null;
+for(const s of["three","https://unpkg.com/three@0.160.0/build/three.module.js"]){try{THREE=await import(s);if(THREE?.Scene)break;}catch(e){}}
+if(!THREE){loadingEl.textContent='引擎加载失败';throw 0;}
+
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x141010);
+scene.fog=new THREE.Fog(0x141010,20,60);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,100);
+camera.position.set(0,2.0,7);
+scene.add(new THREE.HemisphereLight(0xb0c0d8,0x3a2a1a,.9));
+const dl=new THREE.DirectionalLight(0xfff0d0,1.2);dl.position.set(6,12,8);dl.castShadow=true;scene.add(dl);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x2a1a14,roughness:.95}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+
+// ===== 火柴人骨架 =====
+const SKIN=0xf0c39a,HAIR=0x2b2018,SHIRT=0x3f6fb0,TANK=0xeaeaea,SHORTS=0xf2f2f2,LIMB=0xe2b48c;
+const M=(c,r=0.7)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+const box=(w,h,d,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.castShadow=true;return m;};
+const THIGH=0.78,SHIN=0.72,UPARM=0.6,FOREARM=0.56,ARM_W=0.26,LEG_W=0.3,CHEST_H=1.0,HIP_Y=1.5,SHO_X=0.725,SHO_LOCAL=0.95;
+const char=new THREE.Group();char.position.y=0.15;scene.add(char);
+const yaw=new THREE.Group();char.add(yaw);
+const body=new THREE.Group();yaw.add(body);
+const pelvis=box(1.0,0.42,0.66,SHORTS);pelvis.position.y=HIP_Y;body.add(pelvis);
+const chest=new THREE.Group();chest.position.y=HIP_Y;body.add(chest);
+const torso=box(1.15,CHEST_H,0.7,SHIRT);torso.position.y=CHEST_H/2;chest.add(torso);
+const headGrp=new THREE.Group();headGrp.position.y=CHEST_H+0.05;chest.add(headGrp);
+const head=box(0.78,0.72,0.7,SKIN);head.position.y=0.36;headGrp.add(head);
+// 眼镜(区分正面)
+const GLASS=0x222222;
+const glassMat=new THREE.MeshBasicMaterial({color:GLASS});
+const ringGeo=new THREE.TorusGeometry(0.14,0.038,8,18);
+const gl=new THREE.Mesh(ringGeo,glassMat);gl.position.set(-0.2,0.37,0.38);headGrp.add(gl);
+const gr=new THREE.Mesh(ringGeo,glassMat);gr.position.set(0.2,0.37,0.38);headGrp.add(gr);
+const bridge=box(0.13,0.035,0.05,GLASS);bridge.position.set(0,0.37,0.38);headGrp.add(bridge);
+// 白色背心
+const tank=box(0.6,CHEST_H*0.92,0.56,0xeaeaea);tank.position.set(0,CHEST_H/2,0.09);chest.add(tank);
+function limb(parent,len1,len2,w,px,py,c1,c2){
+  const root=new THREE.Group();root.position.set(px,py,0);parent.add(root);
+  const up=box(w,len1,w,c1);up.position.y=-len1/2;root.add(up);
+  const j2=new THREE.Group();j2.position.y=-len1;root.add(j2);
+  const lo=box(w*.9,len2,w*.9,c2);lo.position.y=-len2/2;j2.add(lo);
+  // 脚(只有腿limb用,手臂不用,用高度判断)
+  if(len2>0.5){ const foot=box(w+0.14,0.12,w+0.34,0x3a4a6b);foot.position.set(0,-len2+0.1,0.12);j2.add(foot); }
+  return{root,j2};
+}
+const RArm=limb(chest,UPARM,FOREARM,ARM_W,-SHO_X,SHO_LOCAL,SHIRT,LIMB);
+const LArm=limb(chest,UPARM,FOREARM,ARM_W, SHO_X,SHO_LOCAL,SHIRT,LIMB);
+const RLeg=limb(body,THIGH,SHIN,LEG_W,-0.3,HIP_Y,LIMB,LIMB);
+const LLeg=limb(body,THIGH,SHIN,LEG_W, 0.3,HIP_Y,LIMB,LIMB);
+
+// 关节注册 (名字 → {obj, axis, range})
+const JOINTS={
+  // 躯干
+  'bodyY':   {obj:body, prop:'py', range:[-1,0.5]},
+  'bodyLean':{obj:body, prop:'rx', range:[-1.5,1.5]},
+  'bodyYaw': {obj:body, prop:'ry', range:[-2,2]},
+  'bodySide':{obj:body, prop:'rz', range:[-1.5,1.5]},
+  'chestY':  {obj:chest,prop:'ry', range:[-2,2]},
+  'chestX':  {obj:chest,prop:'rx', range:[-1.5,1.5]},
+  'chestZ':  {obj:chest,prop:'rz', range:[-1,1]},
+  'head X':  {obj:headGrp,prop:'rx',range:[-1.2,1.2]},
+  'head Y':  {obj:headGrp,prop:'ry',range:[-1.5,1.5]},
+  // 右臂(屏幕左=物理右)
+  'shoR X':  {obj:RArm.root,prop:'rx',range:[-4,2]},
+  'shoR Y':  {obj:RArm.root,prop:'ry',range:[-2,2]},
+  'shoR Z':  {obj:RArm.root,prop:'rz',range:[-2,2]},
+  'elbR X':  {obj:RArm.j2, prop:'rx',range:[-2.5,0.5]},
+  // 左臂
+  'shoL X':  {obj:LArm.root,prop:'rx',range:[-4,2]},
+  'shoL Y':  {obj:LArm.root,prop:'ry',range:[-2,2]},
+  'shoL Z':  {obj:LArm.root,prop:'rz',range:[-2,2]},
+  'elbL X':  {obj:LArm.j2, prop:'rx',range:[-2.5,0.5]},
+  // 右腿(屏幕左=物理右)
+  'hipR X':  {obj:RLeg.root,prop:'rx',range:[-3,2]},
+  'hipR Y':  {obj:RLeg.root,prop:'ry',range:[-1.5,1.5]},
+  'hipR Z':  {obj:RLeg.root,prop:'rz',range:[-1.5,1.5]},
+  'kneeR X': {obj:RLeg.j2, prop:'rx',range:[-0.2,2.5]},
+  // 左腿
+  'hipL X':  {obj:LLeg.root,prop:'rx',range:[-3,2]},
+  'hipL Y':  {obj:LLeg.root,prop:'ry',range:[-1.5,1.5]},
+  'hipL Z':  {obj:LLeg.root,prop:'rz',range:[-1.5,1.5]},
+  'kneeL X': {obj:LLeg.j2, prop:'rx',range:[-0.2,2.5]},
+};
+const vals={};
+for(const k in JOINTS)vals[k]=0;
+
+// 建UI
+const groups=[
+  ['躯干',['bodyY','bodyLean','bodyYaw','bodySide','chestY','chestX','chestZ','head X','head Y']],
+  ['右臂(物理右=屏幕左)',['shoR X','shoR Y','shoR Z','elbR X']],
+  ['左臂',['shoL X','shoL Y','shoL Z','elbL X']],
+  ['右腿(物理右=屏幕左)',['hipR X','hipR Y','hipR Z','kneeR X']],
+  ['左腿',['hipL X','hipL Y','hipL Z','kneeL X']],
+];
+const panel=document.getElementById('panel');
+const sliders={};
+const spans={};
+groups.forEach(([gname,keys])=>{
+  const g=document.createElement('div');g.className='grp';
+  const h=document.createElement('h3');h.textContent=gname;g.appendChild(h);
+  keys.forEach(k=>{
+    const jt=JOINTS[k];
+    const row=document.createElement('div');row.className='row';
+    const lbl=document.createElement('label');lbl.textContent=k;
+    const sl=document.createElement('input');sl.type='range';
+    sl.min=jt.range[0]*100;sl.max=jt.range[1]*100;sl.step=2;sl.value=0;
+    const sp=document.createElement('span');sp.textContent='0.00';
+    sl.addEventListener('input',()=>{
+      vals[k]=parseFloat(sl.value)/100;
+      sp.textContent=vals[k].toFixed(2);
+      applyPose();updateOutput();
+    });
+    row.appendChild(lbl);row.appendChild(sl);row.appendChild(sp);
+    g.appendChild(row);spans[k]=sp;sliders[k]=sl;
+  });
+  panel.appendChild(g);
+});
+
+// ── Clip帧载入 ──
+const clipSection=document.createElement('div');
+clipSection.style.cssText='margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #3a2a1a;';
+clipSection.innerHTML=`
+  <h2 style="color:#ffd35a;font-size:13px;padding:6px 0 4px;border-bottom:1px solid #3a2a1a;margin-bottom:6px;">📥 载入Clip帧</h2>
+  <textarea id="clipData" style="width:100%;height:90px;background:#1a0f0a;color:#aef0c0;border:1px solid #3a5a6a;font-size:10px;font-family:monospace;resize:vertical;padding:4px;" placeholder="粘贴tracks对象，例:\n{bodyLean:[{t:0,v:0.9},{t:0.25,v:1.5}],\nchestX:[{t:0,v:0.6},...]}"></textarea>
+  <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+    <label style="color:#9a8d80;font-size:10px;flex-shrink:0;">t=</label>
+    <input type="range" id="clipTime" min="0" max="100" value="0" style="flex:1;height:14px;accent-color:#ffd35a;">
+    <span id="clipTimeVal" style="color:#ffd35a;font-size:10px;width:36px;text-align:right;font-family:monospace;">0.00</span>
+  </div>
+  <button id="loadClipBtn" style="width:100%;margin-top:4px;padding:4px;background:#2a3a4a;border:1px solid #3a5a6a;color:#5bd6c0;border-radius:4px;cursor:pointer;font-size:11px;">▶ 载入到滑块</button>
+`;
+panel.insertBefore(clipSection, panel.firstChild);
+
+function _lerpV(a,b,r){return a+(b-a)*r;}
+function _evalTrack(trk,t){
+  if(!trk?.length)return null;
+  if(trk.length===1){const o={};for(const k in trk[0])if(k!=='t')o[k]=trk[0][k];return o;}
+  let lo=trk[0],hi=trk[trk.length-1];
+  for(let i=0;i<trk.length-1;i++)if(t>=trk[i].t&&t<=trk[i+1].t){lo=trk[i];hi=trk[i+1];break;}
+  const r=lo.t===hi.t?0:(t-lo.t)/(hi.t-lo.t);
+  const o={};for(const k in lo)if(k!=='t')o[k]=_lerpV(lo[k]??0,hi[k]??0,r);return o;
+}
+const TRACK_MAP={
+  bodyLean:[['bodyLean','v']],bodyY:[['bodyY','v']],
+  chestX:[['chestX','v']],chestY:[['chestY','v']],chestZ:[['chestZ','v']],
+  shoR:[['shoR X','x'],['shoR Y','y'],['shoR Z','z']],
+  shoL:[['shoL X','x'],['shoL Y','y'],['shoL Z','z']],
+  elbR:[['elbR X','x']],elbL:[['elbL X','x']],
+  hipR:[['hipR X','x'],['hipR Y','y'],['hipR Z','z']],
+  hipL:[['hipL X','x'],['hipL Y','y'],['hipL Z','z']],
+  kneeR:[['kneeR X','x']],kneeL:[['kneeL X','x']],
+};
+function loadClipFrame(){
+  let tracks;
+  try{let raw=document.getElementById('clipData').value.trim().replace(/^\w+\s*:/,'').replace(/[,\s]+$/,'');let obj=Function('return('+raw+')')();tracks=obj.tracks||obj;}catch(e){alert('解析失败:'+e);return;}
+  const t=parseFloat(document.getElementById('clipTimeVal').textContent);
+  for(const [tname,maps] of Object.entries(TRACK_MAP)){
+    const v=_evalTrack(tracks[tname],t);
+    if(!v)continue;
+    maps.forEach(([key,src])=>{
+      if(v[src]===undefined)return;
+      vals[key]=v[src];
+      if(sliders[key])sliders[key].value=Math.round(v[src]*100);
+      if(spans[key])spans[key].textContent=v[src].toFixed(2);
+    });
+  }
+  applyPose();updateOutput();
+}
+document.getElementById('clipTime').addEventListener('input',e=>{
+  document.getElementById('clipTimeVal').textContent=(e.target.value/100).toFixed(2);
+  loadClipFrame();
+});
+document.getElementById('loadClipBtn').addEventListener('click',loadClipFrame);
+
+// 零位按钮
+const resetBtn=document.createElement('button');
+resetBtn.textContent='归零';
+resetBtn.style.cssText='width:100%;padding:5px;background:#3a2a1a;border:1px solid #5a3a2a;color:#d7c18a;border-radius:4px;cursor:pointer;margin-top:4px;';
+resetBtn.onclick=()=>{
+  for(const k in vals)vals[k]=0;
+  document.querySelectorAll('#panel input[type=range]').forEach(sl=>sl.value=0);
+  for(const k in spans)spans[k].textContent='0.00';
+  applyPose();updateOutput();
+};
+panel.appendChild(resetBtn);
+
+function applyPose(){
+  body.position.y=vals['bodyY']||0;
+  body.rotation.x=vals['bodyLean']||0;
+  body.rotation.y=vals['bodyYaw']||0;
+  body.rotation.z=vals['bodySide']||0;
+  chest.rotation.set(vals['chestX']||0,vals['chestY']||0,vals['chestZ']||0);
+  headGrp.rotation.set(vals['head X']||0,vals['head Y']||0,0);
+  RArm.root.rotation.set(vals['shoR X']||0,vals['shoR Y']||0,vals['shoR Z']||0);
+  RArm.j2.rotation.set(vals['elbR X']||0,0,0);
+  LArm.root.rotation.set(vals['shoL X']||0,vals['shoL Y']||0,vals['shoL Z']||0);
+  LArm.j2.rotation.set(vals['elbL X']||0,0,0);
+  RLeg.root.rotation.set(vals['hipR X']||0,vals['hipR Y']||0,vals['hipR Z']||0);
+  RLeg.j2.rotation.set(vals['kneeR X']||0,0,0);
+  LLeg.root.rotation.set(vals['hipL X']||0,vals['hipL Y']||0,vals['hipL Z']||0);
+  LLeg.j2.rotation.set(vals['kneeL X']||0,0,0);
+}
+function updateOutput(){
+  const lines=[];
+  const v=n=>vals[n]||0;
+  lines.push(`bodyY: ${v('bodyY').toFixed(2)}`);
+  lines.push(`bodyLean: ${v('bodyLean').toFixed(2)}`);
+  lines.push(`bodyYaw: ${v('bodyYaw').toFixed(2)}`);
+  lines.push(`bodySide: ${v('bodySide').toFixed(2)}`);
+  lines.push(`chestX: ${v('chestX').toFixed(2)}`);
+  lines.push(`chestY: ${v('chestY').toFixed(2)}`);
+  lines.push(`chestZ: ${v('chestZ').toFixed(2)}`);
+  lines.push(`shoR: x:${v('shoR X').toFixed(2)} y:${v('shoR Y').toFixed(2)} z:${v('shoR Z').toFixed(2)}`);
+  lines.push(`elbR: x:${v('elbR X').toFixed(2)}`);
+  lines.push(`shoL: x:${v('shoL X').toFixed(2)} y:${v('shoL Y').toFixed(2)} z:${v('shoL Z').toFixed(2)}`);
+  lines.push(`elbL: x:${v('elbL X').toFixed(2)}`);
+  lines.push(`hipR: x:${v('hipR X').toFixed(2)} y:${v('hipR Y').toFixed(2)} z:${v('hipR Z').toFixed(2)}`);
+  lines.push(`kneeR: x:${v('kneeR X').toFixed(2)}`);
+  lines.push(`hipL: x:${v('hipL X').toFixed(2)} y:${v('hipL Y').toFixed(2)} z:${v('hipL Z').toFixed(2)}`);
+  lines.push(`kneeL: x:${v('kneeL X').toFixed(2)}`);
+  document.getElementById('outText').textContent=lines.join('\n');
+}
+document.getElementById('copyBtn').onclick=()=>{
+  navigator.clipboard?.writeText(document.getElementById('outText').textContent).then(()=>{
+    document.getElementById('copyBtn').textContent='✓ 已复制';
+    setTimeout(()=>document.getElementById('copyBtn').textContent='复制',1200);
+  });
+};
+
+// 镜头
+let yawA=0,pitch=0.15,dist=7,drag=false,lx=0,ly=0;
+canvas.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+addEventListener('mouseup',()=>drag=false);
+addEventListener('mousemove',e=>{if(drag){yawA-=(e.clientX-lx)*.006;pitch-=(e.clientY-ly)*.006;pitch=Math.max(-.5,Math.min(1.4,pitch));lx=e.clientX;ly=e.clientY;}});
+canvas.addEventListener('wheel',e=>{dist=Math.max(2,Math.min(12,dist+e.deltaY*.003));e.preventDefault();},{passive:false});
+function resize(){const w=innerWidth-280,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+const clock=new THREE.Clock();
+loadingEl.style.display='none';
+function loop(){
+  clock.getDelta();
+  camera.position.set(Math.sin(yawA)*Math.cos(pitch)*dist,Math.sin(pitch)*dist+1.2,Math.cos(yawA)*Math.cos(p

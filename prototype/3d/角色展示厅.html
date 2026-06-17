@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>角色展示厅 — 没事地下城</title>
+<style>
+  :root{color-scheme:light;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#1a1714;
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;user-select:none;}
+  #c{display:block;width:100%;height:100%;}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c8b48a;font-size:16px;z-index:20;}
+  #bar{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);z-index:10;
+    display:flex;align-items:center;gap:18px;background:rgba(20,16,12,0.82);
+    padding:14px 22px;border-radius:14px;border:1px solid #6e5b43;backdrop-filter:blur(6px);}
+  .nav{width:48px;height:48px;border-radius:50%;border:2px solid #7a6549;background:rgba(40,30,18,0.8);
+    color:#f0d68a;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .nav:hover{border-color:#ffd35a;color:#ffd35a;}
+  #info{text-align:center;min-width:220px;}
+  #cname{color:#ffd35a;font-size:22px;font-weight:700;}
+  #ctype{color:#9a8d80;font-size:13px;margin-top:3px;}
+  #counter{color:#7a6e62;font-size:12px;margin-top:6px;}
+  #title{position:absolute;top:24px;left:50%;transform:translateX(-50%);color:#c8b48a;font-size:15px;z-index:10;text-align:center;}
+  #hint{position:absolute;top:54px;left:50%;transform:translateX(-50%);color:#6e6258;font-size:12px;z-index:10;text-align:center;}
+  #pick{position:absolute;top:20px;right:20px;z-index:10;background:rgba(40,55,40,0.85);
+    color:#aef0c0;border:1px solid #4a8a5a;border-radius:8px;padding:10px 16px;font-size:13px;max-width:260px;line-height:1.5;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">加载 3D 引擎中…</div>
+<div id="title">🏛️ 角色展示厅</div>
+<div id="hint">← → 切换角色 ・ 鼠标拖动旋转 ・ 滚轮缩放</div>
+<div id="pick">选好了告诉 Claude 角色名字(屏幕下方显示),我就把它换成你的主角并学会你的动作。</div>
+<div id="bar">
+  <button class="nav" id="prev">‹</button>
+  <div id="info">
+    <div id="cname">—</div>
+    <div id="ctype">—</div>
+    <div id="counter">—</div>
+  </div>
+  <button class="nav" id="next">›</button>
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js",
+    "three/addons/loaders/GLTFLoader.js": "./lib/GLTFLoader.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const CHARS=[
+  {f:'Knight.glb',       n:'骑士 Knight',        t:'全身板甲 · 正经主角范'},
+  {f:'Barbarian.glb',    n:'野蛮人 Barbarian',   t:'赤膊肌肉猛男'},
+  {f:'Rogue_Hooded.glb', n:'兜帽盗贼 Rogue Hooded',t:'兜帽刺客 · 神秘'},
+  {f:'Rogue.glb',        n:'盗贼 Rogue',         t:'轻甲刺客'},
+  {f:'Ranger.glb',       n:'游侠 Ranger',        t:'皮甲弓手'},
+  {f:'Mage.glb',         n:'法师 Mage',          t:'长袍尖帽'},
+  {f:'Skeleton_Warrior.glb',n:'骷髅战士 Skeleton Warrior',t:'亡灵 · 可当敌人或主角'},
+  {f:'Skeleton_Rogue.glb',  n:'骷髅盗贼 Skeleton Rogue',  t:'亡灵刺客'},
+  {f:'Skeleton_Mage.glb',   n:'骷髅法师 Skeleton Mage',   t:'亡灵法师'},
+  {f:'Skeleton_Minion.glb', n:'骷髅小兵 Skeleton Minion', t:'亡灵杂兵(现在的怪)'},
+];
+const DIR='./assets/vendor/character_gallery/';
+
+const loadingEl=document.getElementById('loading');
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1a1714);
+const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
+camera.position.set(0,1.5,5);
+scene.add(new THREE.HemisphereLight(0xc8d4e0,0x4a3f36,1.0));
+const key=new THREE.DirectionalLight(0xfff2d8,1.4); key.position.set(4,8,6); scene.add(key);
+const fill=new THREE.DirectionalLight(0x88aaff,0.5); fill.position.set(-5,3,-4); scene.add(fill);
+// 地台
+const disk=new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.6,0.1,40),new THREE.MeshStandardMaterial({color:0x3a322a,roughness:0.9}));
+disk.position.y=-0.05; scene.add(disk);
+
+const loader=new GLTFLoader();
+const holder=new THREE.Group(); scene.add(holder);
+let idx=0, cur=null, dragging=false, lx=0, autoSpin=true;
+
+function show(i){
+  idx=(i+CHARS.length)%CHARS.length;
+  const c=CHARS[idx];
+  document.getElementById('cname').textContent=c.n;
+  document.getElementById('ctype').textContent=c.t;
+  document.getElementById('counter').textContent=`${idx+1} / ${CHARS.length}`;
+  if(cur){ holder.remove(cur); cur=null; }
+  loader.load(DIR+c.f, gltf=>{
+    const m=gltf.scene;
+    const box=new THREE.Box3().setFromObject(m);
+    const size=box.getSize(new THREE.Vector3());
+    const s=2.6/Math.max(size.y,0.001); m.scale.setScalar(s);
+    const box2=new THREE.Box3().setFromObject(m);
+    const c2=box2.getCenter(new THREE.Vector3());
+    m.position.set(-c2.x, -box2.min.y, -c2.z);
+    holder.add(m); cur=m; holder.rotation.y=0;
+  }, undefined, e=>{ document.getElementById('ctype').textContent='⚠️ 加载失败:'+c.f; });
+}
+document.getElementById('next').onclick=()=>show(idx+1);
+document.getElementById('prev').onclick=()=>show(idx-1);
+addEventListener('keydown',e=>{ if(e.code==='ArrowRight')show(idx+1); if(e.code==='ArrowLeft')show(idx-1); });
+canvas.addEventListener('mousedown',e=>{dragging=true;lx=e.clientX;autoSpin=false;});
+addEventListener('mouseup',()=>dragging=false);
+addEventListener('mousemove',e=>{ if(dragging){ holder.rotation.y+=(e.clientX-lx)*0.01; lx=e.clientX; } });
+canvas.addEventListener('wheel',e=>{ camera.position.z=Math.max(2.5,Math.min(9,camera.position.z+e.deltaY*0.002)); e.preventDefault(); },{passive:false});
+
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+addEventListener('resize',resize); resize();
+loadingEl.style.display='none';
+show(0);
+function loop(){ if(autoSpin)holder.rotation.y+=0.006; camera.lookAt(0,1.2,0); renderer.render(scene,camera); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>

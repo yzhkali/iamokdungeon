@@ -1,6 +1,7 @@
 // ===== 多 CDN 自动回退加载 Three.js =====
 // jsdelivr 在国内常被墙/超慢，这里依次尝试多个源，哪个通用哪个
 const THREE_SOURCES = [
+  "three",                                  // 本地lib(importmap),离线首选
   "https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js", // 国内淘宝镜像
   "https://cdn.jsdmirror.com/npm/three@0.160.0/build/three.module.js",         // jsdelivr 国内镜像
   "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -8,6 +9,7 @@ const THREE_SOURCES = [
   "https://esm.sh/three@0.160.0",
 ];
 const GLTF_LOADER_SOURCES = [
+  "three/addons/loaders/GLTFLoader.js",     // 本地lib(importmap)
   "https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/loaders/GLTFLoader.js",
   "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
   "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
@@ -52,6 +54,51 @@ const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+// ===== 音效系统 (真实CC0音效文件) =====
+const SFX=(()=>{
+  let ac=null; const cache={};
+  function getAC(){ if(!ac)try{ac=new AudioContext();}catch(e){}; return ac; }
+  async function load(url){
+    if(cache[url]) return cache[url];
+    const a=getAC(); if(!a) return null;
+    try{
+      const r=await fetch(url); const buf=await r.arrayBuffer();
+      const decoded=await a.decodeAudioData(buf);
+      cache[url]=decoded; return decoded;
+    }catch(e){ return null; }
+  }
+  function play(url,vol=1){
+    const a=getAC(); if(!a) return;
+    load(url).then(buf=>{
+      if(!buf) return;
+      const src=a.createBufferSource(); src.buffer=buf;
+      const g=a.createGain(); g.gain.value=vol;
+      src.connect(g); g.connect(a.destination); src.start();
+    });
+  }
+  const P='./assets/sounds/';
+  let _si=0;
+  return {
+    resume(){ getAC()?.resume(); },
+    swing(){ const ff=['swoshes/swosh-18','swoshes/swosh-20','swoshes/swosh-16']; play(P+ff[_si++%3]+'.ogg',0.55); },
+    hitBone(){ const v=['hit_bone','hit_bone2','hit_bone3'][Math.floor(Math.random()*3)]; play(P+v+'.ogg',0.75); },
+    hitWood(){ play(P+'hit_wood.ogg',0.65); },
+    hitFlesh(){ play(P+(Math.random()<.5?'hit_flesh':'hit_flesh2')+'.ogg',0.6); },
+    stomp(){   play(P+'stomp.ogg',0.85); play(P+'stomp2.ogg',0.4); },
+    kick(){    play(P+'hit_bone.ogg',0.6); },
+    thrust(){ const ff=['swoshes/swosh-18','swoshes/swosh-29']; play(P+ff[Math.floor(Math.random()*2)]+'.ogg',0.6); },
+    _spinSrc:null,_spinGain:null,
+    spinPlay(dur){ const url=P+'swoshes/swosh-23.ogg'; load(url).then(buf=>{ if(!buf)return; const a=getAC(),t0=a.currentTime,s=a.createBufferSource(),g=a.createGain(); s.buffer=buf; g.gain.setValueAtTime(0.6,t0); g.gain.setValueAtTime(0.6,t0+Math.max(0,dur-0.3)); g.gain.linearRampToValueAtTime(0,t0+dur); s.connect(g); g.connect(a.destination); this._spinSrc=s;this._spinGain=g; s.start(); s.stop(t0+dur+0.05); s.onended=()=>{this._spinSrc=null;this._spinGain=null;}; }); },
+    spinStop(){ if(this._spinSrc&&this._spinGain){const a=getAC(),g=this._spinGain.gain,t=a.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(0.6,t); g.linearRampToValueAtTime(0,t+0.15); try{this._spinSrc.stop(t+0.16);}catch(e){} this._spinSrc=null;this._spinGain=null;} },
+    dodge(){ play(P+(Math.random()<.5?'dodge':'dodge2')+'.ogg',0.4); },
+    rise(){ const ff=['swoshes/swosh-33','swoshes/swosh-26']; play(P+ff[_si++%2]+'.ogg',0.5); },
+    drill(){   play(P+'stomp.ogg',0.9); },
+    chop(){    play(P+'swoshes/swosh-3.ogg',0.7); },
+  };
+})();
+document.addEventListener('keydown',()=>SFX.resume(),{once:true});
+document.addEventListener('mousedown',()=>SFX.resume(),{once:true});
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x1c1714);
@@ -236,7 +283,7 @@ function makeGableRoof(w,d,h,color){
     -hw,0,-hd,  hw,0,-hd,  0,h,-hd,
     -hw,0, hd,  hw,0, hd,  0,h, hd
   ]),3));
-  geo.setIndex([0,1,2, 3,5,4, 0,3,4, 0,4,1, 0,2,5, 0,5,3, 1,4,5, 1,5,2]);
+  geo.setIndex([0,1,2, 3,5,4, 0,2,5, 0,5,3, 1,4,5, 1,5,2]); // 删底面防z-fighting
   geo.computeVertexNormals();
   return new THREE.Mesh(geo,mat(color,0.82));
 }
@@ -374,116 +421,118 @@ addStep(19,-5.8,6,1.2,0.12);
 addStep(19,-7.0,5,1.2,VILLAGE_TOPS.church);
 
 // Low walls and yard fences, with gaps left for entrances.
-for(const [x,z,w,d] of [
-  [-28,15,1,12],[-14,15,1,12],[-21,21.5,14,1],[-25.5,8.5,5,1],[-16.5,8.5,5,1],
-  [15,15,1,12],[29,15,1,12],[22,21.5,14,1],[18,8.5,5,1],[26,8.5,5,1],
-  [-10,-29,5,1],[10,-29,5,1],[-12,-23,1,11],[12,-23,1,11]
-]) addLowWall(x,z,w,d,1.25,0x5f4f3d);
-
+// for(const [x,z,w,d] of [
+//   [-28,15,1,12],[-14,15,1,12],[-21,21.5,14,1],[-25.5,8.5,5,1],[-16.5,8.5,5,1],
+//   [15,15,1,12],[29,15,1,12],[22,21.5,14,1],[18,8.5,5,1],[26,8.5,5,1],
+//   [-10,-29,5,1],[10,-29,5,1],[-12,-23,1,11],[12,-23,1,11]
+// ]) addLowWall(x,z,w,d,1.25,0x5f4f3d);
+// 
 // Buildings: elder home, villagers, inn, smith, shop, church.
-addBuilding({name:'elder',x:0,z:-24,w:10,d:7,top:VILLAGE_TOPS.elder,wallColor:0xd2bc8f,roofColor:0x6b302c,sign:'ELDER'});
-addBuilding({name:'inn',x:-14,z:0,w:9,d:8,wallColor:0xc79f73,roofColor:0x7a3b2d,sign:'INN'});
-addBuilding({name:'smith',x:-16,z:11,w:8,d:7,wallColor:0xb69a74,roofColor:0x4f3a32,sign:'SMITH'});
-addBuilding({name:'shop',x:14,z:5,w:8,d:7,wallColor:0xd2b783,roofColor:0x5d693f,sign:'SHOP'});
-addBuilding({name:'chapel',x:19,z:-15,w:8,d:10,top:VILLAGE_TOPS.church,wallColor:0xb8ae9c,roofColor:0x5d3433,stone:true,tower:true,sign:'CHAPEL'});
-addBuilding({name:'home-a',x:-9,z:-11,w:6,d:6,wallColor:0xc8b07f,roofColor:0x704436,sign:'HOME'});
-addBuilding({name:'home-b',x:8,z:-8,w:6,d:6,wallColor:0xc5ab83,roofColor:0x684334,sign:'HOME'});
-addPlayerHome({x:-22,z:31,rot:0});
-addBuilding({name:'home-d',x:7,z:19,w:6,d:6,wallColor:0xbfa57d,roofColor:0x6c4738,sign:'HOME'});
-
+// addBuilding({name:'elder',x:0,z:-24,w:10,d:7,top:VILLAGE_TOPS.elder,wallColor:0xd2bc8f,roofColor:0x6b302c,sign:'ELDER'});
+// addBuilding({name:'inn',x:-14,z:0,w:9,d:8,wallColor:0xc79f73,roofColor:0x7a3b2d,sign:'INN'});
+// addBuilding({name:'smith',x:-16,z:11,w:8,d:7,wallColor:0xb69a74,roofColor:0x4f3a32,sign:'SMITH'});
+// addBuilding({name:'shop',x:14,z:5,w:8,d:7,wallColor:0xd2b783,roofColor:0x5d693f,sign:'SHOP'});
+// addBuilding({name:'chapel',x:19,z:-15,w:8,d:10,top:VILLAGE_TOPS.church,wallColor:0xb8ae9c,roofColor:0x5d3433,stone:true,tower:true,sign:'CHAPEL'});
+// addBuilding({name:'home-a',x:-9,z:-11,w:6,d:6,wallColor:0xc8b07f,roofColor:0x704436,sign:'HOME'});
+// addBuilding({name:'home-b',x:8,z:-8,w:6,d:6,wallColor:0xc5ab83,roofColor:0x684334,sign:'HOME'});
+// addPlayerHome({x:-22,z:31,rot:0});
+// addBuilding({name:'home-d',x:7,z:19,w:6,d:6,wallColor:0xbfa57d,roofColor:0x6c4738,sign:'HOME'});
+// 
 // Gameplay props and set dressing. Primitive shapes keep the layout readable if a model fails.
-const ASSET_VENDOR=new URL('../assets/vendor/', import.meta.url).href;
-const DUN=ASSET_VENDOR+'kaykit_dungeon/';
-const MV=ASSET_VENDOR+'medieval_village/';
-const PROP=ASSET_VENDOR+'fantasy_props/';
-const FOREST=ASSET_VENDOR+'kaykit_forest/';
-const SKEL=ASSET_VENDOR+'kaykit_skeletons/';
-for(const z of [23,18,13,8,3,-2,-7,-12,-17]) placeGroundModel(MV+'Floor_Brick.gltf',0,z,{scale:1.5,rot:Math.PI/2,groundCenter:true});
-for(const [x,z,s,p] of [
-  [-31,-3,1.35,'Tree_3_A_Color1.gltf'],[-34,32,1.25,'Tree_2_B_Color1.gltf'],[-28,-24,1.5,'Tree_4_A_Color1.gltf'],
-  [30,-28,1.45,'Tree_3_A_Color1.gltf'],[32,5,1.25,'Tree_2_B_Color1.gltf'],[29,27,1.15,'Tree_1_A_Color1.gltf'],
-  [-2,-33,1.2,'Tree_2_B_Color1.gltf'],[25,-4,1.0,'Tree_1_A_Color1.gltf'],[-25,2,1.0,'Tree_1_A_Color1.gltf']
-]) addTree(x,z,s,p);
-for(const [x,z,s] of [[-30,10,0.8],[30,11,0.7],[-22,-6,0.6],[24,-25,0.75],[2,27,0.6]]) addPrimitiveRock(x,z,s);
-for(const [x,z,p] of [[-15,25,'Bush_3_A_Color1.gltf'],[-31,26,'Bush_4_A_Color1.gltf'],[19,24,'Bush_2_A_Color1.gltf'],[28,22,'Bush_4_A_Color1.gltf'],[-2,-16,'Bush_1_A_Color1.gltf'],[24,-7,'Bush_3_A_Color1.gltf']]){
-  placeGroundModel(FOREST+p,x,z,{scale:1.2,rot:Math.random()*Math.PI*2,groundCenter:true});
-}
-for(const [x,z,r] of [[-18,14,0],[-14,13,0],[-15,8,0.3]]) placeGroundModel(PROP+'Workbench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
-placeGroundModel(PROP+'Anvil.gltf',-20,12,{scale:1.0,rot:-0.4,groundCenter:true});
-placeGroundModel(PROP+'WeaponStand.gltf',-12.3,11.7,{scale:1.0,rot:Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Stall_Empty.gltf',12.5,10,{scale:1.05,rot:Math.PI,groundCenter:true});
-placeGroundModel(PROP+'Stall_Cart_Empty.gltf',17,10,{scale:1.05,rot:-Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Shelf_Small_Bottles.gltf',16,3,{scale:1.0,rot:-Math.PI/2,groundCenter:true});
-for(const [x,z,p] of [[11,12,'FarmCrate_Apple.gltf'],[14,12,'FarmCrate_Carrot.gltf'],[18,7,'Crate_Wooden.gltf'],[11,7,'Barrel_Apples.gltf']]) placeGroundModel(PROP+p,x,z,{scale:1.0,rot:Math.random(),groundCenter:true});
-placeGroundModel(PROP+'Table_Large.gltf',-14,5,{scale:1.0,rot:0.2,groundCenter:true});
-for(const [x,z,r] of [[-17,4.5,Math.PI/2],[-11,4.5,-Math.PI/2],[-14,7.5,0]]) placeGroundModel(PROP+'Bench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
-for(const [x,z] of [[17,-11],[21,-11],[17,-18],[21,-18]]) placeGroundModel(PROP+'CandleStick_Stand.gltf',x,z,{scale:0.9,groundCenter:true});
-placeGroundModel(PROP+'Bookcase_2.gltf',15.5,-16,{scale:1.0,rot:Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Chest_Wood.gltf',-2,-20,{scale:0.9,rot:0.4,groundCenter:true});
-for(const [x,z] of [[-3,1],[3,1],[-3,23],[3,23],[-24,9],[15,9]]) placeGroundModel(DUN+'torch_lit.gltf',x,z,{scale:1.05,groundCenter:true});
-
-const pillarDefs=[[-4,1.2,1.15,0.85],[4,1.2,1.15,0.85],[-24,17,1.2,1.0],[25,17,1.2,1.0]];
-pillarDefs.forEach(([x,z,s,h])=>{
-  const top=terrainYAt(x,z);
-  const pMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
-  const m=new THREE.Mesh(new THREE.BoxGeometry(s,h,s),pMat);
-  m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
-  const capH=0.18, capW=s+0.18;
-  const cap=new THREE.Mesh(new THREE.BoxGeometry(capW,capH,capW), new THREE.MeshStandardMaterial({color:0x8a7358,roughness:0.8}));
-  cap.position.set(x,top+h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; mapRoot.add(cap);
-  const platformTop=top+h+capH;
-  addCollider(x,z,s,s,top,platformTop);
-  platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top:platformTop});
-  hittables.push({mesh:m,mat:pMat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top:platformTop,shakeT:0,flashT:0,baseX:x,baseZ:z});
-});
-
+// const ASSET_VENDOR=new URL('../assets/vendor/', import.meta.url).href;
+// const DUN=ASSET_VENDOR+'kaykit_dungeon/';
+// const MV=ASSET_VENDOR+'medieval_village/';
+// const PROP=ASSET_VENDOR+'fantasy_props/';
+// const FOREST=ASSET_VENDOR+'kaykit_forest/';
+// const SKEL=ASSET_VENDOR+'kaykit_skeletons/';
+// for(const z of [23,18,13,8,3,-2,-7,-12,-17]) placeGroundModel(MV+'Floor_Brick.gltf',0,z,{scale:1.5,rot:Math.PI/2,groundCenter:true});
+// for(const [x,z,s,p] of [
+//   [-31,-3,1.35,'Tree_3_A_Color1.gltf'],[-34,32,1.25,'Tree_2_B_Color1.gltf'],[-28,-24,1.5,'Tree_4_A_Color1.gltf'],
+//   [30,-28,1.45,'Tree_3_A_Color1.gltf'],[32,5,1.25,'Tree_2_B_Color1.gltf'],[29,27,1.15,'Tree_1_A_Color1.gltf'],
+//   [-2,-33,1.2,'Tree_2_B_Color1.gltf'],[25,-4,1.0,'Tree_1_A_Color1.gltf'],[-25,2,1.0,'Tree_1_A_Color1.gltf']
+// ]) addTree(x,z,s,p);
+// for(const [x,z,s] of [[-30,10,0.8],[30,11,0.7],[-22,-6,0.6],[24,-25,0.75],[2,27,0.6]]) addPrimitiveRock(x,z,s);
+// for(const [x,z,p] of [[-15,25,'Bush_3_A_Color1.gltf'],[-31,26,'Bush_4_A_Color1.gltf'],[19,24,'Bush_2_A_Color1.gltf'],[28,22,'Bush_4_A_Color1.gltf'],[-2,-16,'Bush_1_A_Color1.gltf'],[24,-7,'Bush_3_A_Color1.gltf']]){
+//   placeGroundModel(FOREST+p,x,z,{scale:1.2,rot:Math.random()*Math.PI*2,groundCenter:true});
+// }
+// for(const [x,z,r] of [[-18,14,0],[-14,13,0],[-15,8,0.3]]) placeGroundModel(PROP+'Workbench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
+// placeGroundModel(PROP+'Anvil.gltf',-20,12,{scale:1.0,rot:-0.4,groundCenter:true});
+// placeGroundModel(PROP+'WeaponStand.gltf',-12.3,11.7,{scale:1.0,rot:Math.PI/2,groundCenter:true});
+// placeGroundModel(PROP+'Stall_Empty.gltf',12.5,10,{scale:1.05,rot:Math.PI,groundCenter:true});
+// placeGroundModel(PROP+'Stall_Cart_Empty.gltf',17,10,{scale:1.05,rot:-Math.PI/2,groundCenter:true});
+// placeGroundModel(PROP+'Shelf_Small_Bottles.gltf',16,3,{scale:1.0,rot:-Math.PI/2,groundCenter:true});
+// for(const [x,z,p] of [[11,12,'FarmCrate_Apple.gltf'],[14,12,'FarmCrate_Carrot.gltf'],[18,7,'Crate_Wooden.gltf'],[11,7,'Barrel_Apples.gltf']]) placeGroundModel(PROP+p,x,z,{scale:1.0,rot:Math.random(),groundCenter:true});
+// placeGroundModel(PROP+'Table_Large.gltf',-14,5,{scale:1.0,rot:0.2,groundCenter:true});
+// for(const [x,z,r] of [[-17,4.5,Math.PI/2],[-11,4.5,-Math.PI/2],[-14,7.5,0]]) placeGroundModel(PROP+'Bench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
+// for(const [x,z] of [[17,-11],[21,-11],[17,-18],[21,-18]]) placeGroundModel(PROP+'CandleStick_Stand.gltf',x,z,{scale:0.9,groundCenter:true});
+// placeGroundModel(PROP+'Bookcase_2.gltf',15.5,-16,{scale:1.0,rot:Math.PI/2,groundCenter:true});
+// placeGroundModel(PROP+'Chest_Wood.gltf',-2,-20,{scale:0.9,rot:0.4,groundCenter:true});
+// for(const [x,z] of [[-3,1],[3,1],[-3,23],[3,23],[-24,9],[15,9]]) placeGroundModel(DUN+'torch_lit.gltf',x,z,{scale:1.05,groundCenter:true});
+// 
+// const pillarDefs=[[-4,1.2,1.15,0.85],[4,1.2,1.15,0.85],[-24,17,1.2,1.0],[25,17,1.2,1.0]];
+// pillarDefs.forEach(([x,z,s,h])=>{
+//   const top=terrainYAt(x,z);
+//   const pMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
+//   const m=new THREE.Mesh(new THREE.BoxGeometry(s,h,s),pMat);
+//   m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
+//   const capH=0.18, capW=s+0.18;
+//   const cap=new THREE.Mesh(new THREE.BoxGeometry(capW,capH,capW), new THREE.MeshStandardMaterial({color:0x8a7358,roughness:0.8}));
+//   cap.position.set(x,top+h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; mapRoot.add(cap);
+//   const platformTop=top+h+capH;
+//   addCollider(x,z,s,s,top,platformTop);
+//   platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top:platformTop});
+//   hittables.push({mesh:m,mat:pMat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top:platformTop,shakeT:0,flashT:0,baseX:x,baseZ:z});
+// });
+// 
 // ============================================================
 //  练武木人桩（插在地上，带横臂；被打会后仰晃动+回弹）
 // ============================================================
-const WOOD=0x9a6b3e, WOOD_D=0x6e4a28;
-function Mwood(c){return new THREE.MeshStandardMaterial({color:c,roughness:0.85});}
-function woodBox(w,h,d,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),Mwood(c));m.castShadow=true;m.receiveShadow=true;return m;}
-function makeDummy(dx,dz,face){
-  const root=new THREE.Group(); root.position.set(dx,0,dz); root.rotation.y=face; scene.add(root);
-  registerMapFeature({type:'training',name:'木桩',x:dx,z:dz,w:1.2,d:1.2,rot:face});
+// const WOOD=0x9a6b3e, WOOD_D=0x6e4a28;
+// function Mwood(c){return new THREE.MeshStandardMaterial({color:c,roughness:0.85});}
+// function woodBox(w,h,d,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),Mwood(c));m.castShadow=true;m.receiveShadow=true;return m;}
+// function makeDummy(dx,dz,face){
+//   const root=new THREE.Group(); root.position.set(dx,0,dz); root.rotation.y=face; scene.add(root);
+//   registerMapFeature({type:'training',name:'木桩',x:dx,z:dz,w:1.2,d:1.2,rot:face});
   // 地面底座(沙袋样的圆台)
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.4,16),Mwood(WOOD_D));
-  base.position.y=0.2; base.castShadow=true; base.receiveShadow=true; root.add(base);
+//   const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.4,16),Mwood(WOOD_D));
+//   base.position.y=0.2; base.castShadow=true; base.receiveShadow=true; root.add(base);
   // 倾倒枢轴(被打时绕底部前后仰)
-  const pivot=new THREE.Group(); pivot.position.y=0.4; root.add(pivot);
-  const mats=[];   // 收集需要闪红的材质
-  function reg(mesh){ mats.push(mesh.material); return mesh; }
+//   const pivot=new THREE.Group(); pivot.position.y=0.4; root.add(pivot);
+//   const mats=[];   // 收集需要闪红的材质
+//   function reg(mesh){ mats.push(mesh.material); return mesh; }
   // 主立柱
-  const post=woodBox(0.42,2.4,0.42,WOOD); post.position.y=1.2; pivot.add(reg(post));
+//   const post=woodBox(0.42,2.4,0.42,WOOD); post.position.y=1.2; pivot.add(reg(post));
   // 缠绳纹(几道深色环)
-  for(const yy of [0.5,1.0,2.0]){ const r=woodBox(0.46,0.1,0.46,WOOD_D); r.position.y=yy; pivot.add(reg(r)); }
+//   for(const yy of [0.5,1.0,2.0]){ const r=woodBox(0.46,0.1,0.46,WOOD_D); r.position.y=yy; pivot.add(reg(r)); }
   // 头部圆球
-  const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,16,12),Mwood(WOOD)); head.position.y=2.6; head.castShadow=true; pivot.add(reg(head));
+//   const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,16,12),Mwood(WOOD)); head.position.y=2.6; head.castShadow=true; pivot.add(reg(head));
   // 两条横臂(木人桩特征)
-  const armT=woodBox(1.7,0.22,0.22,WOOD); armT.position.set(0,1.9,0.0); pivot.add(reg(armT));
-  const armDiagL=woodBox(0.22,0.22,1.1,WOOD); armDiagL.position.set(-0.5,1.5,0.3); armDiagL.rotation.x=0.5; pivot.add(reg(armDiagL));
-  const armDiagR=woodBox(0.22,0.22,1.1,WOOD); armDiagR.position.set(0.5,1.5,0.3); armDiagR.rotation.x=0.5; pivot.add(reg(armDiagR));
+//   const armT=woodBox(1.7,0.22,0.22,WOOD); armT.position.set(0,1.9,0.0); pivot.add(reg(armT));
+//   const armDiagL=woodBox(0.22,0.22,1.1,WOOD); armDiagL.position.set(-0.5,1.5,0.3); armDiagL.rotation.x=0.5; pivot.add(reg(armDiagL));
+//   const armDiagR=woodBox(0.22,0.22,1.1,WOOD); armDiagR.position.set(0.5,1.5,0.3); armDiagR.rotation.x=0.5; pivot.add(reg(armDiagR));
   // 一条朝前的中臂
-  const armMid=woodBox(0.2,0.2,0.9,WOOD); armMid.position.set(0,1.15,0.45); pivot.add(reg(armMid));
-
-  addCollider(dx,dz,0.6,0.6,terrainYAt(dx,dz),terrainYAt(dx,dz)+3.0);   // 立柱碰撞
-  const dummy={root,pivot,mats, x:dx,z:dz, r:1.2, face,
-    flashT:0, tilt:0, tiltVel:0};   // tilt: 后仰角(物理回弹)
-  dummies.push(dummy);
-}
-const dummies=[];
-makeDummy(-21.8,15.0,0.15);      // training yard main dummy
-makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
-
+//   const armMid=woodBox(0.2,0.2,0.9,WOOD); armMid.position.set(0,1.15,0.45); pivot.add(reg(armMid));
+// 
+//   addCollider(dx,dz,0.6,0.6,terrainYAt(dx,dz),terrainYAt(dx,dz)+3.0);   // 立柱碰撞
+//   const dummy={root,pivot,mats, x:dx,z:dz, r:1.2, face,
+//     flashT:0, tilt:0, tiltVel:0};   // tilt: 后仰角(物理回弹)
+//   dummies.push(dummy);
+// }
+// const dummies=[];
+// makeDummy(-21.8,15.0,0.15);      // training yard main dummy
+// makeDummy(-24.5,17.8,-0.35);     // training yard side dummy
+// 
+// const ASSET_VENDOR=new URL('../assets/vendor/', import.meta.url).href;
+const SKEL=ASSET_VENDOR+'kaykit_skeletons/';
 const monsters=[];
-function collectMonsterMaterials(root, out){
-  root.traverse(o=>{
-    if(o.isMesh && o.material){
-      const mats=Array.isArray(o.material)?o.material:[o.material];
-      for(const mat of mats) if(mat && !out.includes(mat)) out.push(mat);
-    }
-  });
-}
+// function collectMonsterMaterials(root, out){
+//   root.traverse(o=>{
+//     if(o.isMesh && o.material){
+//       const mats=Array.isArray(o.material)?o.material:[o.material];
+//       for(const mat of mats) if(mat && !out.includes(mat)) out.push(mat);
+//     }
+//   });
+// }
 function makeMonsterTarget(x,z,name='打我'){
   const top=terrainYAt(x,z);
   const root=new THREE.Group(); root.position.set(x,top,z); scene.add(root);
@@ -507,22 +556,22 @@ function makeMonsterTarget(x,z,name='打我'){
   marker.rotation.x=-Math.PI/2; marker.position.y=0.04; root.add(marker);
   const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
   monsters.push(mon);
-  loadFreshModel(SKEL+'Skeleton_Minion.glb').then(model=>{
-    if(!model) return;
-    model.scale.setScalar(1.55);
-    model.rotation.y=Math.PI;
-    const box=new THREE.Box3().setFromObject(model);
-    const center=box.getCenter(new THREE.Vector3());
-    model.position.set(-center.x,-box.min.y,-center.z);
-    collectMonsterMaterials(model,mon.mats);
-    fallback.visible=false;
-    mon.model=model;
-    root.add(model);
-  });
-  addCollider(x,z,0.8,0.8,top,top+2.4);
-  return mon;
+//   loadFreshModel(SKEL+'Skeleton_Minion.glb').then(model=>{
+//     if(!model) return;
+//     model.scale.setScalar(1.55);
+//     model.rotation.y=Math.PI;
+//     const box=new THREE.Box3().setFromObject(model);
+//     const center=box.getCenter(new THREE.Vector3());
+//     model.position.set(-center.x,-box.min.y,-center.z);
+//     collectMonsterMaterials(model,mon.mats);
+//     fallback.visible=false;
+//     mon.model=model;
+//     root.add(model);
+//   });
+//   addCollider(x,z,0.8,0.8,top,top+2.4);
+//   return mon;
 }
-makeMonsterTarget(0,-6,'打我');
+makeMonsterTarget(0,6,'打我');
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
@@ -634,6 +683,15 @@ weaponSocket.add(weapon);
 const weaponTip=weapon.userData.tipRef;   // 剑尖世界坐标采样点
 
 // 蓄满闪烁光环(挂在body中部)
+// ===== 木星球体变身系统 =====
+const jupiterBall=new THREE.Group();jupiterBall.visible=false;scene.add(jupiterBall);
+const _jOrb1=new THREE.Group();jupiterBall.add(_jOrb1);
+const _jSwd1=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.1,0.07),new THREE.MeshStandardMaterial({color:0xeaeaea,roughness:0.1,emissive:0x8888aa,emissiveIntensity:1.2}));
+_jOrb1.add(_jSwd1);
+const _jOrb2=new THREE.Group();jupiterBall.add(_jOrb2);
+const _jSwd2=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.1,0.07),new THREE.MeshStandardMaterial({color:0x3f6fb0,roughness:0.1,emissive:0x2244aa,emissiveIntensity:1.2}));
+_jOrb2.add(_jSwd2);
+let jupiterActive=false,_jSpin=0,_drillSpin=0;
 const chargeAuraMat=new THREE.MeshBasicMaterial({color:0xffe85a,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
 const chargeAura=new THREE.Mesh(new THREE.SphereGeometry(1.3,16,12),chargeAuraMat);
 chargeAura.position.y=1.6; chargeAura.visible=false; body.add(chargeAura);
@@ -678,6 +736,12 @@ function updateSpaceSlash(dt){
 // 命中钩子：带空间斩标记时，在命中点放空间斩并清除标记
 function onHitTarget(ox,oy,oz){
   if(spaceSlashReady){ spawnSpaceSlash(ox,oy,oz); spaceSlashReady=false; hitstop=Math.max(hitstop,0.06); shake=Math.max(shake,0.2); }
+  // 命中音效:骷髅→骨头脆响, 木桩→撞木声, 怪物(肉)→闷击声
+  const nearDummy=dummies.some(d=>Math.hypot(d.x-ox,d.z-oz)<1.8);
+  const nearMonster=monsters.some(m=>Math.hypot(m.x-ox,m.z-oz)<1.8);
+  if(nearMonster) SFX.hitBone();
+  else if(nearDummy) SFX.hitWood();
+  else SFX.hitFlesh();
 }
 
 // ============================================================
@@ -686,7 +750,7 @@ function onHitTarget(ox,oy,oz){
 // 轻击：正前方的弧形刀光（弧心朝 +Z=正前方）；用 Y轴pivot做左扫
 const slashPivot=new THREE.Group(); slashPivot.position.set(0,0.06,0); yaw.add(slashPivot);
 const slashMat=new THREE.MeshBasicMaterial({color:0xffe08a,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
-const slashMesh=new THREE.Mesh(new THREE.RingGeometry(0.8,2.0,28,1, -Math.PI/2-0.95, 1.9),slashMat);
+const slashMesh=new THREE.Mesh(new THREE.RingGeometry(0.45,1.2,28,1, -Math.PI/2-0.95, 1.9),slashMat);
 slashMesh.rotation.x=-Math.PI/2; slashMesh.position.set(0,0,0.3); slashMesh.visible=false; slashPivot.add(slashMesh);
 
 // 重击：正前方地面圆圈判定（蓄力时实时显示、随蓄力变大）
@@ -951,6 +1015,7 @@ function spawnDebris(cx,cz){
   return bits;
 }
 function doStomp(){
+  SFX.stomp();
   hitstop=Math.max(hitstop,0.12); shake=Math.max(shake,0.45);     // 强顿帧 + 大震屏
   const cr=spawnCrater(P.x,P.z); const bits=spawnDebris(P.x,P.z);
   stompMarks.push({grp:cr.grp, mats:cr.mats, bits, age:0});
@@ -989,46 +1054,49 @@ function updateStomps(dt){
 const JOINTS={ shoR:RArm.root, elbR:RArm.j2, shoL:LArm.root, elbL:LArm.j2,
   hipR:RLeg.root, kneeR:RLeg.j2, hipL:LLeg.root, kneeL:LLeg.j2, chest:chest, head:headGrp, wristR:rWrist };
 function resetJoints(){ for(const k in JOINTS){ JOINTS[k].rotation.set(0,0,0); } }
-
 const CLIPS={
   // ===== 地面轻击三连（全身发力链：蹬腿→沉胯核心拧转→抬身带臂）=====
   // L1 向左挥：左腿弓步前蹲沉身、右腿后蹬，核心右拧前倾蓄势 → 蹬地抬身、向左猛拧挥砍 → 定格
-  gL1:{ dur:0.62, tracks:{
+  gL1:{ dur:0.50, tracks:{
     // 身体：先下沉前倾蓄势(bodyY负/lean正) → 发力时抬起(bodyY回升/lean减) → 定格
-    bodyY:[{t:0,v:0},{t:0.18,v:-0.34},{t:0.30,v:-0.12},{t:0.62,v:-0.14}],
-    bodyLean:[{t:0,v:0.05},{t:0.18,v:0.42},{t:0.30,v:0.12},{t:0.62,v:0.16}],
+    bodyY:[{t:0,v:0},{t:0.13,v:-0.34},{t:0.22,v:-0.12},{t:0.50,v:-0.14}],
+    bodyLean:[{t:0,v:0.12},{t:0.13,v:0.72},{t:0.22,v:0.28},{t:0.50,v:0.30}],
+    chestX:[{t:0,v:0.1},{t:0.13,v:0.45},{t:0.22,v:0.2},{t:0.50,v:0.22}],
     // 核心拧转：右拧蓄势 → 猛地左拧
-    chestY:[{t:0,v:0.1},{t:0.18,v:0.95},{t:0.30,v:-1.0},{t:0.62,v:-0.92}],
+    chestY:[{t:0,v:0.1},{t:0.13,v:0.95},{t:0.22,v:-1.0},{t:0.50,v:-0.92}],
     // 左腿大弓步前屈(髋前抬+深屈膝)
-    hipL:[{t:0,x:0},{t:0.18,x:-1.0},{t:0.30,x:-0.7},{t:0.62,x:-0.62}],
-    kneeL:[{t:0,x:0.1},{t:0.18,x:1.3},{t:0.30,x:0.95},{t:0.62,x:0.9}],
+    hipL:[{t:0,x:0},{t:0.13,x:-1.25},{t:0.22,x:-0.85},{t:0.50,x:-0.75}],
+    kneeL:[{t:0,x:0.1},{t:0.13,x:1.55},{t:0.22,x:1.15},{t:0.50,x:1.05}],
     // 右腿向后蹬直
-    hipR:[{t:0,x:0},{t:0.18,x:0.55},{t:0.30,x:0.4},{t:0.62,x:0.36}],
-    kneeR:[{t:0,x:0.1},{t:0.18,x:0.2},{t:0.62,x:0.15}],
+    hipR:[{t:0,x:0},{t:0.13,x:0.55},{t:0.22,x:0.4},{t:0.50,x:0.36}],
+    kneeR:[{t:0,x:0.1},{t:0.13,x:0.2},{t:0.50,x:0.15}],
     // 右臂：举右后蓄势 → 大幅扫向左前 → 定格(收向胸前时肘趋近160°,基本伸直)；起手放低到胸口
-    shoR:[{t:0,x:0.15,z:0.6},{t:0.18,x:-1.95,z:1.4},{t:0.30,x:-1.6,z:-1.05},{t:0.62,x:-1.55,z:-1.0}],
-    elbR:[{t:0,x:-0.5},{t:0.18,x:-0.2},{t:0.30,x:-0.32},{t:0.62,x:-0.35}],
-    shoL:[{t:0,x:0.3,z:-0.4},{t:0.18,x:0.55,z:-0.5},{t:0.30,x:-0.4},{t:0.62,x:-0.35}],
+    shoR:[{t:0,x:0.15,z:0.6},{t:0.13,x:-1.95,z:1.4},{t:0.22,x:-1.6,z:-1.05},{t:0.50,x:-1.55,z:-1.0}],
+    elbR:[{t:0,x:-0.5},{t:0.13,x:-0.2},{t:0.22,x:-0.32},{t:0.50,x:-0.35}],
+    elbL:[{t:0,x:-0.9},{t:0.13,x:-1.1},{t:0.22,x:-0.85},{t:0.50,x:-0.8}],
+    shoL:[{t:0,x:0.2,z:-0.9},{t:0.13,x:0.4,z:-1.1},{t:0.22,x:-0.3,z:-0.55},{t:0.50,x:-0.28,z:-0.5}],
     // 挥剑时改成枪式握剑(剑沿小臂延长线)，取代原来的转手腕
-    gripMode:[{t:0,v:0},{t:0.18,v:1},{t:0.62,v:1}],
+    gripMode:[{t:0,v:0},{t:0.13,v:1},{t:0.50,v:1}],
   }},
   // L2 向右挥：起手帧接续L1收尾姿势(手在左/躯干左拧)，不回拉，直接向右猛砍
-  gL2:{ dur:0.62, tracks:{
-    bodyY:[{t:0,v:-0.14},{t:0.18,v:-0.20},{t:0.30,v:-0.12},{t:0.62,v:-0.14}],
-    bodyLean:[{t:0,v:0.16},{t:0.18,v:0.30},{t:0.30,v:0.12},{t:0.62,v:0.16}],
-    // 起手保持L1收尾的左拧(-0.92)，直接向右猛拧(不回拉)
-    chestY:[{t:0,v:-0.92},{t:0.30,v:1.0,e:'in'},{t:0.62,v:0.92}],
-    // 腿保持弓步桩，只随核心轻微晃
-    hipL:[{t:0,x:-0.62},{t:0.18,x:-0.68},{t:0.30,x:-0.58},{t:0.62,x:-0.62}],
-    kneeL:[{t:0,x:0.9},{t:0.18,x:0.95},{t:0.30,x:0.85},{t:0.62,x:0.9}],
-    hipR:[{t:0,x:0.36},{t:0.18,x:0.42},{t:0.30,x:0.32},{t:0.62,x:0.36}],
-    kneeR:[{t:0,x:0.15},{t:0.62,x:0.15}],
-    // 右臂：起手=L1收尾位置(x:-1.55,z:-1.0)，直接扫向右前(z正)，不先回拉；落点放低到胸口
-    shoR:[{t:0,x:-1.55,z:-1.0},{t:0.30,x:-1.1,z:1.2,e:'in'},{t:0.62,x:-1.1,z:1.2}],
-    elbR:[{t:0,x:-0.45},{t:0.30,x:-0.45},{t:0.62,x:-0.45}],
-    shoL:[{t:0,x:-0.35},{t:0.18,x:-0.3},{t:0.30,x:0.5,z:0.4},{t:0.62,x:0.45,z:0.4}],
-    // 挥剑时枪式握剑(取代转手腕)；起手沿用L1的枪式(1)，全程保持
-    gripMode:[{t:0,v:1},{t:0.62,v:1}],
+  // L2 参考Q-B:0.53秒,弓步更深,前倾更大,手臂幅度更大,动作完整不打折
+  gL2:{ dur:0.53, tracks:{
+    bodyY:[{t:0,v:-0.14},{t:0.13,v:-0.22},{t:0.22,v:-0.12},{t:0.53,v:-0.14}],
+    bodyLean:[{t:0,v:0.20},{t:0.13,v:0.44},{t:0.22,v:0.22},{t:0.53,v:0.26}],
+    chestX:[{t:0,v:0.12},{t:0.13,v:0.36},{t:0.22,v:0.18},{t:0.53,v:0.20}],
+    // 核心向右猛拧(全程不停顿,幅度到底)
+    chestY:[{t:0,v:-0.92},{t:0.22,v:1.05,e:'in'},{t:0.53,v:0.95}],
+    // 腿更深的弓步桩
+    hipL:[{t:0,x:-0.75},{t:0.13,x:-0.82},{t:0.22,x:-0.72},{t:0.53,x:-0.78}],
+    kneeL:[{t:0,x:1.05},{t:0.13,x:1.14},{t:0.22,x:1.02},{t:0.53,x:1.08}],
+    hipR:[{t:0,x:0.42},{t:0.13,x:0.48},{t:0.22,x:0.38},{t:0.53,x:0.42}],
+    kneeR:[{t:0,x:0.18},{t:0.53,x:0.18}],
+    // 右臂:幅度拉满,从左下大幅扫向右上
+    shoR:[{t:0,x:-1.55,z:-1.0},{t:0.22,x:-0.75,z:1.55,e:'in'},{t:0.53,x:-0.75,z:1.55}],
+    elbR:[{t:0,x:-0.45},{t:0.22,x:-0.38},{t:0.53,x:-0.4}],
+    shoL:[{t:0,x:-0.35,z:-0.3},{t:0.13,x:-0.3,z:-0.35},{t:0.22,x:0.55,z:0.45},{t:0.53,x:0.50,z:0.4}],
+    elbL:[{t:0,x:-0.8},{t:0.22,x:-0.6},{t:0.53,x:-0.65}],
+    gripMode:[{t:0,v:1},{t:0.53,v:1}],
   }},
   // L3 大劈(扔实心球式全力一击)：起手→慢动作举顶(减速)→顶点定格→猛砸→砸地停顿→起身
   // 节奏: 0-.20起手 / .20-.54慢举到顶(ease out) / .54-.64顶点停 / .64-.72猛砸(ease in) / .72后砸地停顿
@@ -1057,6 +1125,63 @@ const CLIPS={
     shoR:[{t:0,x:0.6},{t:0.34,x:0}], shoL:[{t:0,x:0.48},{t:0.34,x:0}],
     hipL:[{t:0,x:-0.72},{t:0.34,x:0}], kneeL:[{t:0,x:1.0},{t:0.34,x:0}],
     hipR:[{t:0,x:0.46},{t:0.34,x:0}], kneeR:[{t:0,x:0.18},{t:0.34,x:0}],
+  }},
+
+  aDrill:{ dur:0.25, tracks:{ // 旋风坠
+    bodyLean:[{t:0,v:0.9},{t:0.25,v:1.5}],chestX:[{t:0,v:0.6},{t:0.25,v:0.95}],
+    shoR:[{t:0,x:-2.8,z:0.05},{t:0.25,x:-3.0,z:0.05}],
+    shoL:[{t:0,x:-2.8,z:-0.05},{t:0.25,x:-3.0,z:-0.05}],
+    elbR:[{t:0,x:-0.06},{t:0.25,x:-0.04}],elbL:[{t:0,x:-0.06},{t:0.25,x:-0.04}],
+    hipR:[{t:0,x:-0.2},{t:0.25,x:-0.15}],hipL:[{t:0,x:-0.2},{t:0.25,x:-0.15}],
+    kneeR:[{t:0,x:0.08},{t:0.25,x:0.06}],kneeL:[{t:0,x:0.08},{t:0.25,x:0.06}],
+    gripMode:[{t:0,v:1},{t:0.25,v:1}],
+  }},
+  aJupiter:{ dur:0.75, tracks:{
+    bodyLean:[{t:0,v:1.2},{t:0.75,v:1.2}],
+    chestX:[{t:0,v:0.9},{t:0.75,v:0.9}],
+    shoR:[{t:0,x:-1.55,z:0.05},{t:0.75,x:-1.55,z:0.05}],
+    elbR:[{t:0,x:-1.55},{t:0.75,x:-1.55}],
+    shoL:[{t:0,x:-1.55,z:-0.05},{t:0.75,x:-1.55,z:-0.05}],
+    elbL:[{t:0,x:-1.55},{t:0.75,x:-1.55}],
+    hipR:[{t:0,x:-1.65},{t:0.75,x:-1.65}],
+    hipL:[{t:0,x:-1.65},{t:0.75,x:-1.65}],
+    kneeR:[{t:0,x:1.55},{t:0.75,x:1.55}],
+    kneeL:[{t:0,x:1.55},{t:0.75,x:1.55}],
+    gripMode:[{t:0,v:1},{t:0.75,v:1}],
+  }},
+  aJupiterLand:{ dur:0.65, tracks:{
+    bodyY:[{t:0,v:-0.88},{t:0.28,v:-0.85},{t:0.65,v:0,e:'out'}],
+    bodyLean:[{t:0,v:0.65},{t:0.28,v:0.62},{t:0.65,v:0,e:'out'}],
+    chestX:[{t:0,v:0.4},{t:0.28,v:0.38},{t:0.65,v:0}],
+    shoR:[{t:0,x:0.5,z:-0.8},{t:0.28,x:0.5,z:-0.8},{t:0.65,x:0,z:0}],
+    elbR:[{t:0,x:-0.05},{t:0.28,x:-0.05},{t:0.65,x:-0.3}],
+    shoL:[{t:0,x:-1.1,z:0.5},{t:0.28,x:-1.1,z:0.5},{t:0.65,x:0,z:0}],
+    elbL:[{t:0,x:-0.4},{t:0.28,x:-0.4},{t:0.65,x:-0.3}],
+    hipL:[{t:0,x:-1.05},{t:0.28,x:-1.02},{t:0.65,x:0,e:'out'}],
+    kneeL:[{t:0,x:1.45},{t:0.28,x:1.42},{t:0.65,x:0,e:'out'}],
+    hipR:[{t:0,x:0.72},{t:0.28,x:0.70},{t:0.65,x:0,e:'out'}],
+    kneeR:[{t:0,x:0.12},{t:0.28,x:0.10},{t:0.65,x:0,e:'out'}],
+  }},
+
+  // 飞踹镜像膝击(gKnee):右腿踢,是dKick的左右镜像
+  gKnee:{ dur:0.68, tracks:{
+    // 蓄势:像践踏一样深蹲核心收紧 → 爆发膝踢
+    bodyY:[{t:0,v:0},{t:0.06,v:0},{t:0.16,v:-0.62,e:'out'},{t:0.30,v:0.18,e:'in'},{t:0.50,v:0.02},{t:0.68,v:0}],
+    bodyLean:[{t:0,v:0.2},{t:0.06,v:0.22},{t:0.16,v:0.72,e:'out'},{t:0.30,v:-0.04,e:'in'},{t:0.50,v:-0.04},{t:0.68,v:0}],
+    bodyYaw:[{t:0,v:0.2},{t:0.14,v:0.55},{t:0.30,v:1.04,e:'in'},{t:0.50,v:1.04},{t:0.68,v:0}],
+    bodySide:[{t:0,v:0},{t:0.14,v:-0.08},{t:0.30,v:-0.28,e:'in'},{t:0.50,v:-0.28},{t:0.68,v:0}],
+    chestX:[{t:0,v:0.6},{t:0.14,v:0.75,e:'out'},{t:0.30,v:-0.38,e:'in'},{t:0.50,v:-0.38},{t:0.68,v:0}],
+    chestY:[{t:0,v:-0.5},{t:0.34,v:-0.10},{t:0.50,v:-0.10},{t:0.68,v:0}],
+    chestZ:[{t:0,v:0},{t:0.34,v:-0.14},{t:0.50,v:-0.14},{t:0.68,v:0}],
+    shoR:[{t:0,x:-0.5,z:-0.5},{t:0.34,x:-0.34,y:-0.78,z:-0.74},{t:0.50,x:-0.34,y:-0.78,z:-0.74},{t:0.68,x:0,y:0,z:0}],
+    elbR:[{t:0,x:-0.5},{t:0.34,x:-0.58},{t:0.50,x:-0.58},{t:0.68,x:-0.3}],
+    shoL:[{t:0,x:-0.3,z:0.2},{t:0.16,x:-0.6,z:0.1},{t:0.34,x:-0.84,y:-0.76,z:-0.22},{t:0.50,x:-0.84,y:-0.76,z:-0.22},{t:0.68,x:0,y:0,z:0}],
+    elbL:[{t:0,x:-0.5},{t:0.34,x:-1.16},{t:0.50,x:-1.16},{t:0.68,x:-0.3}],
+    hipR:[{t:0,x:0.36},{t:0.16,x:-1.0,z:-0.4},{t:0.34,x:-1.68,y:0.12,z:-0.84,e:'in'},{t:0.50,x:-1.68,y:0.12,z:-0.84},{t:0.68,x:0,y:0,z:0}],
+    kneeR:[{t:0,x:0.15},{t:0.16,x:1.6},{t:0.34,x:2.32,e:'in'},{t:0.50,x:2.30},{t:0.68,x:0.1}],
+    hipL:[{t:0,x:-0.62},{t:0.34,x:0.06,y:0.50,z:0.24},{t:0.50,x:0.06,y:0.50,z:0.24},{t:0.68,x:0,y:0,z:0}],
+    kneeL:[{t:0,x:0.9},{t:0.34,x:0},{t:0.68,x:0}],
+    gripMode:[{t:0,v:1},{t:0.68,v:1}],
   }},
 
   // ===== 重击系列 =====
@@ -1132,9 +1257,9 @@ const CLIPS={
     bodyLean:[{t:0,v:0.1},{t:0.20,v:0.3,e:'out'},{t:0.26,v:0.32},{t:0.34,v:0.06},{t:0.62,v:0.05}],
     // —— 蓄力段(0~0.26): 右手抬胸前肘内拐(篮球顶人) / 左手大臂后撤肘收紧(刺拳预备) ——
     // —— 爆发段(0.26~0.50): 双臂舒展打开(船头式) ——
-    shoR:[{t:0,x:-0.9,z:0.3},{t:0.20,x:-1.0,z:0.35,e:'out'},{t:0.26,x:-1.0,z:0.35},{t:0.34,x:-0.15,z:-1.38,e:'in'},{t:0.50,x:-0.15,z:-1.38},{t:0.62,x:-0.2,z:-1.0}],
+    shoR:[{t:0,x:-0.9,z:0.3},{t:0.20,x:-1.0,z:0.35,e:'out'},{t:0.26,x:-1.0,z:0.35},{t:0.34,x:-0.15,z:-1.38,e:'in'},{t:0.50,x:-0.15,z:-1.38},{t:0.62,x:-0.15,z:-1.38}],
     elbR:[{t:0,x:-1.7},{t:0.26,x:-1.75},{t:0.34,x:-0.12,e:'in'},{t:0.62,x:-0.12}],   // 蓄力肘内拐折紧→爆发伸直
-    shoL:[{t:0,x:-1.2,z:0.2},{t:0.20,x:-1.4,z:0.2,e:'out'},{t:0.26,x:-1.4,z:0.2},{t:0.34,x:-0.15,z:1.38,e:'in'},{t:0.50,x:-0.15,z:1.38},{t:0.62,x:-0.2,z:1.0}],
+    shoL:[{t:0,x:-1.2,z:0.2},{t:0.20,x:-1.4,z:0.2,e:'out'},{t:0.26,x:-1.4,z:0.2},{t:0.34,x:-0.15,z:1.38,e:'in'},{t:0.50,x:-0.15,z:1.38},{t:0.62,x:-0.15,z:1.38}],
     elbL:[{t:0,x:-2.3},{t:0.26,x:-2.35},{t:0.34,x:-0.12,e:'in'},{t:0.62,x:-0.12}],   // 左手肘完全收紧→爆发展开
     // 腿：蓄力=左脚前深屈弓步+右脚后蹬(同突刺结束) → 爆发踢踏交叉步 → 收回
     hipL:[{t:0,x:-0.92},{t:0.26,x:-0.92},{t:0.34,x:-0.2,z:0.5,e:'in'},{t:0.44,x:-0.15,z:-0.5},{t:0.62,x:0,z:0}],
@@ -1288,20 +1413,21 @@ const CLIPS={
     bodyY:[{t:0,v:-0.1},{t:0.14,v:-0.45},{t:0.24,v:-0.58},{t:0.30,v:0.15,e:'out'},{t:0.56,v:0.30},{t:0.80,v:0.28},{t:0.90,v:0.1}],
     // 上身往下"快卷"+核心收紧, 二次压缩最狠；起跳后由旋转接管(spinning会忽略bodyLean)
     bodyLean:[{t:0,v:0.35},{t:0.14,v:0.62},{t:0.24,v:0.74},{t:0.30,v:0.1,e:'out'}],
-    chestX:[{t:0,v:0.35},{t:0.14,v:0.6},{t:0.24,v:0.74},{t:0.30,v:0,e:'out'},{t:0.56,v:-0.15},{t:0.90,v:0}],
-    // 右臂(持剑)：蓄力大臂往胸内侧收(z正=内收过身体, 剑横到左腿左侧低位) → 猛地高举过头(x大负) → 顶点保持
+    chestX:[{t:0,v:0.35},{t:0.14,v:0.6},{t:0.24,v:0.74},{t:0.30,v:0,e:'out'},{t:0.56,v:-0.4,e:'out'},{t:0.80,v:-0.45},{t:0.90,v:0}],
+    // 右臂(持剑):顶点往后方天空延伸(后仰蓄势)
     shoR:[{t:0,x:-0.2,z:0.7},{t:0.14,x:-0.05,z:0.9},{t:0.24,x:0.0,z:1.0},{t:0.30,x:-2.9,z:-0.1,e:'out'},{t:0.56,x:-3.05,z:-0.1},{t:0.80,x:-2.95,z:-0.1},{t:0.90,x:-2.6,z:-0.1}],
     elbR:[{t:0,x:-1.0},{t:0.24,x:-1.25},{t:0.30,x:-0.12,e:'out'},{t:0.90,x:-0.15}],
     wristR:[{t:0,y:-0.35},{t:0.90,y:-0.35}],   // 手腕外转,剑不穿身
     // 左臂：蓄力往后摆(x正) → 起跳后垂直(x≈0)
-    shoL:[{t:0,x:0.5},{t:0.14,x:0.85},{t:0.24,x:0.98},{t:0.30,x:0.05,e:'out'},{t:0.56,x:0},{t:0.90,x:0.1}],
+    shoL:[{t:0,x:0.5},{t:0.14,x:0.85},{t:0.24,x:0.98},{t:0.30,x:0.55,e:'out'},{t:0.56,x:0.6},{t:0.90,x:0.5}],
     elbL:[{t:0,x:-0.5},{t:0.24,x:-0.6},{t:0.30,x:-0.1,e:'out'},{t:0.90,x:-0.2}],
     // 左腿(前、弓步深屈) → 起跳蹬直(左脚蹬地)
-    hipL:[{t:0,x:-0.35},{t:0.14,x:-0.75},{t:0.24,x:-0.88},{t:0.30,x:0.15,e:'out'},{t:0.56,x:0.3},{t:0.90,x:0.1}],
-    kneeL:[{t:0,x:0.7},{t:0.14,x:1.2},{t:0.24,x:1.35},{t:0.30,x:0.1,e:'out'},{t:0.56,x:0.12},{t:0.90,x:0.35}],
-    // 右腿(后、蹬伸) → 起跳后高抬腿(髋前抬x负+屈膝)
-    hipR:[{t:0,x:0.4},{t:0.14,x:0.5},{t:0.24,x:0.55},{t:0.30,x:-1.3,e:'out'},{t:0.56,x:-1.45},{t:0.80,x:-1.2},{t:0.90,x:-0.6}],
-    kneeR:[{t:0,x:0.3},{t:0.24,x:0.4},{t:0.30,x:1.4,e:'out'},{t:0.56,x:1.5},{t:0.90,x:0.8}],
+    // 左腿:蓄力弓步深屈不变 → 起跳后改为高抬腿(原右腿动作,左右已互换)
+    hipL:[{t:0,x:-0.35},{t:0.14,x:-0.75},{t:0.24,x:-0.88},{t:0.30,x:-1.3,e:'out'},{t:0.56,x:-1.45},{t:0.80,x:-1.2},{t:0.90,x:-0.6}],
+    kneeL:[{t:0,x:0.7},{t:0.14,x:1.2},{t:0.24,x:1.35},{t:0.30,x:1.4,e:'out'},{t:0.56,x:1.5},{t:0.90,x:0.8}],
+    // 右腿:蓄力后蹬不变 → 起跳后改为蹬直(原左腿动作,左右已互换)
+    hipR:[{t:0,x:0.4},{t:0.14,x:0.5},{t:0.24,x:0.55},{t:0.30,x:0.15,e:'out'},{t:0.56,x:0.3},{t:0.90,x:0.1}],
+    kneeR:[{t:0,x:0.3},{t:0.24,x:0.4},{t:0.30,x:0.1,e:'out'},{t:0.56,x:0.12},{t:0.90,x:0.35}],
   }},
   // 升龙剑落地泄力(简单)：落地深蹲卸力 → 站直
   dRise_land:{ dur:0.30, tracks:{
@@ -1340,7 +1466,7 @@ function sampleTrack(track,t){
 }
 // 切招过渡：记录切招瞬间每个关节的实际旋转，作为补间起点
 const POSE_SNAP={};
-let clipBodyY=null, clipBodyLean=null, clipGripMode=null;   // 动作驱动的身体下沉/前倾/握剑姿态(null=不覆盖)
+let clipBodyY=null, clipBodyLean=null, clipBodyYaw=null, clipBodySide=null, clipGripMode=null;   // 动作驱动的身体下沉/前倾/握剑姿态(null=不覆盖)
 function capturePoseSnapshot(){
   for(const k in JOINTS){
     const r=JOINTS[k].rotation;
@@ -1348,6 +1474,8 @@ function capturePoseSnapshot(){
   }
   POSE_SNAP._bodyY = body.position.y;
   POSE_SNAP._bodyLean = body.rotation.x;
+  POSE_SNAP._bodyYaw = body.rotation.y;
+  POSE_SNAP._bodySide = body.rotation.z;
   POSE_SNAP._gripMode = (clipGripMode!==null)?clipGripMode:0;
 }
 function applyClip(name,time,blend){
@@ -1365,6 +1493,8 @@ function applyClip(name,time,blend){
       const tgt=val.v||0; const s=(POSE_SNAP._bodyLean??0);
       clipBodyLean = (b<1)?THREE.MathUtils.lerp(s,tgt,b):tgt; continue;
     }
+    if(jn==='bodyYaw'){ clipBodyYaw=(b<1)?THREE.MathUtils.lerp(POSE_SNAP._bodyYaw??0,val.v||0,b):(val.v||0); continue; }
+    if(jn==='bodySide'){ clipBodySide=(b<1)?THREE.MathUtils.lerp(POSE_SNAP._bodySide??0,val.v||0,b):(val.v||0); continue; }
     // 握剑姿态(0=斜握默认, 1=突刺枪式握法:剑沿小臂延长线)
     if(jn==='gripMode'){
       const tgt=val.v||0; const s=(POSE_SNAP._gripMode??0);
@@ -1412,6 +1542,10 @@ addEventListener('gamepaddisconnected',e=>{if(gpIndex===e.gamepad.index)gpIndex=
 function padStatus(){const el=document.getElementById('padState');if(gpIndex!==null){el.textContent='已连接 ✓';el.className='on';}else{el.textContent='未连接';el.className='';}}
 const btnKb=document.getElementById('btnKeyboard'),btnGp=document.getElementById('btnGamepad');
 function setMode(m){inputMode=m;btnKb.classList.toggle('active',m==='keyboard');btnGp.classList.toggle('active',m==='gamepad');}
+let invertX=false, invertY=false;
+const btnInvX=document.getElementById('btnInvertX'), btnInvY=document.getElementById('btnInvertY');
+if(btnInvX) btnInvX.addEventListener('click',()=>{ invertX=!invertX; btnInvX.classList.toggle('active',invertX); });
+if(btnInvY) btnInvY.addEventListener('click',()=>{ invertY=!invertY; btnInvY.classList.toggle('active',invertY); });
 btnKb.onclick=()=>setMode('keyboard'); btnGp.onclick=()=>setMode('gamepad');
 
 function stickDeadzone(v,dz=0.25){
@@ -1443,6 +1577,8 @@ function pollInput(){
       if(gp.buttons[14]?.pressed)mx-=1;if(gp.buttons[15]?.pressed)mx+=1;if(gp.buttons[12]?.pressed)mz-=1;if(gp.buttons[13]?.pressed)mz+=1;
       aJump=gp.buttons[0]?.pressed;aDodge=gp.buttons[1]?.pressed;aAtk=gp.buttons[2]?.pressed;aHeavy=gp.buttons[3]?.pressed;aTaunt=gp.buttons[5]?.pressed;}
   }
+  if(invertX) cameraRig.stickX=-cameraRig.stickX;
+  if(invertY) cameraRig.stickY=-cameraRig.stickY;
   const len=Math.hypot(mx,mz);if(len>1){mx/=len;mz/=len;}
   Actions.moveX=mx;Actions.moveZ=mz;
   Actions.attack=aAtk&&!prev.attack;Actions.jump=aJump&&!prev.jump;Actions.dodge=aDodge&&!prev.dodge;Actions.taunt=aTaunt&&!prev.taunt;
@@ -1463,14 +1599,14 @@ const P={x:0,z:0,y:0,vy:0,facing:0,jumping:false,
   nextBuffer:null,       // 输入缓冲: 'light' | 'heavy'
   lunge:0,
   charging:false,chargeT:0,chargeHold:0,chargeLock:false,chargeFull:false,chargeFullT:0,
-  dodgeT:0,dodgeDir:new THREE.Vector3(),roll:0,iframe:0, airDodge:false,
+  dodgeT:0,dodgeDir:new THREE.Vector3(),roll:0,iframe:0, airDodge:false, _drillBounce:0, _drillBounced:false,
   spin:0,                // 空中旋转砸的角度进度
   stamina:100,staminaMax:100, runPhase:0,moving:false,speed:0};
 
 const MOVE_SPEED=9.2, TURN_LERP=20, JUMP_V=15.5, GRAVITY=43;
 // 跳跃最高点≈2.8单位(高过2.7的柱子)，空中时间≈0.72s，上升/下落都更快一点
 const LIGHT_LUNGE=2.5, HEAVY_LUNGE=4.0, CHARGE_MAX=1.1, CHARGE_MOVE=0.38, CHARGE_AUTO=1.0;
-const HEAVY_CHARGE_TIME=1.5;      // 蓄满需要1.5秒
+const HEAVY_CHARGE_TIME=1.0;      // 蓄满需要1.5秒
 const HEAVY_CHARGE_HOLD=1.0;      // 蓄满后保持1秒不松手则取消
 const HEAVY_CHARGE_MINSPD=0.2;    // 蓄满时移速降到20%
 const DODGE_DUR=0.20, DODGE_SPEED=17.0, DODGE_IFRAME=0.16, DODGE_COST=0, STAM_REGEN=10;
@@ -1491,41 +1627,46 @@ let shake=0,hitstop=0;
 // ============================================================
 const MOVES={
   // —— 地面轻击三连（cancel~total 之间为结尾定格，加长以增强分量感）——
-  gL1:{clip:'gL1', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'gL2', onHeavy:'gThrust', lunge:2.4, fx:'slashR', trail:true, hitR:0.85},
-  gL2:{clip:'gL2', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'gL3', onHeavy:'gFollowHeavy', lunge:2.6, fx:'slashL', trail:true, hitR:0.85},
+  gL1:{clip:'gL1', strike:0.18, cancel:0.24, total:0.50, comboAt:0.32, onLight:'gL2', onHeavy:'gThrust', lunge:3.0, fx:'slashR', trail:true, trailSegs:8, hitR:0.85},
+  gL2:{clip:'gL2', strike:0.17, cancel:0.24, total:0.53, comboAt:0.32, onLight:'gL3', onHeavy:'gKnee', lunge:2.6, fx:'slashL', trail:true, hitR:0.85},
   gL3:{clip:'gL3', strike:0.72, cancel:0.86, total:1.06, recoverClip:'gL3_recover', onLight:null, onHeavy:'gHeavyChain1', lunge:2.4, fx:'chop', trail:true},
   // 轻→重：突刺（滑行更远；突刺动作做完后才可按重击接大风车）
   gThrust:{clip:'gThrust', strike:0.44, cancel:0.54, total:0.80, comboAt:0.72, recoverClip:'gThrust_recover', onLight:null, onHeavy:'gSpinSlide', lunge:0, slide:20, fx:'thrust', thrustHit:true, trail:true},
   // 轻轻→重：顺发蓄力重击
   gFollowHeavy:{clip:'gFollowHeavy', strike:0.30, cancel:0.44, total:0.88, recoverClip:'gFollowHeavy_recover', onLight:null, onHeavy:null, lunge:3.6, fx:'heavyCircle'},
   // 大风车(重击按一次)：极快360°横扫，周身一圈判定
+  gKnee:{clip:'gKnee', strike:0.32, cancel:0.46, total:0.68, onLight:null, onHeavy:null, lunge:14.0, slide:6, fx:'kick', hitR:1.1},
   gSpin:{clip:'gSpin', strike:0.30, cancel:0.52, total:0.62, recoverClip:'gSpin_recover', onLight:null, onHeavy:null, lunge:0, spinY:true, spinStart:0.26, spinEnd:0.50, fx:'spinSlash', ringHit:true, trail:true},
   // 突刺接出的大风车：带向前滑动 + 结束僵直更长
   gSpinSlide:{clip:'gSpin', strike:0.30, cancel:0.52, total:0.82, recoverClip:'gSpin_recover', onLight:null, onHeavy:null, lunge:0, spinY:true, spinStart:0.26, spinEnd:0.50, slide:9, fx:'spinSlash', ringHit:true, trail:true},
   // 蓄满大风车：转3圈，可20%移动，结尾不僵直→半蹲晕一圈
-  gSpinCharged:{clip:'gSpin', strike:0.30, cancel:1.10, total:2.30, recoverClip:'gSpinCharged_recover', useRecoverClip:true, onLight:null, onHeavy:null, lunge:0, spinY:true, spinTurns:3, spinStart:0.26, spinEnd:1.10, chargedMove:true, dizzy:true, fx:'spinSlash', ringHit:true, trail:true},
+  gSpinCharged:{clip:'gSpin', strike:0.30, cancel:1.10, total:2.30, recoverClip:'gSpinCharged_recover', useRecoverClip:true, onLight:null, onHeavy:null, lunge:0, spinY:true, spinTurns:4, spinStart:0.26, spinEnd:1.10, chargedMove:true, dizzy:true, fx:'spinSlash', ringHit:true, trail:true},
   // 轻轻轻→重：顺发重击×2（A自动接B，B后有较长定格）
   gHeavyChain1:{clip:'gHeavyA', strike:0.24, cancel:0.34, total:0.44, onLight:null, onHeavy:null, auto:'gHeavyChain2', lunge:3.0, fx:'heavyCircle'},
   gHeavyChain2:{clip:'gHeavyB', strike:0.30, cancel:0.44, total:0.92, recoverClip:'gHeavyB_recover', onLight:null, onHeavy:null, lunge:3.4, fx:'heavyCircleBig'},
 
   // —— 空中招（第一下滞空挥剑，第二下从天而降大劈）——
   // 空中轻击两下：①aL1=地面轻击1(gL1)放空中挥+滞空 ②aChop=举刀从天而降俯冲、落地砸地、收势对齐 gL3、不发剑气
-  aL1:{clip:'gL1', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'aChop', onHeavy:'aStomp', lunge:2.4, air:true, fx:'slashR', trail:true, hitR:0.85},
+  aL1:{clip:'gL1', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'aChop', onHeavy:'aDrill', lunge:2.4, air:true, fx:'slashR', trail:true, hitR:0.85},
   // 空中第二下：举刀从天而降，落地瞬间砸地(无剑气)，落地姿态/收势对齐地面大劈 gL3
   aChop:{clip:'aChop', strike:0.35, cancel:0.42, total:0.45, hangT:0.25, onLight:null, onHeavy:null, air:true, plunge:'aChopLand', landHit:true, landFx:'slam', hitR:1.0, trail:true},
-  aL2:{clip:'gL2', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:null, onHeavy:'aSpin', lunge:2.6, air:true, fx:'slashL', trail:true, hitR:0.85},  // (现未接入连招，保留备用)
+  aL2:{clip:'gL2', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:null, onHeavy:'aChop', lunge:2.6, air:true, fx:'slashL', trail:true, hitR:0.85},  // (现未接入连招，保留备用)
   aPlunge:{clip:'aPlunge', strike:0.16, cancel:99, total:0.30, onLight:null, onHeavy:null, air:true, plunge:'aPlunge_stiff', fx:'chop'},
   aThrust:{clip:'aThrust', strike:0.14, cancel:99, total:0.44, recoverClip:'aThrust_stiff', onLight:null, onHeavy:null, air:true, lunge:5.5, fx:'thrust'},
   aHeavyPlunge:{clip:'aHeavyPlunge', strike:0.16, cancel:99, total:0.30, onLight:null, onHeavy:null, air:true, plunge:'aHeavyPlunge_stiff', fx:'heavyCircle'},  // (旧空中重击，已被 aStomp 取代，保留备用)
   // 空中重击=陨石式战争践踏：无剑、双手举高瞬间砸地，落地坑痕+碎石+强震，半蹲力量姿势收尾
   aStomp:{clip:'aStomp', strike:0.05, cancel:99, total:0.40, onLight:null, onHeavy:null, air:true, plunge:'aStompLand', diveV:26, landFx:'stomp'},
+  aJupiterLand:{clip:'aJupiterLand', strike:99, cancel:99, total:0.65, onLight:null, onHeavy:null},
+  // 升龙接重击：空中木星电锯球(3圈前翻滚电锯+密集剑影+蜘蛛侠落地)
+  aDrill:{clip:'aDrill', strike:0.04, cancel:99, total:0.25, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', diveV:40, landFx:'drill', trail:true, trailSegs:10, ringHit:true, hitR:1.1}, // 旋风坠
+  aJupiter:{clip:'aJupiter', strike:0.08, cancel:99, total:0.75, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', spin:true, spinTurns:3, diveV:28, trail:true, trailSegs:24, hitR:1.8, fx:'heavyCircleBig', ringHit:true, landFx:'stomp'},
   aSpin:{clip:'aSpin', strike:0.30, cancel:99, total:0.42, onLight:null, onHeavy:null, air:true, plunge:'aSpin_stiff', spin:true, fx:'heavyCircleBig'},
 
   // —— 闪避连招 ——
   // 闪避→轻击：闪现飞踹(瞬移已在触发处完成，这里只播飞踹动作；暂不击飞，留给血量系统)
-  dKick:{clip:'dKick', strike:0.26, cancel:0.46, total:0.60, onLight:null, onHeavy:null, lunge:2.0, air:true, fx:'kick', hitR:1.0},
+  dKick:{clip:'dKick', strike:0.26, cancel:0.46, total:0.60, onLight:null, onHeavy:null, lunge:2.0, slide:8, air:true, fx:'kick', hitR:1.0},
   // 闪避→重击：升龙剑。地面深蹲蓄力(0~0.24)→啪蹬地起跳上挑→空翻到顶→顶点定格。comboAt 在顶点(0.56)，接招更从容
-  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.56, onLight:'aChop', onHeavy:'aStomp', lunge:0.4, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
+  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.68, onLight:'aChop', onHeavy:'aJupiter', lunge:0.4, chargeSlide:10, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
 };
 
 function startSlash(type,ratio=0){
@@ -1548,15 +1689,16 @@ function playClip(name){ P.clip=name; P.clipT=0; P.clipDur=CLIPS[name].dur; }
 // 触发某招特效
 function fireFx(fx){
   switch(fx){
-    case 'slashR': /* 前两击只保留剑的拖尾，去掉黄色扇形判定 */ hitstop=0.03; shake=0.08; break;
-    case 'slashL': hitstop=0.03; shake=0.08; break;
-    case 'chop':   hitstop=0.05; shake=0.16; spawnSwordBeam(); break;
-    case 'slam':   hitstop=0.09; shake=0.26; break;   // 落地砸地：顿帧+震屏(更重)，不发剑气
-    case 'stomp':  doStomp(); break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
-    case 'kick':   hitstop=0.06; shake=0.14; break;   // 飞踹：顿帧+震屏(暂不击飞)
-    case 'rise':   hitstop=0.05; shake=0.12; break;   // 升龙剑上挑：顿帧+震屏
-    case 'thrust': doThrust(); break;
-    case 'spinSlash': hitstop=0.05; shake=0.2; break;
+    case 'slashR': hitstop=0.07; shake=0.14; SFX.swing(); break;
+    case 'slashL': hitstop=0.07; shake=0.14; SFX.swing(); break;
+    case 'chop':   hitstop=0.10; shake=0.22; SFX.chop(); spawnSwordBeam(); break;
+    case 'slam':   hitstop=0.14; shake=0.32; break;   // 落地砸地：顿帧+震屏(更重)，不发剑气
+    case 'stomp':  doStomp(); break;
+    case 'drill':  hitstop=0.14; shake=0.6; doStomp(); P._drillBounce=4.5; break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
+    case 'kick':   hitstop=0.10; shake=0.20; SFX.kick(); break;   // 飞踹：顿帧+震屏(暂不击飞)
+    case 'rise':   hitstop=0.09; shake=0.18; SFX.rise(); break;   // 升龙剑上挑：顿帧+震屏
+    case 'thrust': SFX.thrust(); doThrust(); break;
+    case 'spinSlash': hitstop=0.08; shake=0.22; break;
     case 'heavyCircle':    burstCircle(1.7); break;
     case 'heavyCircleBig': burstCircle(2.6); break;
   }
@@ -1565,7 +1707,7 @@ function doSlash(from,to,heavy){
   slashMesh.visible=true;slashMesh._t=0;slashMesh._dur=heavy?0.18:0.15;
   slashMesh.scale.setScalar(heavy?1.7:1.4);   // 扇形半径×1.5(原0.95/1.15)
   slashPivot._from=from; slashPivot._to=to;
-  if(!heavy){hitstop=0.03;shake=0.08;}
+  if(!heavy){hitstop=0.08;shake=0.16;}
 }
 function doThrust(){
   // 去掉黄色刀光区域，只保留顿帧/震屏(剑的拖尾已表现突刺)
@@ -1583,7 +1725,8 @@ function burstCircle(radius){
 // 开始一招
 function startMove(name){
   const mv=MOVES[name]; if(!mv)return;
-  const prevMove=P.move;   // 捕获上一招(用于特殊衔接)
+  const prevMove=P.move;
+  const prevState=P.state;
   P.state='attack'; P.move=name; P.moveT=0;
   P.phase='startup'; P.struck=false; P._plungeDone=false; P._customRecover=null;
   P.nextBuffer=null;
@@ -1591,10 +1734,12 @@ function startMove(name){
   P.lunge=mv.lunge||0;
   P.spin = (mv.spin||mv.spinY)?0:P.spin;
   if(mv.spinY && P._spinHit) P._spinHit.clear();   // 重置大风车命中记录
+  P._spinSnd=false; SFX.spinStop();
   P._slideV=undefined; P._slideStarted=null;   // 重置滑行
   // 拍下当前姿势快照，用于切招过渡补间(消除"弹一下"的卡顿)
   capturePoseSnapshot();
-  P.blendT=0; P.blendDur=0.13;
+  P.blendT=0;
+  P.blendDur=(name==='dRise'&&prevState==='dodge')?0.22:0.13;
   playClip(mv.clip);
   P._trailStarted=false;   // 拖尾在挥砍主体段才开启(见招式推进)
   P._launched=false;       // 升龙剑(dRise)地面蓄力后再起跳的一次性标志
@@ -1777,7 +1922,8 @@ function tryRingHit(){
 // 大风车扫掠判定：只命中"剑当前扫到的角度扇区"内的目标，每个目标一次
 function trySweepHit(){
   // 剑当前世界朝向角度：身体绕Y顺时针转(body.rotation.y=-spin*2π)，剑在右侧(facing基础上+90°起转)
-  const swordAng = P.facing + Math.PI/2 - P.spin*Math.PI*2;   // 当前剑角度
+  const _turns=MOVES[P.move]?.spinTurns||1;
+  const swordAng = P.facing + Math.PI/2 - P.spin*Math.PI*2*_turns;   // 当前剑角度(乘以转圈数)
   const ARC=0.6;   // 扇区半角(弧度)~34°
   if(!P._spinHit) P._spinHit=new Set();
   const checkList=[...hittables,...dummies,...monsters];
@@ -1790,7 +1936,7 @@ function trySweepHit(){
     let diff=((ang-swordAng)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI;
     if(Math.abs(diff)<ARC){
       P._spinHit.add(o);
-      if(o.tiltVel!==undefined){ o.flashT=0.25; o.tiltVel+=9; hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.16); onHitTarget(o.x,1.6,o.z); }
+      if(o.tiltVel!==undefined){ o.flashT=0.12; o.tiltVel=Math.max(o.tiltVel,8); hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.16); onHitTarget(o.x,1.6,o.z); }
       else { o.flashT=0.2; o.shakeT=0.2; onHitTarget(o.x,1.4,o.z); }
     }
   }
@@ -1812,6 +1958,7 @@ function update(dt){
     // 剑攻击中(挥砍主体段/剑影还在)用闪避打断 → 标记下次剑攻击触发空间斩
     if(P.move && trailMesh.visible && trailActive){ spaceSlashReady=true; }
     P.state='dodge';P.dodgeT=DODGE_DUR;P.dodgeDir.set(dx,0,dz);P.roll=0;
+    SFX.dodge();
     P.iframe=DODGE_IFRAME;P.stamina-=DODGE_COST;P.facing=Math.atan2(dx,dz);
     P.charging=false;P.chargeHold=0;P.chargeFull=false;P.chargeFullT=0;P.chargeLock=true;P.clip=null;P.move=null;
     P.airDodge = P.jumping || P.y>0.01;
@@ -1836,6 +1983,12 @@ function update(dt){
   // ===== 连招输入处理 =====
   const gH = groundHeightAt(P.x,P.z);
   const onGround = !P.jumping && P.y<=gH+0.05;
+  // 钻地反弹:第一次落地弹起,第二次落地播蜘蛛侠
+  if(P._drillBounce>0&&onGround&&!P.jumping&&!P.move){P.vy=P._drillBounce;P.jumping=true;P._drillBounce=0;P._drillBounced=true;}
+  if(P._drillBounced&&onGround&&!P.jumping&&!P.move){P._drillBounced=false;startMove('aJupiterLand');}
+  // 钻地反弹:第一次落地弹起,第二次落地播蜘蛛侠
+  if(P._drillBounce>0&&onGround&&!P.jumping&&!P.move){P.vy=P._drillBounce;P.jumping=true;P._drillBounce=0;P._drillBounced=true;}
+  if(P._drillBounced&&onGround&&!P.jumping&&!P.move){P._drillBounced=false;startMove('aJupiterLand');}
   if(P.state!=='dodge' && P.state!=='taunt'){
     // --- 不在招式中：起手 ---
     if(!P.move){
@@ -1852,8 +2005,8 @@ function update(dt){
           startMove(full ? 'gSpinCharged' : 'gSpin');   // 蓄满→三圈, 否则→一圈
         }
       } else if(!onGround && Actions.heavyReleased && !P.chargeLock){
-        // 空中直接重击：陨石式战争践踏(无剑、瞬间下坠)
-        startMove('aStomp'); P.chargeLock=true;
+        // 空中直接重击：木星电锯球(与升龙接重击共用同一招)
+        startMove('aJupiter'); P.chargeLock=true;
       }
     }
     // --- 招式中：缓冲下一击输入（整段招式内都可预输入）---
@@ -1914,14 +2067,20 @@ function update(dt){
     if(P.clip===mv.recoverClip) P.clipT+=dt;
 
     // 挥砍主体段开启拖尾(strike前一点开始，cancel停止)
-    if(mv.trail && !P._trailStarted && P.moveT>=mv.strike-0.10){ P._trailStarted=true; startTrail(mv.spinY?26:4); }
+    if(mv.trail && !P._trailStarted && P.moveT>=mv.strike-0.10){ P._trailStarted=true; startTrail(mv.trailSegs||(mv.spinY?26:4)); }
     // 命中瞬间：触发特效 + 顿帧 + 检测打到的物体
     if(!P.struck && P.moveT>=mv.strike){ P.struck=true; if(mv.fx) fireFx(mv.fx);
       if(mv.thrustHit) tryThrustHit();
       else if(mv.ringHit && !mv.spinY) tryRingHit();
       else if(!mv.ringHit && !mv.spinY && !mv.landHit && !mv.plunge) tryHitObjects(mv.hitR||0); }
     // 大风车：判定跟随剑的旋转角度(扫到哪个角度,那个角度才命中)
-    if(mv.spinY && P.spin>0 && P.spin<1){ trySweepHit(); }
+    if(mv.spinY && P.spin>0 && P.spin<1){
+      // 每完成一圈就重置命中记录,让转几圈打几次
+      const turns=mv.spinTurns||1;
+      const curRot=Math.floor(P.spin*turns);
+      if(P._lastSpinRot===undefined||curRot!==P._lastSpinRot){ P._spinHit&&P._spinHit.clear(); P._lastSpinRot=curRot; }
+      trySweepHit();
+    }
     // 突刺判定：滑行全程持续命中(长矩形)
     if(mv.thrustHit && P.struck && P.moveT<mv.cancel){ tryThrustHit(); }
     // 挥砍结束后让拖尾淡出(大风车记录到招式末尾以画满整圈，其余到cancel)
@@ -1931,6 +2090,10 @@ function update(dt){
     // 空中俯冲砸：落地瞬间转入插地僵直动画
     if(mv.plunge && onGround && P.moveT>0.05 && !P._plungeDone){
       P._plungeDone=true;
+      // 木星球体变身：落地瞬间恢复角色
+      if(jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); }
+      P.chargeLock=true;   // 落地后短暂锁定重击,防止连按重击意外触发地面大风车
+      if(jupiterActive){jupiterActive=false;jupiterBall.visible=false;}
       if(mv.landFx) fireFx(mv.landFx);              // 落地冲击特效(aChop=slam / aStomp=stomp)
       if(mv.landHit) tryHitObjects(mv.hitR||0);     // 落地正前判定(仅 aChop；aStomp 的判定在 doStomp 周身AoE)
       P.clip=mv.plunge; P.clipDur=CLIPS[mv.plunge].dur; P.clipT=0;
@@ -1960,7 +2123,8 @@ function update(dt){
       else if(P.nextBuffer==='light' && mv.onLight) nxt=mv.onLight;
       else if(P.nextBuffer==='heavy' && mv.onHeavy) nxt=mv.onHeavy;
       if(nxt){ startMove(nxt); }            // 衔接下一招(已含其自身的预备段)
-      else { P._customRecover=null; P._plungeDone=false; P.move=null; P.spin=0; P.state='idle'; P.clip=null; }
+      else { P._customRecover=null; P._plungeDone=false; if(jupiterActive){jupiterActive=false;jupiterBall.visible=false;char.traverse(o=>{if(o.isMesh)o.visible=true;})}
+      P.move=null; P.spin=0; P.state='idle'; P.clip=null; }
     }
   }
 
@@ -1993,6 +2157,10 @@ function update(dt){
       const k = P.lunge * Math.max(0, 1 - Math.abs(P.moveT-mv.strike)/0.18);
       vX=Math.sin(P.facing)*k; vZ=Math.cos(P.facing)*k;
     }
+    if(mv.chargeSlide && P.move==='dRise' && !P._launched){
+      const k=mv.chargeSlide*Math.max(0,1-P.moveT/0.24);
+      vX+=Math.sin(P.facing)*k; vZ+=Math.cos(P.facing)*k;
+    }
     // 冰面打滑式滑行：突刺瞬间(strike)给一个高速度，之后指数减速滑停
     if(mv.slide){
       if(!P.struck){ /* 蓄力阶段不滑 */ }
@@ -2019,6 +2187,7 @@ function update(dt){
       const s0=mv.spinStart||0, s1=mv.spinEnd||mv.total;
       if(P.moveT>=s0 && P.moveT<=s1){ P.spin=Math.min(1,(P.moveT-s0)/(s1-s0)); }
       else if(P.moveT>s1){ P.spin=1; }
+      if(P.moveT>=s0 && !P._spinSnd){ P._spinSnd=true; SFX.spinPlay(s1-s0); }
     }
   } else if(P.state==='taunt'){
   } else {
@@ -2261,7 +2430,7 @@ function poseCharacter(dt){
   char.position.set(P.x,P.y,P.z);
   resetJoints();
   body.rotation.set(0,0,0); body.position.set(0,0,0);
-  clipBodyY=null; clipBodyLean=null; clipGripMode=null;   // 每帧重置动作驱动的身体下沉/前倾/握剑
+  clipBodyY=null; clipBodyLean=null; clipBodyYaw=null; clipBodySide=null; clipGripMode=null;   // 每帧重置动作驱动的身体下沉/前倾/握剑
   let bob=0, lean=0;
   const ph=P.runPhase;
 
@@ -2337,6 +2506,47 @@ function poseCharacter(dt){
     body.rotation.x = P.spin*Math.PI*2;   // 翻一圈砸下
     lean=0; spinning=true;
   }
+  if(P.move==='aJupiter' && !P._plungeDone){
+    jupiterBall.position.set(P.x,P.y+1.4,P.z);
+    if(!jupiterActive){ jupiterActive=true; _jSpin=0; jupiterBall.visible=true;
+      // 隐藏剑网格:剑影由weaponSocket拖尾产生,不需要这两个网格
+      _jSwd1.visible=false; _jSwd2.visible=false; }
+    _jSpin += dt*30;   // 30rad/s(≈5rps),足够快且允许全轴位移补偿
+    if(P.moveT<0.18){ P.vy=0; }
+    body.rotation.x = _jSpin;
+    // 全轴动平衡:让旋转轴穿过球心(y=1.4),消除脚底打圈感
+    const _c=1.4;
+    char.position.y += _c*(1-Math.cos(_jSpin));
+    char.position.x -= _c*Math.sin(_jSpin)*Math.sin(P.facing);
+    char.position.z -= _c*Math.sin(_jSpin)*Math.cos(P.facing);
+    lean=0; spinning=true;
+  }
+  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; }
+  // —— 空中木星电锯球 aJupiter：人变成球+剑高速旋转 ——
+  if(P.move==='aJupiter' && !P._plungeDone){
+    // 首帧：隐藏角色mesh,显示球体,触发剑气环
+    if(!jupiterActive){
+      jupiterActive=true; _jSpin=0;
+      char.traverse(o=>{ if(o.isMesh) o.visible=false; });
+      jupiterBall.visible=true;
+      spawnSaturnRings();   // 发射木星环扩散特效
+    }
+    // 球体位置跟随角色
+    jupiterBall.position.set(P.x, P.y+1.4, P.z);
+    // 剑高速自转:轨道1正转,轨道2以1.4倍速反转→交叉残影
+    _jSpin += dt*22;
+    _jOrb1.rotation.z = _jSpin;
+    _jOrb2.rotation.x = -_jSpin*1.4;
+    // 前0.12s顶点悬停
+    if(P.moveT<0.12){ P.vy=0; }
+    // 骨架仍旋转→剑影拖尾仍然工作(画竖圈电锯残影)
+    const turns=MOVES['aJupiter'].spinTurns||3;
+    body.rotation.x = P.spin*Math.PI*2*turns;
+    lean=0; spinning=true;
+  }
+  if(P.move==='aDrill'){
+    _drillSpin+=dt*90; body.rotation.y=_drillSpin; spinning=true;
+  }
   // —— 大风车 gSpin / gSpinSlide / gSpinCharged：整体绕Y轴横扫(可多圈) ——
   if(P.move==='gSpin' || P.move==='gSpinSlide' || P.move==='gSpinCharged'){
     const turns = MOVES[P.move].spinTurns || 1;
@@ -2370,17 +2580,20 @@ function poseCharacter(dt){
   if(P.move==='dRise' && P._launched && !P._plungeDone){
     // 0.24起跳 → 0.56到顶，这段时间内绕竖直轴(头顶→脚)旋身一圈，之后保持(落地后不再旋转)
     const k=Math.max(0,Math.min(1,(P.moveT-0.24)/0.32));
-    body.rotation.y = k*Math.PI*2;   // 绕竖直轴旋身一圈 —— 转向反了就改负号
+    const COIL=-0.7;
+    body.rotation.y = -COIL - k*(Math.PI*2 - COIL);
     spinning=true;
+  }
+  if(P.move==='dRise' && !P._launched){
+    body.rotation.y = 0.7*Math.min(1,P.moveT/0.24);
   }
 
   // —— 闪避：快速前冲弓步（物理右腿大跨、左腿蹬直、身体前压）——
   if(P.state==='dodge'){
     const k=P.roll;                       // 0→1 整个冲刺过程
     const ease=Math.sin(Math.min(1,k)*Math.PI); // 中段最舒展
-    RLeg.root.rotation.x=0.9*ease+0.2; RLeg.j2.rotation.x=0.9*ease+0.1;
-    LLeg.root.rotation.x=-0.7*ease;    LLeg.j2.rotation.x=0.25*ease;
-    // 对侧手臂：右腿前跨 → 左臂前探、右臂后收
+    LLeg.root.rotation.x=0.9*ease+0.2; LLeg.j2.rotation.x=0.9*ease+0.1;
+    RLeg.root.rotation.x=-0.7*ease;    RLeg.j2.rotation.x=0.25*ease;
     LArm.root.rotation.x=-0.6*ease; LArm.j2.rotation.x=-0.5;
     RArm.root.rotation.x=0.5*ease;  RArm.j2.rotation.x=-0.5;
     lean=0.35*ease;                        // 身体前压
@@ -2394,6 +2607,8 @@ function poseCharacter(dt){
     const targetLean = (clipBodyLean!==null)? clipBodyLean : lean;
     body.rotation.x=THREE.MathUtils.lerp(body.rotation.x,targetLean,0.5);
   }
+  if(clipBodyYaw!==null) body.rotation.y=THREE.MathUtils.lerp(body.rotation.y,clipBodyYaw,0.5);
+  if(clipBodySide!==null) body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,clipBodySide,0.5);
 
   // 握剑姿态：gripMode 0=斜握默认 / 1=突刺枪式(剑沿小臂延长线)
   const GRIP_DEFAULT=Math.PI*0.5-0.35, GRIP_SPEAR=Math.PI;
@@ -2407,6 +2622,27 @@ function poseCharacter(dt){
     headGrp.rotation.y += -chest.rotation.y*(1-followRatio);
     // 同理对躯干前后倾(chestX)做轻度补偿，让头不过度低/抬
     headGrp.rotation.x += -chest.rotation.x*0.4;
+  }
+  if(P.move==='aDrill'){
+    if(!P._drillSword){ P._drillSword=true; char.attach(weapon); }
+    P._drillAng=(P._drillAng||0)+dt*30;
+    weapon.position.set(0.9*Math.cos(P._drillAng),0.95,0.9*Math.sin(P._drillAng));
+    weapon.rotation.set(0,P._drillAng+Math.PI*0.5,Math.PI*0.5);
+  } else if(P._drillSword){
+    P._drillSword=false; P._drillAng=0;
+    weaponSocket.attach(weapon);
+    weapon.position.set(0,0,0); weapon.rotation.set(0,0,0);
+  }
+  // 旋风坠：剑脱离右手→在char根节点绕Y轴轨道，土星环效果；落地还手
+  if(P.move==='aDrill'){
+    if(!P._drillSword){ P._drillSword=true; char.attach(weapon); }
+    P._drillAng=(P._drillAng||0)+dt*30;
+    weapon.position.set(0.9*Math.cos(P._drillAng),0.95,0.9*Math.sin(P._drillAng));
+    weapon.rotation.set(0,P._drillAng+Math.PI*0.5,Math.PI*0.5);
+  } else if(P._drillSword){
+    P._drillSword=false; P._drillAng=0;
+    weaponSocket.attach(weapon);
+    weapon.position.set(0,0,0); weapon.rotation.set(0,0,0);
   }
   weapon.visible=true;   // 木棍一直握在手里
 }
