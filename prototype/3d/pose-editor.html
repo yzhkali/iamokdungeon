@@ -278,4 +278,8 @@ const clock=new THREE.Clock();
 loadingEl.style.display='none';
 function loop(){
   clock.getDelta();
-  camera.position.set(Math.sin(yawA)*Math.cos(pitch)*dist,Math.sin(pitch)*dist+1.2,Math.cos(yawA)*Math.cos(p
+  camera.position.set(Math.sin(yawA)*Math.cos(pitch)*dist,Math.sin(pitch)*dist+1.2,Math.cos(yawA)*Math.cos(pitch)*dist);
+  camera.lookAt(0,1.6,0);renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+loop();
+</script></body></html>
