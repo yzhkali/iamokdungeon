@@ -1610,6 +1610,7 @@ function startMove(name){
   P._launched=false;       // 升龙剑(dRise)地面蓄力后再起跳的一次性标志
   // 升龙剑顶点接践踏：先在最高点滞空停顿一下再俯冲(其它来源的践踏不停顿)
   P._stompHang = (name==='aStomp' && prevMove==='dRise') ? 0.28 : 0;
+  if(name==='aDrill') _drillSpin=0;   // 旋风坠每次从0开始转，不累积
   // 特效在 strike 时刻才触发(见招式推进)，不在起手触发
 }
 // 闪避连招触发：轻=李小龙腾空飞踢(立即起跳) / 重=升龙剑(先地面蓄力，起跳由推进段处理)
@@ -2487,16 +2488,6 @@ function poseCharacter(dt){
     headGrp.rotation.y += -chest.rotation.y*(1-followRatio);
     // 同理对躯干前后倾(chestX)做轻度补偿，让头不过度低/抬
     headGrp.rotation.x += -chest.rotation.x*0.4;
-  }
-  if(P.move==='aDrill'){
-    if(!P._drillSword){ P._drillSword=true; char.attach(weapon); }
-    P._drillAng=(P._drillAng||0)+dt*30;
-    weapon.position.set(0.9*Math.cos(P._drillAng),0.95,0.9*Math.sin(P._drillAng));
-    weapon.rotation.set(0,P._drillAng+Math.PI*0.5,Math.PI*0.5);
-  } else if(P._drillSword){
-    P._drillSword=false; P._drillAng=0;
-    weaponSocket.attach(weapon);
-    weapon.position.set(0,0,0); weapon.rotation.set(0,0,0);
   }
   // 旋风坠：剑脱离右手→在char根节点绕Y轴轨道，土星环效果；落地还手
   if(P.move==='aDrill'){
