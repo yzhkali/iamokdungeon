@@ -1852,9 +1852,6 @@ function update(dt){
   // 钻地反弹:第一次落地弹起,第二次落地播蜘蛛侠
   if(P._drillBounce>0&&onGround&&!P.jumping&&!P.move){P.vy=P._drillBounce;P.jumping=true;P._drillBounce=0;P._drillBounced=true;}
   if(P._drillBounced&&onGround&&!P.jumping&&!P.move){P._drillBounced=false;startMove('aJupiterLand');}
-  // 钻地反弹:第一次落地弹起,第二次落地播蜘蛛侠
-  if(P._drillBounce>0&&onGround&&!P.jumping&&!P.move){P.vy=P._drillBounce;P.jumping=true;P._drillBounce=0;P._drillBounced=true;}
-  if(P._drillBounced&&onGround&&!P.jumping&&!P.move){P._drillBounced=false;startMove('aJupiterLand');}
   if(P.state!=='dodge' && P.state!=='taunt'){
     // --- 不在招式中：起手 ---
     if(!P.move){
@@ -2372,7 +2369,7 @@ function poseCharacter(dt){
     body.rotation.x = P.spin*Math.PI*2;   // 翻一圈砸下
     lean=0; spinning=true;
   }
-  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; }
+  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); }
   // —— 空中木星电锯球 aJupiter：人变成球+剑高速旋转 ——
   if(P.move==='aJupiter' && !P._plungeDone){
     // 首帧：隐藏角色mesh,显示球体,触发剑气环
