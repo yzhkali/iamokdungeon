@@ -1494,7 +1494,7 @@ const MOVES={
   // —— 地面轻击三连（cancel~total 之间为结尾定格，加长以增强分量感）——
   gL1:{clip:'gL1', strike:0.18, cancel:0.24, total:0.50, comboAt:0.32, onLight:'gL2', onHeavy:'gThrust', lunge:3.0, fx:'slashR', trail:true, trailSegs:8, hitR:0.85},
   gL2:{clip:'gL2', strike:0.17, cancel:0.24, total:0.53, comboAt:0.32, onLight:'gL3', onHeavy:'gKnee', lunge:2.6, fx:'slashL', trail:true, hitR:0.85},
-  gL3:{clip:'gL3', strike:0.72, cancel:0.86, total:1.06, recoverClip:'gL3_recover', onLight:null, onHeavy:'gHeavyChain1', lunge:2.4, fx:'chop', trail:true},
+  gL3:{clip:'gL3', strike:0.72, cancel:0.86, total:1.06, recoverClip:'gL3_recover', onLight:null, onHeavy:null, lunge:2.4, fx:'chop', trail:true},
   // 轻→重：突刺（滑行更远；突刺动作做完后才可按重击接大风车）
   gThrust:{clip:'gThrust', strike:0.44, cancel:0.54, total:0.80, comboAt:0.72, recoverClip:'gThrust_recover', onLight:null, onHeavy:'gSpinSlide', lunge:0, slide:20, fx:'thrust', thrustHit:true, trail:true},
   // 轻轻→重：顺发蓄力重击
@@ -1512,7 +1512,7 @@ const MOVES={
 
   // —— 空中招（第一下滞空挥剑，第二下从天而降大劈）——
   // 空中轻击两下：①aL1=地面轻击1(gL1)放空中挥+滞空 ②aChop=举刀从天而降俯冲、落地砸地、收势对齐 gL3、不发剑气
-  aL1:{clip:'gL1', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'aChop', onHeavy:'aDrill', lunge:2.4, air:true, fx:'slashR', trail:true, hitR:0.85},
+  aL1:{clip:'gL1', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:'aL2', onHeavy:'aChop', lunge:2.4, air:true, fx:'slashR', trail:true, hitR:0.85},
   // 空中第二下：举刀从天而降，落地瞬间砸地(无剑气)，落地姿态/收势对齐地面大劈 gL3
   aChop:{clip:'aChop', strike:0.35, cancel:0.42, total:0.45, hangT:0.25, onLight:null, onHeavy:null, air:true, plunge:'aChopLand', landHit:true, landFx:'slam', hitR:1.0, trail:true},
   aL2:{clip:'gL2', strike:0.22, cancel:0.32, total:0.62, comboAt:0.42, onLight:null, onHeavy:'aChop', lunge:2.6, air:true, fx:'slashL', trail:true, hitR:0.85},  // (现未接入连招，保留备用)
@@ -1531,7 +1531,7 @@ const MOVES={
   // 闪避→轻击：闪现飞踹(瞬移已在触发处完成，这里只播飞踹动作；暂不击飞，留给血量系统)
   dKick:{clip:'dKick', strike:0.26, cancel:0.46, total:0.60, onLight:null, onHeavy:null, lunge:2.0, slide:8, air:true, fx:'kick', hitR:1.0},
   // 闪避→重击：升龙剑。地面深蹲蓄力(0~0.24)→啪蹬地起跳上挑→空翻到顶→顶点定格。comboAt 在顶点(0.56)，接招更从容
-  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.68, onLight:'aChop', onHeavy:'aJupiter', lunge:0.4, chargeSlide:10, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
+  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.68, onLight:'aChop', onHeavy:'aDrill', lunge:0.4, chargeSlide:10, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
 };
 
 function startSlash(type,ratio=0){
@@ -1870,8 +1870,8 @@ function update(dt){
           startMove(full ? 'gSpinCharged' : 'gSpin');   // 蓄满→三圈, 否则→一圈
         }
       } else if(!onGround && Actions.heavyReleased && !P.chargeLock){
-        // 空中直接重击：木星电锯球(与升龙接重击共用同一招)
-        startMove('aJupiter'); P.chargeLock=true;
+        // 空中直接重击：践踏(aStomp)
+        startMove('aStomp'); P.chargeLock=true;
       }
     }
     // --- 招式中：缓冲下一击输入（整段招式内都可预输入）---
