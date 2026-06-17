@@ -2391,7 +2391,7 @@ function poseCharacter(dt){
   // 人球阶段剑立于头顶
   if(P.move==='aJupiter' && !P._plungeDone && P.moveT>=0.22){
     if(!P._jupSword){ P._jupSword=true; body.attach(weapon); }
-    weapon.position.set(0,2.8,0); weapon.rotation.set(Math.PI/2,0,0);
+    weapon.position.set(0,4.2,0); weapon.rotation.set(Math.PI/2,0,0);
   } else if(P._jupSword){ P._jupSword=false; weaponSocket.attach(weapon); weapon.position.set(0,0,0); weapon.rotation.set(0,0,0); }
   if(P.move==='aDrill'){
     _drillSpin+=dt*90; body.rotation.y=_drillSpin; spinning=true;
