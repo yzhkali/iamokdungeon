@@ -1002,17 +1002,18 @@ const CLIPS={
     gripMode:[{t:0,v:1},{t:0.25,v:1}],
   }},
   aJupiter:{ dur:0.75, tracks:{
-    // 0~0.12 后仰起手, 0.12~0.22 收体变人球, 0.22+ 保持球形(旋转由代码驱动)
+    // 0~0.12 后仰起手(参考aChop), 0.12~0.22 快速收体, 0.22+ 紧球(跳水前空翻)
     bodyLean:[{t:0,v:-0.48},{t:0.12,v:-0.48},{t:0.22,v:0,e:'out'},{t:0.75,v:0}],
-    chestX:[{t:0,v:-0.28},{t:0.12,v:-0.30},{t:0.22,v:0,e:'out'},{t:0.75,v:0}],
-    shoR:[{t:0,x:-3.05,z:0.05},{t:0.12,x:-3.05,z:0.05},{t:0.22,x:-1.55,z:0,e:'out'},{t:0.75,x:-1.55,z:0}],
-    elbR:[{t:0,x:-0.15},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
-    shoL:[{t:0,x:-1.8},{t:0.12,x:-1.8},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
-    elbL:[{t:0,x:-0.3},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
-    hipR:[{t:0,x:0.3},{t:0.22,x:-1.65,e:'out'},{t:0.75,x:-1.65}],
-    hipL:[{t:0,x:-0.5},{t:0.22,x:-1.65,e:'out'},{t:0.75,x:-1.65}],
-    kneeR:[{t:0,x:0.35},{t:0.22,x:1.55,e:'out'},{t:0.75,x:1.55}],
-    kneeL:[{t:0,x:0.8},{t:0.22,x:1.55,e:'out'},{t:0.75,x:1.55}],
+    bodyY:[{t:0.22,v:-0.32},{t:0.75,v:-0.32}],
+    chestX:[{t:0,v:-0.28},{t:0.12,v:-0.30},{t:0.22,v:0.55,e:'out'},{t:0.75,v:0.55}],
+    shoR:[{t:0,x:-3.05,z:0.05},{t:0.12,x:-3.05,z:0.05},{t:0.22,x:-1.6,z:0,e:'out'},{t:0.75,x:-1.6,z:0}],
+    elbR:[{t:0,x:-0.15},{t:0.22,x:-1.7,e:'out'},{t:0.75,x:-1.7}],
+    shoL:[{t:0,x:-1.8},{t:0.12,x:-1.8},{t:0.22,x:-1.6,e:'out'},{t:0.75,x:-1.6}],
+    elbL:[{t:0,x:-0.3},{t:0.22,x:-1.7,e:'out'},{t:0.75,x:-1.7}],
+    hipR:[{t:0,x:0.3},{t:0.22,x:-2.1,e:'out'},{t:0.75,x:-2.1}],
+    hipL:[{t:0,x:-0.5},{t:0.22,x:-2.1,e:'out'},{t:0.75,x:-2.1}],
+    kneeR:[{t:0,x:0.35},{t:0.22,x:2.0,e:'out'},{t:0.75,x:2.0}],
+    kneeL:[{t:0,x:0.8},{t:0.22,x:2.0,e:'out'},{t:0.75,x:2.0}],
     gripMode:[{t:0,v:1},{t:0.75,v:1}],
   }},
   aJupiterLand:{ dur:0.65, tracks:{
@@ -1525,7 +1526,7 @@ const MOVES={
   aJupiterLand:{clip:'aJupiterLand', strike:99, cancel:99, total:0.65, onLight:null, onHeavy:null},
   // 升龙接重击：空中木星电锯球(3圈前翻滚电锯+密集剑影+蜘蛛侠落地)
   aDrill:{clip:'aDrill', strike:0.04, cancel:99, total:0.25, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', diveV:40, landFx:'drill', trail:true, trailSegs:10, ringHit:true, hitR:1.1}, // 旋风坠
-  aJupiter:{clip:'aJupiter', strike:0.22, cancel:99, total:0.75, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', hangT:0.40, diveV:22, trail:true, trailSegs:24, hitR:1.8, ringHit:true},
+  aJupiter:{clip:'aJupiter', strike:0.22, cancel:99, total:0.75, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', hangT:0.55, diveV:22, trail:true, trailSegs:24, hitR:1.8, ringHit:true},
   aSpin:{clip:'aSpin', strike:0.30, cancel:99, total:0.42, onLight:null, onHeavy:null, air:true, plunge:'aSpin_stiff', spin:true, fx:'heavyCircleBig'},
 
   // —— 闪避连招 ——
@@ -2375,8 +2376,18 @@ function poseCharacter(dt){
   // —— aJupiter：起手后仰→人球X轴高速旋转→蜘蛛侠落地 ——
   if(P.move==='aJupiter' && !P._plungeDone){
     if(!jupiterActive){ jupiterActive=true; _jSpin=0; }
-    if(P.moveT>=0.22){ _jSpin+=dt*28; body.rotation.x=_jSpin; lean=0; spinning=true; }
+    if(P.moveT>=0.22){
+      _jSpin+=dt*40;
+      body.rotation.x=_jSpin;
+      // 动平衡：让旋转轴穿过重心(y=1.4)，消除脚底打圈感
+      const _c=1.4;
+      char.position.y+=_c*(1-Math.cos(_jSpin));
+      char.position.x-=_c*Math.sin(_jSpin)*Math.sin(P.facing);
+      char.position.z-=_c*Math.sin(_jSpin)*Math.cos(P.facing);
+      lean=0; spinning=true;
+    }
   }
+  if(P.move==='aJupiter' && P._plungeDone){ body.rotation.x=0; }
   // 人球阶段剑立于头顶
   if(P.move==='aJupiter' && !P._plungeDone && P.moveT>=0.22){
     if(!P._jupSword){ P._jupSword=true; char.attach(weapon); }
