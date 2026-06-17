@@ -1613,6 +1613,7 @@ function startMove(name){
   // 升龙剑顶点接践踏：先在最高点滞空停顿一下再俯冲(其它来源的践踏不停顿)
   P._stompHang = (name==='aStomp' && prevMove==='dRise') ? 0.28 : 0;
   if(name==='aDrill') _drillSpin=0;   // 旋风坠每次从0开始转，不累积
+  if(name==='aJupiter') P._jupRev=-1;
   // 特效在 strike 时刻才触发(见招式推进)，不在起手触发
 }
 // 闪避连招触发：轻=李小龙腾空飞踢(立即起跳) / 重=升龙剑(先地面蓄力，起跳由推进段处理)
@@ -1788,6 +1789,12 @@ function tryRingHit(){
   }
 }
 // 大风车扫掠判定：只命中"剑当前扫到的角度扇区"内的目标，每个目标一次
+// aJupiter 多段命中：每转一整圈触发一次
+function tryJupiterHit(){
+  const hr=MOVES['aJupiter'].hitR||1.8;
+  for(const d of dummies){ if(Math.hypot(d.x-P.x,d.z-P.z)<hr+d.r){ d.flashT=0.22;d.tiltVel+=8;hitstop=Math.max(hitstop,0.04);shake=Math.max(shake,0.15);onHitTarget(d.x,1.5,d.z); } }
+  for(const m of monsters){ if(Math.hypot(m.x-P.x,m.z-P.z)<hr+m.r){ m.flashT=0.22;m.tiltVel+=7;hitstop=Math.max(hitstop,0.04);shake=Math.max(shake,0.15);onHitTarget(m.x,1.5,m.z); } }
+}
 function trySweepHit(){
   // 剑当前世界朝向角度：身体绕Y顺时针转(body.rotation.y=-spin*2π)，剑在右侧(facing基础上+90°起转)
   const _turns=MOVES[P.move]?.spinTurns||1;
@@ -1945,6 +1952,11 @@ function update(dt){
       const curRot=Math.floor(P.spin*turns);
       if(P._lastSpinRot===undefined||curRot!==P._lastSpinRot){ P._spinHit&&P._spinHit.clear(); P._lastSpinRot=curRot; }
       trySweepHit();
+    }
+    // aJupiter 多段：每转一整圈再打一次
+    if(P.move==='aJupiter' && P.struck && !P._plungeDone){
+      const curRev=Math.floor(_jSpin/(Math.PI*2));
+      if(P._jupRev!==curRev){ P._jupRev=curRev; if(curRev>0) tryJupiterHit(); }
     }
     // 突刺判定：滑行全程持续命中(长矩形)
     if(mv.thrustHit && P.struck && P.moveT<mv.cancel){ tryThrustHit(); }
