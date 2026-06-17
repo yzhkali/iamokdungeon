@@ -406,83 +406,8 @@ function addPrimitiveRock(x,z,s=1){
   m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
 }
 
-// Ground plan: entrance, main road, square, elder terrace, church terrace, and two functional yards.
-addGroundPatch(0,4,58,52,0,0x4f5941);
-addGroundPatch(0,13,7,34,0.01,0x6d6049);
-addGroundPatch(0,1,20,15,0.02,0x766a58);
-addGroundPatch(-21,15,15,13,0.01,0x5e5245);
-addGroundPatch(22,15,15,13,0.01,0x564946);
-addGroundPatch(0,-23,23,12,VILLAGE_TOPS.elder,0x675c4d);
-addGroundPatch(19,-14,16,15,VILLAGE_TOPS.church,0x625f56);
-addGroundPatch(-22,31,18,14,0.01,0x4f5941);
-addStep(0,-16.5,7,1.2,0.18);
-addStep(0,-17.7,6,1.2,0.34);
-addStep(19,-5.8,6,1.2,0.12);
-addStep(19,-7.0,5,1.2,VILLAGE_TOPS.church);
-
-// Low walls and yard fences, with gaps left for entrances.
-for(const [x,z,w,d] of [
-  [-28,15,1,12],[-14,15,1,12],[-21,21.5,14,1],[-25.5,8.5,5,1],[-16.5,8.5,5,1],
-  [15,15,1,12],[29,15,1,12],[22,21.5,14,1],[18,8.5,5,1],[26,8.5,5,1],
-  [-10,-29,5,1],[10,-29,5,1],[-12,-23,1,11],[12,-23,1,11]
-]) addLowWall(x,z,w,d,1.25,0x5f4f3d);
-
-// Buildings: elder home, villagers, inn, smith, shop, church.
-addBuilding({name:'elder',x:0,z:-24,w:10,d:7,top:VILLAGE_TOPS.elder,wallColor:0xd2bc8f,roofColor:0x6b302c,sign:'ELDER'});
-addBuilding({name:'inn',x:-14,z:0,w:9,d:8,wallColor:0xc79f73,roofColor:0x7a3b2d,sign:'INN'});
-addBuilding({name:'smith',x:-16,z:11,w:8,d:7,wallColor:0xb69a74,roofColor:0x4f3a32,sign:'SMITH'});
-addBuilding({name:'shop',x:14,z:5,w:8,d:7,wallColor:0xd2b783,roofColor:0x5d693f,sign:'SHOP'});
-addBuilding({name:'chapel',x:19,z:-15,w:8,d:10,top:VILLAGE_TOPS.church,wallColor:0xb8ae9c,roofColor:0x5d3433,stone:true,tower:true,sign:'CHAPEL'});
-addBuilding({name:'home-a',x:-9,z:-11,w:6,d:6,wallColor:0xc8b07f,roofColor:0x704436,sign:'HOME'});
-addBuilding({name:'home-b',x:8,z:-8,w:6,d:6,wallColor:0xc5ab83,roofColor:0x684334,sign:'HOME'});
-addPlayerHome({x:-22,z:31,rot:0});
-addBuilding({name:'home-d',x:7,z:19,w:6,d:6,wallColor:0xbfa57d,roofColor:0x6c4738,sign:'HOME'});
-
-// Gameplay props and set dressing.
-const ASSET_VENDOR=new URL('../assets/vendor/', import.meta.url).href;
-const DUN=ASSET_VENDOR+'kaykit_dungeon/';
-const MV=ASSET_VENDOR+'medieval_village/';
-const PROP=ASSET_VENDOR+'fantasy_props/';
-const FOREST=ASSET_VENDOR+'kaykit_forest/';
-const SKEL=ASSET_VENDOR+'kaykit_skeletons/';
-for(const z of [23,18,13,8,3,-2,-7,-12,-17]) placeGroundModel(MV+'Floor_Brick.gltf',0,z,{scale:1.5,rot:Math.PI/2,groundCenter:true});
-for(const [x,z,s,p] of [
-  [-31,-3,1.35,'Tree_3_A_Color1.gltf'],[-34,32,1.25,'Tree_2_B_Color1.gltf'],[-28,-24,1.5,'Tree_4_A_Color1.gltf'],
-  [30,-28,1.45,'Tree_3_A_Color1.gltf'],[32,5,1.25,'Tree_2_B_Color1.gltf'],[29,27,1.15,'Tree_1_A_Color1.gltf'],
-  [-2,-33,1.2,'Tree_2_B_Color1.gltf'],[25,-4,1.0,'Tree_1_A_Color1.gltf'],[-25,2,1.0,'Tree_1_A_Color1.gltf']
-]) addTree(x,z,s,p);
-for(const [x,z,s] of [[-30,10,0.8],[30,11,0.7],[-22,-6,0.6],[24,-25,0.75],[2,27,0.6]]) addPrimitiveRock(x,z,s);
-for(const [x,z,p] of [[-15,25,'Bush_3_A_Color1.gltf'],[-31,26,'Bush_4_A_Color1.gltf'],[19,24,'Bush_2_A_Color1.gltf'],[28,22,'Bush_4_A_Color1.gltf'],[-2,-16,'Bush_1_A_Color1.gltf'],[24,-7,'Bush_3_A_Color1.gltf']]){
-  placeGroundModel(FOREST+p,x,z,{scale:1.2,rot:Math.random()*Math.PI*2,groundCenter:true});
-}
-for(const [x,z,r] of [[-18,14,0],[-14,13,0],[-15,8,0.3]]) placeGroundModel(PROP+'Workbench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
-placeGroundModel(PROP+'Anvil.gltf',-20,12,{scale:1.0,rot:-0.4,groundCenter:true});
-placeGroundModel(PROP+'WeaponStand.gltf',-12.3,11.7,{scale:1.0,rot:Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Stall_Empty.gltf',12.5,10,{scale:1.05,rot:Math.PI,groundCenter:true});
-placeGroundModel(PROP+'Stall_Cart_Empty.gltf',17,10,{scale:1.05,rot:-Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Shelf_Small_Bottles.gltf',16,3,{scale:1.0,rot:-Math.PI/2,groundCenter:true});
-for(const [x,z,p] of [[11,12,'FarmCrate_Apple.gltf'],[14,12,'FarmCrate_Carrot.gltf'],[18,7,'Crate_Wooden.gltf'],[11,7,'Barrel_Apples.gltf']]) placeGroundModel(PROP+p,x,z,{scale:1.0,rot:Math.random(),groundCenter:true});
-placeGroundModel(PROP+'Table_Large.gltf',-14,5,{scale:1.0,rot:0.2,groundCenter:true});
-for(const [x,z,r] of [[-17,4.5,Math.PI/2],[-11,4.5,-Math.PI/2],[-14,7.5,0]]) placeGroundModel(PROP+'Bench.gltf',x,z,{scale:1.0,rot:r,groundCenter:true});
-for(const [x,z] of [[17,-11],[21,-11],[17,-18],[21,-18]]) placeGroundModel(PROP+'CandleStick_Stand.gltf',x,z,{scale:0.9,groundCenter:true});
-placeGroundModel(PROP+'Bookcase_2.gltf',15.5,-16,{scale:1.0,rot:Math.PI/2,groundCenter:true});
-placeGroundModel(PROP+'Chest_Wood.gltf',-2,-20,{scale:0.9,rot:0.4,groundCenter:true});
-for(const [x,z] of [[-3,1],[3,1],[-3,23],[3,23],[-24,9],[15,9]]) placeGroundModel(DUN+'torch_lit.gltf',x,z,{scale:1.05,groundCenter:true});
-
-const pillarDefs=[[-4,1.2,1.15,0.85],[4,1.2,1.15,0.85],[-24,17,1.2,1.0],[25,17,1.2,1.0]];
-pillarDefs.forEach(([x,z,s,h])=>{
-  const top=terrainYAt(x,z);
-  const pMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
-  const m=new THREE.Mesh(new THREE.BoxGeometry(s,h,s),pMat);
-  m.position.set(x,top+h/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
-  const capH=0.18, capW=s+0.18;
-  const cap=new THREE.Mesh(new THREE.BoxGeometry(capW,capH,capW), new THREE.MeshStandardMaterial({color:0x8a7358,roughness:0.8}));
-  cap.position.set(x,top+h+capH/2,z); cap.castShadow=true; cap.receiveShadow=true; mapRoot.add(cap);
-  const platformTop=top+h+capH;
-  addCollider(x,z,s,s,top,platformTop);
-  platforms.push({minx:x-capW/2,maxx:x+capW/2,minz:z-capW/2,maxz:z+capW/2, top:platformTop});
-  hittables.push({mesh:m,mat:pMat,baseColor:0x7a6450,x,z,r:s*0.72+0.6,top:platformTop,shakeT:0,flashT:0,baseX:x,baseZ:z});
-});
+// Ground plan: test arena — flat grass only
+addGroundPatch(0,0,80,80,0,0x4f5941);
 
 // ============================================================
 //  练武木人桩
@@ -510,56 +435,8 @@ function makeDummy(dx,dz,face){
   dummies.push(dummy);
 }
 const dummies=[];
-makeDummy(-21.8,15.0,0.15);
-makeDummy(-24.5,17.8,-0.35);
+makeDummy(0,5,Math.PI);
 const monsters=[];
-// function collectMonsterMaterials(root, out){
-//   root.traverse(o=>{
-//     if(o.isMesh && o.material){
-//       const mats=Array.isArray(o.material)?o.material:[o.material];
-//       for(const mat of mats) if(mat && !out.includes(mat)) out.push(mat);
-//     }
-//   });
-// }
-function makeMonsterTarget(x,z,name='打我'){
-  const top=terrainYAt(x,z);
-  const root=new THREE.Group(); root.position.set(x,top,z); scene.add(root);
-  registerMapFeature({type:'monster',name,x,z,w:1.6,d:1.6,rot:0});
-  const fallback=new THREE.Group(); root.add(fallback);
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.55,1.3,5,10),new THREE.MeshStandardMaterial({color:0x74616c,roughness:0.82}));
-  body.position.y=1.05; body.castShadow=true; body.receiveShadow=true; fallback.add(body);
-  const head=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.55,0.7),new THREE.MeshStandardMaterial({color:0xd8c6a6,roughness:0.8}));
-  head.position.y=2.0; head.castShadow=true; fallback.add(head);
-  const label=document.createElement('canvas');
-  label.width=128; label.height=48;
-  const lctx=label.getContext('2d');
-  lctx.fillStyle='rgba(20,12,12,0.82)'; lctx.fillRect(0,0,128,48);
-  lctx.strokeStyle='#ffcf5a'; lctx.lineWidth=4; lctx.strokeRect(3,3,122,42);
-  lctx.fillStyle='#ffffff'; lctx.font='bold 28px "Microsoft YaHei", sans-serif'; lctx.textAlign='center'; lctx.textBaseline='middle'; lctx.fillText(name,64,25);
-  const tex=new THREE.CanvasTexture(label);
-  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
-  const sprite=new THREE.Sprite(mat); sprite.position.set(0,4.0,0); sprite.scale.set(2.6,0.96,1); root.add(sprite);
-  const markerMat=new THREE.MeshBasicMaterial({color:0xff3030,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false});
-  const marker=new THREE.Mesh(new THREE.RingGeometry(1.55,1.78,48),markerMat);
-  marker.rotation.x=-Math.PI/2; marker.position.y=0.04; root.add(marker);
-  const mon={root,fallback,label:sprite,mats:[body.material,head.material],x,z,r:1.15,flashT:0,tilt:0,tiltVel:0,name};
-  monsters.push(mon);
-//   loadFreshModel(SKEL+'Skeleton_Minion.glb').then(model=>{
-//     if(!model) return;
-//     model.scale.setScalar(1.55);
-//     model.rotation.y=Math.PI;
-//     const box=new THREE.Box3().setFromObject(model);
-//     const center=box.getCenter(new THREE.Vector3());
-//     model.position.set(-center.x,-box.min.y,-center.z);
-//     collectMonsterMaterials(model,mon.mats);
-//     fallback.visible=false;
-//     mon.model=model;
-//     root.add(model);
-//   });
-//   addCollider(x,z,0.8,0.8,top,top+2.4);
-//   return mon;
-}
-makeMonsterTarget(0,6,'打我');
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
