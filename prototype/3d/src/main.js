@@ -1002,16 +1002,17 @@ const CLIPS={
     gripMode:[{t:0,v:1},{t:0.25,v:1}],
   }},
   aJupiter:{ dur:0.75, tracks:{
-    bodyLean:[{t:0,v:1.2},{t:0.75,v:1.2}],
-    chestX:[{t:0,v:0.9},{t:0.75,v:0.9}],
-    shoR:[{t:0,x:-1.55,z:0.05},{t:0.75,x:-1.55,z:0.05}],
-    elbR:[{t:0,x:-1.55},{t:0.75,x:-1.55}],
-    shoL:[{t:0,x:-1.55,z:-0.05},{t:0.75,x:-1.55,z:-0.05}],
-    elbL:[{t:0,x:-1.55},{t:0.75,x:-1.55}],
-    hipR:[{t:0,x:-1.65},{t:0.75,x:-1.65}],
-    hipL:[{t:0,x:-1.65},{t:0.75,x:-1.65}],
-    kneeR:[{t:0,x:1.55},{t:0.75,x:1.55}],
-    kneeL:[{t:0,x:1.55},{t:0.75,x:1.55}],
+    // 0~0.12 后仰起手, 0.12~0.22 收体变人球, 0.22+ 保持球形(旋转由代码驱动)
+    bodyLean:[{t:0,v:-0.48},{t:0.12,v:-0.48},{t:0.22,v:0,e:'out'},{t:0.75,v:0}],
+    chestX:[{t:0,v:-0.28},{t:0.12,v:-0.30},{t:0.22,v:0,e:'out'},{t:0.75,v:0}],
+    shoR:[{t:0,x:-3.05,z:0.05},{t:0.12,x:-3.05,z:0.05},{t:0.22,x:-1.55,z:0,e:'out'},{t:0.75,x:-1.55,z:0}],
+    elbR:[{t:0,x:-0.15},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
+    shoL:[{t:0,x:-1.8},{t:0.12,x:-1.8},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
+    elbL:[{t:0,x:-0.3},{t:0.22,x:-1.55,e:'out'},{t:0.75,x:-1.55}],
+    hipR:[{t:0,x:0.3},{t:0.22,x:-1.65,e:'out'},{t:0.75,x:-1.65}],
+    hipL:[{t:0,x:-0.5},{t:0.22,x:-1.65,e:'out'},{t:0.75,x:-1.65}],
+    kneeR:[{t:0,x:0.35},{t:0.22,x:1.55,e:'out'},{t:0.75,x:1.55}],
+    kneeL:[{t:0,x:0.8},{t:0.22,x:1.55,e:'out'},{t:0.75,x:1.55}],
     gripMode:[{t:0,v:1},{t:0.75,v:1}],
   }},
   aJupiterLand:{ dur:0.65, tracks:{
@@ -1524,7 +1525,7 @@ const MOVES={
   aJupiterLand:{clip:'aJupiterLand', strike:99, cancel:99, total:0.65, onLight:null, onHeavy:null},
   // 升龙接重击：空中木星电锯球(3圈前翻滚电锯+密集剑影+蜘蛛侠落地)
   aDrill:{clip:'aDrill', strike:0.04, cancel:99, total:0.25, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', diveV:40, landFx:'drill', trail:true, trailSegs:10, ringHit:true, hitR:1.1}, // 旋风坠
-  aJupiter:{clip:'aJupiter', strike:0.08, cancel:99, total:0.75, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', spin:true, spinTurns:3, diveV:28, trail:true, trailSegs:24, hitR:1.8, fx:'heavyCircleBig', ringHit:true, landFx:'stomp'},
+  aJupiter:{clip:'aJupiter', strike:0.22, cancel:99, total:0.75, onLight:null, onHeavy:null, air:true, plunge:'aJupiterLand', hangT:0.40, diveV:22, trail:true, trailSegs:24, hitR:1.8, ringHit:true},
   aSpin:{clip:'aSpin', strike:0.30, cancel:99, total:0.42, onLight:null, onHeavy:null, air:true, plunge:'aSpin_stiff', spin:true, fx:'heavyCircleBig'},
 
   // —— 闪避连招 ——
@@ -1954,7 +1955,8 @@ function update(dt){
     if(mv.plunge && onGround && P.moveT>0.05 && !P._plungeDone){
       P._plungeDone=true;
       // 木星球体变身：落地瞬间恢复角色
-      if(jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); }
+      if(jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); body.rotation.x=0; }
+      if(P._jupSword){ P._jupSword=false; weaponSocket.attach(weapon); weapon.position.set(0,0,0); weapon.rotation.set(0,0,0); }
       P.chargeLock=true;   // 落地后短暂锁定重击,防止连按重击意外触发地面大风车
       if(jupiterActive){jupiterActive=false;jupiterBall.visible=false;}
       if(mv.landFx) fireFx(mv.landFx);              // 落地冲击特效(aChop=slam / aStomp=stomp)
@@ -2369,29 +2371,17 @@ function poseCharacter(dt){
     body.rotation.x = P.spin*Math.PI*2;   // 翻一圈砸下
     lean=0; spinning=true;
   }
-  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); }
-  // —— 空中木星电锯球 aJupiter：人变成球+剑高速旋转 ——
+  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); body.rotation.x=0; }
+  // —— aJupiter：起手后仰→人球X轴高速旋转→蜘蛛侠落地 ——
   if(P.move==='aJupiter' && !P._plungeDone){
-    // 首帧：隐藏角色mesh,显示球体,触发剑气环
-    if(!jupiterActive){
-      jupiterActive=true; _jSpin=0;
-      char.traverse(o=>{ if(o.isMesh) o.visible=false; });
-      jupiterBall.visible=true;
-      spawnSaturnRings();   // 发射木星环扩散特效
-    }
-    // 球体位置跟随角色
-    jupiterBall.position.set(P.x, P.y+1.4, P.z);
-    // 剑高速自转:轨道1正转,轨道2以1.4倍速反转→交叉残影
-    _jSpin += dt*22;
-    _jOrb1.rotation.z = _jSpin;
-    _jOrb2.rotation.x = -_jSpin*1.4;
-    // 前0.12s顶点悬停
-    if(P.moveT<0.12){ P.vy=0; }
-    // 骨架仍旋转→剑影拖尾仍然工作(画竖圈电锯残影)
-    const turns=MOVES['aJupiter'].spinTurns||3;
-    body.rotation.x = P.spin*Math.PI*2*turns;
-    lean=0; spinning=true;
+    if(!jupiterActive){ jupiterActive=true; _jSpin=0; }
+    if(P.moveT>=0.22){ _jSpin+=dt*28; body.rotation.x=_jSpin; lean=0; spinning=true; }
   }
+  // 人球阶段剑立于头顶
+  if(P.move==='aJupiter' && !P._plungeDone && P.moveT>=0.22){
+    if(!P._jupSword){ P._jupSword=true; char.attach(weapon); }
+    weapon.position.set(0,3.2,0); weapon.rotation.set(Math.PI/2,0,0);
+  } else if(P._jupSword){ P._jupSword=false; weaponSocket.attach(weapon); weapon.position.set(0,0,0); weapon.rotation.set(0,0,0); }
   if(P.move==='aDrill'){
     _drillSpin+=dt*90; body.rotation.y=_drillSpin; spinning=true;
   }
