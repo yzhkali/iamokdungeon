@@ -126,14 +126,19 @@
   }
 }
 </script>
-<script type="module" src="./src/main.js?v=1781721987"></script>
+<script type="module" src="./src/main.js?v=1781722237"></script>
 <audio id="bgm" src="./assets/sounds/bgm.mp3" loop preload="auto"></audio>
 <script>
 const _bgm=document.getElementById('bgm'),_btn=document.getElementById('btnBGM');
 function _bgmStart(){_bgm.play().catch(()=>{});}
-_bgmStart(); // 尝试自动播放
+_bgmStart();
 document.addEventListener('keydown',_bgmStart,{once:true});
 document.addEventListener('mousedown',_bgmStart,{once:true});
 window.addEventListener('gamepadconnected',_bgmStart,{once:true});
 _btn.addEventListener('click',()=>{
-  if(_bgm.paused){_bgm.play();_btn.classL
+  if(_bgm.paused){_bgm.play();_btn.classList.remove('muted');}
+  else{_bgm.pause();_btn.classList.add('muted');}
+});
+</script>
+</body>
+</html>
