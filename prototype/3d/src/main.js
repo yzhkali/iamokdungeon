@@ -21,7 +21,6 @@ const loadingEl = document.getElementById('loading');
 let THREE = null;
 for(let i=0;i<THREE_SOURCES.length;i++){
   try{
-    loadingEl.textContent = `Loading 3D engine (${i+1}/${THREE_SOURCES.length})`;
     THREE = await import(THREE_SOURCES[i]);
     if(THREE && THREE.Scene) break;
   }catch(e){ /* 试下一个源 */ }
@@ -34,7 +33,6 @@ if(!THREE || !THREE.Scene){
 let GLTFLoader = null;
 for(let i=0;i<GLTF_LOADER_SOURCES.length;i++){
   try{
-    loadingEl.textContent = `Loading model loader (${i+1}/${GLTF_LOADER_SOURCES.length})`;
     const mod = await import(GLTF_LOADER_SOURCES[i]);
     GLTFLoader = mod.GLTFLoader;
     if(GLTFLoader) break;
