@@ -2377,7 +2377,7 @@ function poseCharacter(dt){
   if(P.move==='aJupiter' && !P._plungeDone){
     if(!jupiterActive){ jupiterActive=true; _jSpin=0; }
     if(P.moveT>=0.22){
-      _jSpin+=dt*40;
+      _jSpin+=dt*46;
       body.rotation.x=_jSpin;
       // 动平衡：让旋转轴穿过重心(y=1.4)，消除脚底打圈感
       const _c=1.8;
@@ -2391,7 +2391,7 @@ function poseCharacter(dt){
   // 人球阶段剑立于头顶
   if(P.move==='aJupiter' && !P._plungeDone && P.moveT>=0.22){
     if(!P._jupSword){ P._jupSword=true; body.attach(weapon); }
-    weapon.position.set(0,4.2,0); weapon.rotation.set(Math.PI/2,0,0);
+    weapon.position.set(0,4.2,0); weapon.rotation.set(0,0,0);
   } else if(P._jupSword){ P._jupSword=false; weaponSocket.attach(weapon); weapon.position.set(0,0,0); weapon.rotation.set(0,0,0); }
   if(P.move==='aDrill'){
     _drillSpin+=dt*90; body.rotation.y=_drillSpin; spinning=true;
