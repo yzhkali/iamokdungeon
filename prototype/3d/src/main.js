@@ -2372,21 +2372,6 @@ function poseCharacter(dt){
     body.rotation.x = P.spin*Math.PI*2;   // 翻一圈砸下
     lean=0; spinning=true;
   }
-  if(P.move==='aJupiter' && !P._plungeDone){
-    jupiterBall.position.set(P.x,P.y+1.4,P.z);
-    if(!jupiterActive){ jupiterActive=true; _jSpin=0; jupiterBall.visible=true;
-      // 隐藏剑网格:剑影由weaponSocket拖尾产生,不需要这两个网格
-      _jSwd1.visible=false; _jSwd2.visible=false; }
-    _jSpin += dt*30;   // 30rad/s(≈5rps),足够快且允许全轴位移补偿
-    if(P.moveT<0.18){ P.vy=0; }
-    body.rotation.x = _jSpin;
-    // 全轴动平衡:让旋转轴穿过球心(y=1.4),消除脚底打圈感
-    const _c=1.4;
-    char.position.y += _c*(1-Math.cos(_jSpin));
-    char.position.x -= _c*Math.sin(_jSpin)*Math.sin(P.facing);
-    char.position.z -= _c*Math.sin(_jSpin)*Math.cos(P.facing);
-    lean=0; spinning=true;
-  }
   if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; }
   // —— 空中木星电锯球 aJupiter：人变成球+剑高速旋转 ——
   if(P.move==='aJupiter' && !P._plungeDone){
