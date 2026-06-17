@@ -1531,7 +1531,7 @@ const MOVES={
   // 闪避→轻击：闪现飞踹(瞬移已在触发处完成，这里只播飞踹动作；暂不击飞，留给血量系统)
   dKick:{clip:'dKick', strike:0.26, cancel:0.46, total:0.60, onLight:null, onHeavy:null, lunge:2.0, slide:8, air:true, fx:'kick', hitR:1.0},
   // 闪避→重击：升龙剑。地面深蹲蓄力(0~0.24)→啪蹬地起跳上挑→空翻到顶→顶点定格。comboAt 在顶点(0.56)，接招更从容
-  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.68, onLight:'aChop', onHeavy:'aDrill', lunge:0.4, chargeSlide:10, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
+  dRise:{clip:'dRise', strike:0.32, cancel:0.56, total:0.90, comboAt:0.68, onLight:'aChop', onHeavy:'aJupiter', lunge:0.4, chargeSlide:10, air:true, noHang:true, landClip:'dRise_land', fx:'rise', hitR:1.1, trail:true},
 };
 
 function startSlash(type,ratio=0){
@@ -2583,4 +2583,4 @@ addEventListener('resize',resize);resize();padStatus();
 document.getElementById('loading').style.display='none';
 function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();
-} // end main(THREE)
+} // end main(THREE
