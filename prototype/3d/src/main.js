@@ -1,3 +1,4 @@
+import { makeWolf } from "./wolf.js";
 // ===== 多 CDN 自动回退加载 Three.js =====
 // jsdelivr 在国内常被墙/超慢，这里依次尝试多个源，哪个通用哪个
 const THREE_SOURCES = [
@@ -435,6 +436,94 @@ function makeDummy(dx,dz,face){
 const dummies=[];
 makeDummy(0,5,Math.PI);
 const monsters=[];
+
+// ─── WOLF ──────────────────────────────────────────────
+const wolf = makeWolf(THREE, scene, 5, 0, -5);
+wolf.root.scale.setScalar(1.4);
+wolf.root.position.y = 0.72;
+wolf.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+// ── WOLF AI ─────────────────────────────────────────
+const wolfAI = {
+  hp:5, state:'patrol', attackCool:0, stateTimer:0,
+  wx:5, wz:-5,
+  patrolTarget:{x:5,z:-5}, walking:false,
+  spawnX:5, spawnZ:-5, patrolRadius:6,
+  hittable:{x:5,z:-5,r:1.8,flashT:0,shakeT:0}
+};
+wolfAI.hittable.mat  = wolf.J.body.children[0].material;
+wolfAI.hittable.mesh = wolf.root;
+wolfAI.hittable.baseX=5; wolfAI.hittable.baseZ=-5;
+hittables.push(wolfAI.hittable);
+wolfAI.hittable.onHit = ()=>{
+  if(wolfAI.state==='dead') return;
+  wolfAI.hp--;
+  wolf.setState('hurt');
+  if(wolfAI.hp<=0){ wolf.setState('death'); wolfAI.state='dead'; }
+  else wolfAI.state='chase';
+};
+
+function wolfPickPatrol(){
+  const a=Math.random()*Math.PI*2, r=Math.random()*wolfAI.patrolRadius;
+  wolfAI.patrolTarget={x:wolfAI.spawnX+Math.cos(a)*r, z:wolfAI.spawnZ+Math.sin(a)*r};
+}
+wolfPickPatrol();
+
+function updateWolf(dt){
+  if(wolfAI.state==='dead'){ wolf.update(dt); return; }
+  wolfAI.attackCool=Math.max(0,wolfAI.attackCool-dt);
+  wolfAI.stateTimer=Math.max(0,wolfAI.stateTimer-dt);
+  const wx=wolfAI.wx, wz=wolfAI.wz;
+  const dx=P.x-wx, dz=P.z-wz, dist=Math.hypot(dx,dz);
+  wolfAI.hittable.x=wx; wolfAI.hittable.z=wz;
+  wolfAI.hittable.baseX=wx; wolfAI.hittable.baseZ=wz;
+
+  // 扇形视野检测（120度，10格范围）
+  const faceX=-Math.sin(wolf.root.rotation.y), faceZ=-Math.cos(wolf.root.rotation.y);
+  const dot=dist>0.1?(faceX*dx+faceZ*dz)/dist:0;
+  const canSee = dist<10 && dot>0.5; // cos(60°)=0.5 → 前方120°
+
+  if(wolfAI.state==='patrol'){
+    // 巡逻：走一走停一停
+    if(wolfAI.stateTimer<=0){
+      wolfAI.walking=!wolfAI.walking;
+      wolfAI.stateTimer=wolfAI.walking?(1+Math.random()*2):(0.5+Math.random()*1.5);
+      if(wolfAI.walking) wolfPickPatrol();
+    }
+    if(wolfAI.walking){
+      const ptx=wolfAI.patrolTarget.x-wx, ptz=wolfAI.patrolTarget.z-wz;
+      const pd=Math.hypot(ptx,ptz);
+      if(pd>0.5){
+        wolf.root.rotation.y=Math.atan2(-ptx,-ptz);
+        wolfAI.wx+=ptx/pd*1.5*dt;
+        wolfAI.wz+=ptz/pd*1.5*dt;
+        if(wolf.state!=='wander') wolf.setState('wander');
+      } else { wolfAI.stateTimer=0; } // 到达目标，立即进入停顿
+    } else {
+      if(wolf.state!=='idle') wolf.setState('idle');
+    }
+    if(canSee){ wolfAI.state='look'; wolfAI.stateTimer=0.8; }
+
+  } else if(wolfAI.state==='look'){
+    // 注视玩家
+    wolf.root.rotation.y=Math.atan2(-dx,-dz);
+    if(wolf.state!=='idle') wolf.setState('idle');
+    if(wolfAI.stateTimer<=0) wolfAI.state='chase';
+
+  } else if(wolfAI.state==='chase'){
+    wolf.root.rotation.y=Math.atan2(-dx,-dz);
+    if(dist>3.0){
+      wolfAI.wx+=dx/dist*4.5*dt;
+      wolfAI.wz+=dz/dist*4.5*dt;
+      if(wolf.state!=='run') wolf.setState('run');
+    } else if(wolfAI.attackCool<=0){
+      wolf.setState(Math.random()<0.5?'pounce':'bite');
+      wolfAI.attackCool=2.2;
+      if(dist<2.8){ P.hp&&(P.hp-=1); }
+    }
+  }
+  wolf.root.position.x=wolfAI.wx; wolf.root.position.z=wolfAI.wz;
+  wolf.update(dt);
+}
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
@@ -2574,6 +2663,6 @@ function updateHUD(){
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();padStatus();
 document.getElementById('loading').style.display='none';
-function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
+function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateWolf(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();
 } // end main(THREE

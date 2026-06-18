@@ -1,0 +1,226 @@
+<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><title>ZzFX 音效生成器</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1a1a2e;color:#e0e0f0;padding:20px}
+h1{font-size:1.3rem;margin-bottom:16px;color:#a0c4ff}
+.cats{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.cat-btn{padding:4px 12px;border:1px solid #444;border-radius:20px;background:transparent;color:#aaa;cursor:pointer;font-size:.85rem}
+.cat-btn.active{background:#3a3a6e;color:#fff;border-color:#6a6aae}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{text-align:left;padding:6px 10px;border-bottom:2px solid #333;color:#888;font-weight:500}
+tr:hover td{background:#1e1e3a}
+td{padding:7px 10px;border-bottom:1px solid #2a2a3a}
+.name{font-weight:600;color:#c0d8ff}
+.desc{color:#888;font-size:.82rem}
+.params{font-family:monospace;font-size:.75rem;color:#666;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;title-content:attr(title)}
+.params:hover{color:#a0a0c0}
+.btns{display:flex;gap:6px;white-space:nowrap}
+button{padding:4px 10px;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:.82rem;background:#2a2a4a;color:#c0d0ff}
+button:hover{background:#3a3a6a;border-color:#6a6aaf}
+button.play{border-color:#4a8a4a;color:#90f090}
+button.play:hover{background:#1a3a1a}
+button.dl{border-color:#4a6a8a;color:#90c0f0}
+button.dl:hover{background:#1a2a3a}
+.sep{margin:20px 0 12px;color:#6060a0;font-size:.9rem;font-weight:600;border-bottom:1px solid #2a2a4a;padding-bottom:4px}
+#custom-area{margin-top:20px;background:#16162a;border-radius:8px;padding:16px}
+#custom-area h2{font-size:1rem;margin-bottom:10px;color:#a0c4ff}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+label{color:#888;font-size:.82rem;width:120px}
+input[type=range]{width:140px;accent-color:#6a6aae}
+input[type=number]{width:70px;background:#2a2a4a;border:1px solid #444;color:#e0e0f0;padding:2px 6px;border-radius:4px;font-size:.82rem}
+.val{width:45px;font-size:.82rem;color:#aaa;text-align:right}
+#custom-params{font-family:monospace;font-size:.8rem;background:#1e1e36;padding:8px;border-radius:4px;color:#90c0a0;margin-bottom:8px;word-break:break-all}
+</style>
+</head><body>
+<h1>🎵 ZzFX 音效生成器 — I'm OK Dungeon</h1>
+
+<div class="cats">
+  <button class="cat-btn active" onclick="filterCat('all')">全部</button>
+  <button class="cat-btn" onclick="filterCat('attack')">攻击</button>
+  <button class="cat-btn" onclick="filterCat('hit')">命中</button>
+  <button class="cat-btn" onclick="filterCat('move')">移动</button>
+  <button class="cat-btn" onclick="filterCat('ui')">UI</button>
+  <button class="cat-btn" onclick="filterCat('env')">环境</button>
+</div>
+
+<table id="tbl">
+<thead><tr><th>名称</th><th>描述</th><th>参数预览</th><th style="width:140px">操作</th></tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<div id="custom-area">
+  <h2>🔧 自定义合成</h2>
+  <div id="sliders"></div>
+  <div id="custom-params">[1,0.05,220,0,0,0.1,0,1,0,0,0,0,0,0,0,0,0,1,0,0]</div>
+  <div class="btns">
+    <button class="play" onclick="playCustom()">▶ 试听</button>
+    <button class="dl" onclick="dlCustom()">⬇ 下载 WAV</button>
+    <button onclick="copyCustom()">📋 复制参数</button>
+  </div>
+</div>
+
+<script>
+// ===== ZzFX Mini (MIT) killedbyapixel.github.io/ZzFX =====
+const zzfxR=44100;
+function zzfxG(v=1,r=.05,f=220,a=0,s=0,d=.1,p=0,c=1,l=0,n=0,D=0,A=0,e=0,q=0,k=0,m=0,T=0,P=1,b=0,E=0){
+  let z=2*Math.PI,sr=zzfxR,t=[],o=0,ph=0,sl=0,sv=0,t0=f*=500*(z/sr/sr),i=0;
+  r=99+r*sr|0;a=a*sr|0;s=s*sr|0;d=d*sr|0;T=T*sr|0;n=n*sr|0;D=D*sr|0;A=A*sr|0;
+  e=2*e*z/sr;E=E*z/sr;l*=2*z/sr;
+  let total=sr*(0)+a+s+d+T|0;
+  for(let x=a+s+d+T|0;i<x;){
+    i++;
+    let env=i<a?i/a:i==a+1?(sv=0,1):i>a+s?0:1;
+    let amp=i<a+s?env:i<a+s+d?1:i>x-T?(x-i)/T:1;
+    let sh=i<n||i>x-A?0:p==2?1-i/n*2:p==1?i<n/2?2*i/n:2-2*i/n:1;
+    sv+=(1+r*(Math.random()-.5)*2)*Math.sin(o)*sh*amp*v*env;
+    if(i>D) o+=f+l*i;
+    if(i<e) l+=E;
+    if(i==n){f+=c;t0+=c;}
+    if(m&&!(i%Math.round(m))){f=t0;o=0;}
+    if(e&&!(i%(e*sr)|0)){f+=c;o=0;}
+    t.push(Math.min(Math.max(2*sv-1,2*(sv-1)),1));
+  }
+  return t;
+}
+let _ac=null;
+function getAC(){if(!_ac){try{_ac=new AudioContext();}catch(e){}}return _ac;}
+function playArr(arr){
+  const ac=getAC();if(!ac)return;
+  const buf=ac.createBuffer(1,arr.length,zzfxR);
+  buf.getChannelData(0).set(arr);
+  const src=ac.createBufferSource();src.buffer=buf;
+  src.connect(ac.destination);src.start();
+}
+function arrToWav(arr){
+  const len=arr.length,buf=new ArrayBuffer(44+len*2),v=new DataView(buf);
+  const ws=(s,o)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  ws('RIFF',0);v.setUint32(4,36+len*2,true);ws('WAVE',8);ws('fmt ',12);
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,zzfxR,true);v.setUint32(28,zzfxR*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  ws('data',36);v.setUint32(40,len*2,true);
+  for(let i=0;i<len;i++)v.setInt16(44+i*2,Math.max(-1,Math.min(1,arr[i]))*0x7FFF,true);
+  return buf;
+}
+function dlWav(arr,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([arrToWav(arr)],{type:'audio/wav'}));
+  a.download=name+'.wav';a.click();
+}
+
+// ===== 预设音效库 =====
+const PRESETS=[
+  // 攻击
+  {cat:'attack',name:'轻击挥砍',desc:'剑划过空气，轻快',p:[0.7,.1,380,0,0,.1,2,1,-1.8,0,0,0,0,.08,0,0,0,1,0,0]},
+  {cat:'attack',name:'重击挥砍',desc:'厚重的横扫风声',p:[1,.1,200,.01,.03,.2,2,1,-.9,0,0,0,0,.12,0,0,0,1,0,0]},
+  {cat:'attack',name:'突刺',desc:'锋利的刺出声',p:[.8,.05,420,0,0,.09,0,1,2.5,0,0,0,0,.04,0,0,0,1,0,0]},
+  {cat:'attack',name:'大风车起手',desc:'旋风蓄力嗡嗡声',p:[.9,.1,260,.02,.1,.18,2,1,-.6,0,0,0,0,.1,0,0,0,1,0,0]},
+  {cat:'attack',name:'下劈',desc:'从高处猛砸的沉重劈砍',p:[1,.15,150,.03,.05,.25,2,1,-1.2,0,0,0,0,.2,0,0,0,1,0,0]},
+  {cat:'attack',name:'飞踹',desc:'腿部快速踢出',p:[.7,.2,300,0,.02,.1,3,1,-.5,0,0,0,0,.15,0,0,0,1,0,0]},
+  {cat:'attack',name:'升龙剑',desc:'从下往上的猛烈上挑',p:[.9,.1,280,0,.02,.18,2,1,2.5,0,0,0,0,.08,0,0,0,1,0,0]},
+  {cat:'attack',name:'践踏落地冲击',desc:'从空中砸下的重击',p:[1,.3,55,.02,.05,.28,0,1,-.4,0,0,0,0,.65,0,0,0,1,0,0]},
+  // 命中
+  {cat:'hit',name:'打中骨头',desc:'清脆骨骼碎击声',p:[1,.3,700,.01,.02,.1,3,1,0,0,0,0,0,.12,0,0,0,1,0,0]},
+  {cat:'hit',name:'打中木头',desc:'沉闷木头撞击',p:[.8,.2,160,.01,.04,.14,0,1,-.4,0,0,0,0,.45,0,0,0,1,0,0]},
+  {cat:'hit',name:'打中肉',desc:'肉质闷击感',p:[.7,.3,110,.01,.05,.17,0,1,-.6,0,0,0,0,.55,0,0,0,1,0,0]},
+  {cat:'hit',name:'受击硬直',desc:'玩家被打的钝响',p:[.9,.25,90,.01,.04,.2,0,1,-.3,0,0,0,0,.6,0,0,0,1,0,0]},
+  {cat:'hit',name:'暴击',desc:'夸张的重度命中',p:[1,.2,80,.02,.06,.3,0,1,-.5,0,0,0,0,.7,0,0,0,1,0,0]},
+  // 移动
+  {cat:'move',name:'跳跃',desc:'轻盈上升感',p:[.55,.08,240,0,0,.09,0,1,1.5,0,0,0,0,0,0,0,0,1,0,0]},
+  {cat:'move',name:'落地',desc:'落地踩实的一声',p:[.65,.2,70,.01,.03,.16,0,1,-.5,0,0,0,0,.55,0,0,0,1,0,0]},
+  {cat:'move',name:'闪避冲刺',desc:'快速滑过的气流',p:[.45,.1,330,0,0,.07,2,1,-3.5,0,0,0,0,.04,0,0,0,1,0,0]},
+  {cat:'move',name:'跑步脚步',desc:'单步踩地声',p:[.4,.3,100,.005,.01,.08,0,1,0,0,0,0,0,.7,0,0,0,1,0,0]},
+  // UI
+  {cat:'ui',name:'拾取物品',desc:'明亮上升音调',p:[.6,.04,600,0,0,.22,0,1,.35,0,180,.12,0,0,0,0,0,1,0,0]},
+  {cat:'ui',name:'菜单选择',desc:'轻点确认音',p:[.5,.02,520,0,0,.1,0,2,0,0,100,.06,0,0,0,0,0,1,0,0]},
+  {cat:'ui',name:'错误/取消',desc:'短促低沉否定音',p:[.5,.05,180,0,0,.12,0,1,-.8,0,0,0,0,0,0,0,0,1,0,0]},
+  {cat:'ui',name:'血量危险',desc:'心跳式警告声',p:[.6,.05,80,0,.05,.05,0,1,0,0,0,0,.4,0,0,0,0,1,0,0]},
+  // 环境
+  {cat:'env',name:'爆炸',desc:'低频噪声爆炸',p:[1,.5,45,.02,.15,.35,0,1,-.25,0,0,0,0,1,0,0,0,1,0,0]},
+  {cat:'env',name:'死亡音效',desc:'音调下落的失败感',p:[1,.2,380,.02,.1,.55,0,1,-2.2,0,0,0,0,.1,0,0,0,1,0,0]},
+  {cat:'env',name:'魔法释放',desc:'高频散射的魔法感',p:[.7,.05,900,.01,.03,.25,0,2,0,0,0,0,0,.05,8,0,0,1,0,0]},
+  {cat:'env',name:'剑气飞射',desc:'贴地飞行的气浪',p:[.8,.1,280,.01,.08,.2,2,1,-1,0,0,0,0,.15,0,0,0,1,0,0]},
+];
+
+let curCat='all';
+function filterCat(cat){
+  curCat=cat;
+  document.querySelectorAll('.cat-btn').forEach(b=>{
+    b.classList.toggle('active',b.textContent==['全部','攻击','命中','移动','UI','环境'][['all','attack','hit','move','ui','env'].indexOf(cat)]);
+  });
+  renderTable();
+}
+function renderTable(){
+  const tb=document.getElementById('tbody');
+  tb.innerHTML='';
+  PRESETS.filter(p=>curCat==='all'||p.cat===curCat).forEach((pr,i)=>{
+    const ps=JSON.stringify(pr.p);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><span class="name">${pr.name}</span></td><td><span class="desc">${pr.desc}</span></td>
+    <td><span class="params" title="${ps}" onclick="navigator.clipboard.writeText('${ps}')" title="点击复制">${ps.substring(0,40)}…</span></td>
+    <td><div class="btns">
+      <button class="play" onclick='playP(${i})'>▶</button>
+      <button class="dl" onclick='dlP(${i})'>WAV</button>
+      <button onclick='loadToCustom(${i})'>调节</button>
+    </div></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function visiblePresets(){return PRESETS.filter(p=>curCat==='all'||p.cat===curCat);}
+function playP(i){const pr=visiblePresets()[i];playArr(zzfxG(...pr.p));}
+function dlP(i){const pr=visiblePresets()[i];dlWav(zzfxG(...pr.p),pr.name);}
+
+// ===== 自定义调节面板 =====
+const PNAMES=[
+  ['音量','volume',0,2,.01,1],
+  ['随机度','random',0,1,.01,.05],
+  ['频率','frequency',20,2000,1,220],
+  ['起音','attack',0,.5,.01,0],
+  ['持续','sustain',0,1,.01,0],
+  ['释音','release',0,2,.01,.1],
+  ['波形','shape',0,4,1,0],
+  ['波形曲线','shapeCurve',.1,4,.1,1],
+  ['滑音','slide',-10,10,.1,0],
+  ['滑音加速','dSlide',-1,1,.01,0],
+  ['音调跳跃','pitchJump',-1000,1000,1,0],
+  ['跳跃时间','pitchJumpTime',0,.5,.01,0],
+  ['重复','repeat',0,.5,.01,0],
+  ['噪声','noise',0,1,.01,0],
+  ['调制','mod',0,20,.1,0],
+  ['比特压缩','bitCrush',0,1,.01,0],
+  ['延迟','delay',0,.5,.01,0],
+  ['持续音量','susVol',0,2,.01,1],
+  ['衰减','decay',0,.5,.01,0],
+  ['颤音','tremolo',0,1,.01,0],
+];
+let customP=[1,.05,220,0,0,.1,0,1,0,0,0,0,0,0,0,0,0,1,0,0];
+function buildSliders(){
+  const el=document.getElementById('sliders');
+  el.innerHTML='';
+  PNAMES.forEach(([label,key,min,max,step,def],i)=>{
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML=`<label>${label}</label>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${customP[i]}" oninput="updateCustom(${i},parseFloat(this.value));document.getElementById('v${i}').textContent=this.value" id="r${i}">
+    <span class="val" id="v${i}">${customP[i]}</span>`;
+    el.appendChild(row);
+  });
+  updateCustomParamsDisplay();
+}
+function updateCustom(i,v){customP[i]=v;updateCustomParamsDisplay();}
+function updateCustomParamsDisplay(){
+  document.getElementById('custom-params').textContent=JSON.stringify(customP);
+}
+function playCustom(){playArr(zzfxG(...customP));}
+function dlCustom(){dlWav(zzfxG(...customP),'custom_sfx');}
+function copyCustom(){navigator.clipboard.writeText(JSON.stringify(customP));}
+function loadToCustom(i){
+  customP=[...visiblePresets()[i].p];
+  buildSliders();
+  document.getElementById('custom-area').scrollIntoView({behavior:'smooth'});
+}
+
+renderTable();
+buildSliders();
+</script>
+</body></html>

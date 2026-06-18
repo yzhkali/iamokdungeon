@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "npx",
+      "args": ["-y", "@ahujasid/blender-mcp"]
+    }
+  }
+}
