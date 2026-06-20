@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>没事地下城 — 3D地图编辑器</title>
+<style>
+:root{color-scheme:light}
+*{margin:0;padding:0;box-sizing:border-box}
+body{display:flex;flex-direction:column;height:100vh;background:#111;font-family:-apple-system,"PingFang SC",sans-serif;overflow:hidden;color:#ccc}
+/* top toolbar */
+#toolbar{display:flex;align-items:center;gap:8px;padding:5px 10px;background:#1e1a14;border-bottom:1px solid #3a3020;flex-shrink:0;flex-wrap:wrap}
+#toolbar h2{color:#d4b87a;font-size:12px;margin-right:4px;white-space:nowrap}
+.toolBtn{padding:4px 10px;border-radius:4px;border:1.5px solid #5a4a30;background:#2a2010;color:#b4a070;font-size:12px;cursor:pointer;white-space:nowrap}
+.toolBtn:hover{background:#3a3020}
+.toolBtn.active{border-color:#ffd35a;color:#ffd35a;background:rgba(255,211,90,0.1)}
+.sep{width:1px;height:22px;background:#3a3020;margin:0 2px}
+#brushSz{accent-color:#d4b87a;width:70px}
+#brushStr{accent-color:#d4b87a;width:60px}
+/* body row */
+#body{display:flex;flex:1;overflow:hidden}
+/* sidebar */
+#side{width:180px;background:#1e1a14;display:flex;flex-direction:column;border-right:1px solid #3a3020;flex-shrink:0;overflow:hidden}
+#assetScroll{flex:1;overflow-y:auto;padding:4px}
+.cat{margin-bottom:3px}
+.catHead{padding:4px 6px;background:#2a2418;color:#b4a070;font-size:11px;cursor:pointer;border-radius:4px;user-select:none;display:flex;justify-content:space-between}
+.catHead:hover{background:#3a3020}
+.assetBtn{width:100%;padding:4px 8px 4px 14px;background:none;border:1.5px solid transparent;border-radius:4px;color:#aaa;font-size:11px;text-align:left;cursor:pointer;display:block}
+.assetBtn:hover{color:#fff;border-color:#5a4a30}
+.assetBtn.active{border-color:#ffd35a;color:#ffd35a;background:rgba(255,211,90,0.08)}
+#sideBot{padding:6px;border-top:1px solid #3a3020;display:flex;flex-direction:column;gap:4px}
+.propRow{display:flex;align-items:center;gap:5px;font-size:11px;color:#888}
+.propRow label{width:40px;flex-shrink:0}
+.propRow input[type=range]{flex:1;accent-color:#d4b87a}
+.propRow span{width:30px;text-align:right;color:#aaa;font-size:10px}
+.smallBtn{padding:4px 6px;border-radius:4px;border:1px solid #5a4a30;background:#2a2010;color:#aaa;font-size:11px;cursor:pointer}
+.smallBtn:hover{background:#3a3020;color:#fff}
+#btnDel{border-color:#7a3020;color:#e08060}
+#btnDel:hover{background:#4a1810}
+/* main canvas */
+#main{flex:1;position:relative}
+#c{display:block;width:100%;height:100%}
+#hud{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);color:#555;font-size:11px;pointer-events:none;white-space:nowrap;text-align:center}
+#modeTag{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(255,211,90,0.15);border:1px solid #ffd35a;color:#ffd35a;font-size:11px;padding:3px 12px;border-radius:12px;display:none;pointer-events:none}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;color:#888;font-size:14px;z-index:20}
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h2>工具</h2>
+  <button class="toolBtn active" id="tView">👁 观察</button>
+  <button class="toolBtn" id="tSculpt">⛰ 地形</button>
+  <button class="toolBtn" id="tPlace">🌳 放置</button>
+  <button class="toolBtn" id="tRoad">🛤 道路</button>
+  <div id="roadTools" style="display:none;align-items:center;gap:6px">
+    <span style="font-size:11px;color:#888">路色:</span>
+    <input type="color" id="roadColorPicker" value="#7d7260" style="width:32px;height:22px;border:none;background:none;cursor:pointer;padding:0">
+  </div>
+  <div class="sep"></div>
+  <div id="sculptTools" style="display:none;gap:4px;display:none">
+    <button class="toolBtn active" id="sBrushRaise">🔺 升高</button>
+    <button class="toolBtn" id="sBrushLower">🔻 降低</button>
+    <button class="toolBtn" id="sBrushFlat">⬜ 找平</button>
+    <button class="toolBtn" id="sBrushSetH">📏 定高</button>
+    <label id="setHLabel" style="font-size:11px;color:#888;display:none">高度: <input type="range" id="setHVal" min="-15" max="30" value="0" step="0.5" style="accent-color:#d4b87a;width:80px"><span id="setHV" style="color:#aaa;font-size:10px;margin-left:3px">0.0</span></label>
+  </div>
+  <div id="sculptSep" class="sep" style="display:none"></div>
+  <label style="font-size:11px;color:#888">笔刷: <input type="range" id="brushSz" min="2" max="40" value="12"></label>
+  <label style="font-size:11px;color:#888">强度: <input type="range" id="brushStr" min="1" max="20" value="5"></label>
+  <div class="sep"></div>
+  <button class="toolBtn" id="tRef">👤 参考人</button>
+  <div class="sep"></div>
+  <label style="font-size:11px;color:#888">水位: <input type="range" id="waterY" min="-15" max="5" value="-2" step="0.5" style="accent-color:#4aa4cc;width:70px"><span id="waterYV" style="color:#aaa;font-size:10px;margin-left:3px">-2.0</span></label>
+  <div class="sep"></div>
+  <button class="toolBtn" id="tExport">💾 保存</button>
+  <label class="toolBtn" style="cursor:pointer">📂 载入<input type="file" id="tImport" accept=".json" style="display:none"></label>
+</div>
+<div id="body">
+  <div id="side">
+    <div id="assetScroll"></div>
+    <div id="sideBot">
+      <div style="font-size:11px;color:#888;margin-bottom:2px">放置参数</div>
+      <div class="propRow"><label>旋转Y</label><input type="range" id="pRot" min="0" max="360" value="0"><span id="pRotV">0°</span></div>
+      <div class="propRow"><label>缩放</label><input type="range" id="pSc" min="10" max="500" value="100"><span id="pScV">1.0x</span></div>
+      <div style="display:flex;gap:4px">
+        <button class="smallBtn" id="btnRand" style="flex:1">🎲 随机转</button>
+        <button class="smallBtn" id="btnDel" style="flex:1">🗑 删除</button>
+      </div>
+    </div>
+  </div>
+  <div id="main">
+    <canvas id="c"></canvas>
+    <div id="hud">右键拖 旋转视角 · 中键拖 平移 · 滚轮 缩放</div>
+    <div id="modeTag"></div>
+    <div id="loading">加载中…</div>
+  </div>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/loaders/GLTFLoader.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ── Terrain fn (matches game) ─────────────────────────────────
+function terrainH(x,z){
+  const vd=Math.hypot(x*0.75,(z-40)*0.6);
+  const flat=Math.min(1,Math.max(0,1-(vd-18)/22));
+  let h=(Math.sin(x*0.07)*Math.cos(z*0.05)*2.8+Math.sin(x*0.13+0.9)*Math.sin(z*0.09+1.3)*1.6+Math.sin((x+z)*0.08+2.2)*0.7)*(1-flat);
+  const mb=Math.max(0,(z-75)/55); h+=mb*mb*22+Math.sin(x*0.12+1.2)*mb*5;
+  h-=Math.max(0,Math.min(1,(-z-12)/5))*10;
+  const rf=Math.min(1,Math.max(0,(vd-28)/14));
+  h-=Math.max(0,1-Math.abs(x-(50+Math.sin(z*0.035)*10))/10)*3.5*rf;
+  return h;
+}
+
+// ── Assets ───────────────────────────────────────────────────
+const CATALOG=[
+  {cat:'树木',items:[
+    {label:'Tree 1',path:'assets/vendor/kaykit_forest/Tree_1_A_Color1.gltf'},
+    {label:'Tree 2',path:'assets/vendor/kaykit_forest/Tree_2_B_Color1.gltf'},
+    {label:'Tree 3',path:'assets/vendor/kaykit_forest/Tree_3_A_Color1.gltf'},
+    {label:'Tree 4',path:'assets/vendor/kaykit_forest/Tree_4_A_Color1.gltf'},
+    {label:'Dead Tree',path:'assets/vendor/cube_world/Environment/glTF/DeadTree_1.gltf'},
+    {label:'Bamboo',path:'assets/vendor/cube_world/Environment/glTF/Bamboo.gltf'},
+  ]},
+  {cat:'岩石',items:[
+    {label:'Rock 1',path:'assets/vendor/kaykit_forest/Rock_1_A_Color1.gltf'},
+    {label:'Rock 2',path:'assets/vendor/kaykit_forest/Rock_2_A_Color1.gltf'},
+    {label:'Rock 3',path:'assets/vendor/kaykit_forest/Rock_3_A_Color1.gltf'},
+  ]},
+  {cat:'灌木/植物',items:[
+    {label:'Bush 1',path:'assets/vendor/kaykit_forest/Bush_1_A_Color1.gltf'},
+    {label:'Bush 2',path:'assets/vendor/kaykit_forest/Bush_2_A_Color1.gltf'},
+    {label:'Bush 3',path:'assets/vendor/kaykit_forest/Bush_3_A_Color1.gltf'},
+    {label:'Mushroom',path:'assets/vendor/cube_world/Environment/glTF/Mushroom.gltf'},
+    {label:'Flowers',path:'assets/vendor/cube_world/Environment/glTF/Flowers_1.gltf'},
+  ]},
+  {cat:'其他',items:[
+    {label:'Crystal',path:'assets/vendor/cube_world/Environment/glTF/Crystal_Big.gltf'},
+    {label:'Fence',path:'assets/vendor/cube_world/Environment/glTF/Fence_Center.gltf'},
+    {label:'Block Stone',path:'assets/vendor/cube_world/Blocks/glTF/Block_Stone.gltf'},
+  ]},
+];
+
+// ── Scene ─────────────────────────────────────────────────────
+const canvas=document.getElementById('c'),mainDiv=document.getElementById('main');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x5ab4e8); // 明亮蓝天，无雾感
+
+const camera=new THREE.PerspectiveCamera(45,1,0.1,900);
+let camR=100,camTheta=0.3,camPhi=0.5;
+const camTgt=new THREE.Vector3(0,0,40);
+function camUpdate(){
+  camera.position.set(
+    camTgt.x+camR*Math.sin(camPhi)*Math.sin(camTheta),
+    camTgt.y+camR*Math.cos(camPhi),
+    camTgt.z+camR*Math.sin(camPhi)*Math.cos(camTheta));
+  camera.lookAt(camTgt);
+}
+camUpdate();
+
+scene.add(new THREE.HemisphereLight(0xc8d8e8,0x5a5040,1.0));
+const sun=new THREE.DirectionalLight(0xfff2d8,1.1);
+sun.position.set(12,26,10); sun.castShadow=true; scene.add(sun);
+
+// ── Terrain (mutable heightmap) ───────────────────────────────
+const SZ=260,SEG=130;
+const tGeo=new THREE.PlaneGeometry(SZ,SZ,SEG,SEG);
+tGeo.rotateX(-Math.PI/2);
+const tPos=tGeo.attributes.position;
+const hmap=new Float32Array(tPos.count);
+for(let i=0;i<tPos.count;i++) hmap[i]=terrainH(tPos.getX(i),tPos.getZ(i));
+
+const cD=new THREE.Color(0x446070),cL=new THREE.Color(0xf0efe8),cH=new THREE.Color(0xeae8e0),cR=new THREE.Color(0xe8e8e6),cS=new THREE.Color(0xf0eef4);
+const cRoad=new THREE.Color(0x735f45), cRoadE=new THREE.Color(0x665540);
+let roadMask=null;
+let roadColor='#7d7260';
+function _roadRGB(){const rgb=parseInt(roadColor.slice(1),16);return[(rgb>>16)/255,((rgb>>8)&255)/255,(rgb&255)/255];}
+function refreshTerrain(){
+  const cols=[];
+  const [rr,rg,rb]=_roadRGB();
+  for(let i=0;i<tPos.count;i++){
+    const hv=hmap[i]; tPos.setY(i,hv);
+    let c;
+    if(hv<-1) c=cD.clone().lerp(cL,Math.min(1,(hv+6)/5));
+    else if(hv<5) c=cL.clone().lerp(cH,Math.min(1,(hv+1)/6));
+    else if(hv<10) c=cH.clone().lerp(cR,(hv-5)/5);
+    else c=cR.clone().lerp(cS,Math.min(1,(hv-10)/10));
+    // 道路顶点颜色渐变（GPU三角插值，无环形锯齿）
+    if(roadMask&&roadMask[i]>0.01){
+      const m=roadMask[i];
+      const road=new THREE.Color(rr,rg,rb);
+      c.lerp(road, m*m*(3-2*m)*0.95); // smoothstep混入路面色
+    }
+    cols.push(c.r,c.g,c.b);
+  }
+  tGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+  tPos.needsUpdate=true; tGeo.computeVertexNormals();
+  // 只在页面完全初始化后才自动存档（避免初始化时覆盖用户数据）
+  if(window._terrainReady) try{const b=new Uint8Array(hmap.buffer);let s='';b.forEach(v=>s+=String.fromCharCode(v));localStorage.setItem('e3d_hmap',btoa(s));localStorage.setItem('e3d_wy',document.getElementById('waterY')?.value??'-2');}catch(e){}
+}
+refreshTerrain();
+const _tl=new THREE.TextureLoader();
+const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png');
+[grassTex,rockTex,mountTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
+const tMat=new THREE.MeshLambertMaterial({vertexColors:true});
+tMat.onBeforeCompile=s=>{
+  s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};
+  s.vertexShader=s.vertexShader
+    .replace('void main() {','varying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+    .replace('\t#include <project_vertex>','\t#include <project_vertex>\nvWY=position.y;\nvMyUv=uv;\nvNY=normal.y;');
+  s.fragmentShader=s.fragmentShader
+    .replace('void main() {','uniform sampler2D tGrass,tRock,tMount;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+    .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\ndiffuseColor.rgb*=mix(mix(g,r,rb),m,mb);}');
+};
+tMat.polygonOffset=true; tMat.polygonOffsetFactor=1;
+const tMesh=new THREE.Mesh(tGeo,tMat); tMesh.receiveShadow=true; scene.add(tMesh);
+
+// ── 道路 canvas 纹理叠加（抗锯齿曲线，无像素格感）──────────
+const roadCanvas=document.createElement('canvas'); roadCanvas.width=roadCanvas.height=1024;
+const roadCtx=roadCanvas.getContext('2d');
+const roadTex=new THREE.CanvasTexture(roadCanvas);
+const roadDecal=new THREE.Mesh(tGeo, new THREE.MeshLambertMaterial({
+  map:roadTex, transparent:true, depthWrite:false,
+  polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3
+}));
+scene.add(roadDecal);
+roadDecal.visible=false; // 道路用顶点颜色，不用canvas叠加层
+
+function toCV(wx,wz){return[(wx+130)/260*1024,(130+wz)/260*1024];}
+const roadWidths=[];
+const roadTerrainSnaps=[];
+function drawRoadsToCanvas(){
+  roadCtx.clearRect(0,0,1024,1024);
+  const c=roadColor, rgb=parseInt(c.slice(1),16);
+  const r=(rgb>>16)&255,g=(rgb>>8)&255,b=rgb&255;
+  const segs=roads.map((pts,i)=>{
+    const w=roadWidths[i]??8;
+    return {pts, pw:Math.max(4, w/260*1024*2)};
+  });
+  // 单层描边，canvas只定位路形，颜色渐变由顶点色处理
+  for(const {pts,pw} of segs){
+    roadCtx.filter='none';
+    roadCtx.strokeStyle=`rgba(${r},${g},${b},0.55)`;
+    roadCtx.lineWidth=pw; roadCtx.lineCap='round'; roadCtx.lineJoin='round';
+    roadCtx.beginPath();
+    for(let j=0;j<pts.length;j++){const[cx,cy]=toCV(pts[j][0],pts[j][1]);j?roadCtx.lineTo(cx,cy):roadCtx.moveTo(cx,cy);}
+    roadCtx.stroke();
+  }
+  // 2. 路口填充圆
+  for(const {pts,pw} of segs){
+    for(const ep of [pts[0],pts[pts.length-1]]){
+      const[ex,ey]=toCV(ep[0],ep[1]);
+      let junction=false;
+      for(const {pts:p2} of segs){
+        if(p2===pts||junction) continue;
+        for(const pt of p2){const[px,py]=toCV(pt[0],pt[1]);if(Math.hypot(ex-px,ey-py)<pw+4){junction=true;break;}}
+      }
+      if(junction){roadCtx.fillStyle=`rgba(${r},${g},${b},0.92)`;roadCtx.beginPath();roadCtx.arc(ex,ey,pw/2,0,Math.PI*2);roadCtx.fill();}
+    }
+  }
+  roadTex.needsUpdate=true;
+}
+// water
+const wMesh=new THREE.Mesh(new THREE.PlaneGeometry(260,260),new THREE.MeshLambertMaterial({color:0x3a7aaa,transparent:true,opacity:0.8}));
+wMesh.rotation.x=-Math.PI/2; wMesh.position.y=-2.1; scene.add(wMesh);
+// 自动从 localStorage 恢复上次地形
+try{const b64=localStorage.getItem('e3d_hmap');if(b64){const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const restored=new Float32Array(bytes.buffer);if(restored.length===hmap.length){hmap.set(restored);refreshTerrain();}const wy=localStorage.getItem('e3d_wy');if(wy!=null){document.getElementById('waterY').value=wy;document.getElementById('waterYV').textContent=(+wy).toFixed(1);wMesh.position.y=+wy;}}}catch(e){}
+window._terrainReady=true; // 从此之后的 refreshTerrain() 才会写 localStorage
+
+// Reference person (~1.8m tall, labelled)
+const refGroup=new THREE.Group(); refGroup.visible=false;
+const bm=new THREE.MeshLambertMaterial({color:0x2266ff,transparent:true,opacity:0.85});
+const wm=new THREE.MeshLambertMaterial({color:0xffffff,transparent:true,opacity:0.85});
+// body
+const rb=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.9,0.28),bm); rb.position.y=1.05; refGroup.add(rb);
+// legs
+[-0.13,0.13].forEach(x=>{const l=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.85,0.25),bm);l.position.set(x,0.43,0);refGroup.add(l);});
+// arms
+[-0.42,0.42].forEach(x=>{const a=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.8,0.22),bm);a.position.set(x,1.0,0);refGroup.add(a);});
+// head
+const rh=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.3),wm); rh.position.y=1.67; refGroup.add(rh);
+// "1.8m" label sprite
+{const cv=document.createElement('canvas');cv.width=128;cv.height=48;const c=cv.getContext('2d');
+ c.fillStyle='rgba(0,0,0,0.6)';c.fillRect(0,0,128,48);c.fillStyle='#fff';c.font='bold 22px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('1.8m',64,24);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false}));
+ sp.scale.set(1.5,0.56,1); sp.position.set(1.2,1.8,0); refGroup.add(sp);}
+refGroup.position.set(0,0,40); scene.add(refGroup);
+
+// ── State ─────────────────────────────────────────────────────
+const loader=new GLTFLoader();
+const mcache=new Map();
+const placed=[];
+let selectedObj=null;
+let ghost=null,armedPath=null,armedBtn=null;
+let mode='view'; // view | sculpt | place
+let sculpting=false,sculptLower=false;
+const raycaster=new THREE.Raycaster();
+
+function loadModel(p){
+  if(mcache.has(p)) return Promise.resolve(mcache.get(p));
+  return new Promise(res=>{
+    loader.load(p,g=>{g.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});mcache.set(p,g.scene);res(g.scene);},null,()=>res(null));
+  });
+}
+
+// ── Sidebar ───────────────────────────────────────────────────
+const scroll=document.getElementById('assetScroll');
+CATALOG.forEach(cat=>{
+  const div=document.createElement('div'); div.className='cat';
+  const head=document.createElement('div'); head.className='catHead';
+  head.innerHTML=cat.cat+'<span>▾</span>';
+  const items=document.createElement('div');
+  cat.items.forEach(item=>{
+    const btn=document.createElement('button'); btn.className='assetBtn'; btn.textContent=item.label;
+    btn.onclick=()=>armAsset(item.path,btn);
+    items.appendChild(btn);
+  });
+  head.onclick=()=>{const h=items.style.display==='none';items.style.display=h?'':'none';head.querySelector('span').textContent=h?'▾':'▸';};
+  div.appendChild(head); div.appendChild(items); scroll.appendChild(div);
+});
+
+const pRot=document.getElementById('pRot'),pRotV=document.getElementById('pRotV');
+const pSc=document.getElementById('pSc'),pScV=document.getElementById('pScV');
+pRot.oninput=()=>{pRotV.textContent=pRot.value+'°';applyGhostTransform();if(selectedObj)selectedObj.mesh.rotation.y=+pRot.value*Math.PI/180;};
+pSc.oninput=()=>{pScV.textContent=(pSc.value/100).toFixed(1)+'x';applyGhostTransform();if(selectedObj)selectedObj.mesh.scale.setScalar(pSc.value/100);};
+document.getElementById('btnRand').onclick=()=>{
+  const r=Math.floor(Math.random()*360); pRot.value=r; pRotV.textContent=r+'°';
+  applyGhostTransform(); if(selectedObj)selectedObj.mesh.rotation.y=r*Math.PI/180;
+};
+document.getElementById('btnDel').onclick=()=>{
+  if(!selectedObj) return;
+  scene.remove(selectedObj.mesh); placed.splice(placed.indexOf(selectedObj),1); selectedObj=null;
+};
+
+function applyGhostTransform(){
+  if(!ghost) return;
+  ghost.rotation.y=+pRot.value*Math.PI/180;
+  ghost.scale.setScalar(pSc.value/100);
+}
+
+function armAsset(path,btn){
+  if(armedBtn) armedBtn.classList.remove('active');
+  if(armedPath===path){disarm();return;}
+  armedPath=path; armedBtn=btn; btn.classList.add('active');
+  setMode('place');
+  document.getElementById('modeTag').style.display='block';
+  document.getElementById('modeTag').textContent='放置模式: 左键放置 · 右键随机转 · Esc取消';
+  loadModel(path).then(m=>{
+    if(!m||armedPath!==path) return;
+    if(ghost) scene.remove(ghost);
+    ghost=m.clone();
+    ghost.traverse(o=>{if(o.isMesh&&o.material){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=0.5;}});
+    applyGhostTransform();
+    scene.add(ghost);
+  });
+}
+function disarm(){armedPath=null;armedBtn=null;if(ghost){scene.remove(ghost);ghost=null;}document.getElementById('modeTag').style.display='none';}
+
+// ── Tool modes ────────────────────────────────────────────────
+const hud=document.getElementById('hud');
+const HUD={
+  view:'空格+左键 平移 · Ctrl+左键 旋转 · 滚轮 远近 · 右键拖 也可旋转',
+  sculpt:'左键 升高 · Shift+左键 降低 · 空格+左键 平移 · Ctrl+左键 旋转 · Ctrl+Z 撤销',
+  place:'左键 放置 · 右键单击 随机旋转 · 滚轮 调节大小 · 空格+左键 平移 · Ctrl+Z 撤销',
+  road:'左键拖 画路线 · 右键单击 新建路段 · Ctrl+Z 撤销最后一段 · 空格+左键 平移',
+};
+function updateHud(m){hud.textContent=HUD[m]||HUD.view;}
+
+// ── Road data & visuals ───────────────────────────────────────
+const ROAD_W=4; // 道路宽度（仅视觉参考）
+let roads=[];       // [ [[x,z],...], ... ] 多条路段
+let curRoad=null;   // 当前正在画的路段
+let roadPainting=false;
+const roadMats={
+  active:new THREE.LineBasicMaterial({color:0xff9900,depthTest:false,linewidth:3}),
+  done:new THREE.LineBasicMaterial({color:0xd4a04a,depthTest:false,linewidth:2}),
+};
+const roadLines=[]; // {line:THREE.Line, road:[...]}
+
+function hmapAt(x,z){
+  const gx=Math.round((x+SZ/2)/SZ*SEG), gz=Math.round((z+SZ/2)/SZ*SEG);
+  return hmap[Math.max(0,Math.min(SEG,gz))*(SEG+1)+Math.max(0,Math.min(SEG,gx))]||0;
+}
+function buildRoadLine(pts, mat){
+  const geo=new THREE.BufferGeometry().setFromPoints(
+    pts.map(([x,z])=>new THREE.Vector3(x, hmapAt(x,z)+0.4, z)));
+  const line=new THREE.Line(geo,mat);
+  line.frustumCulled=false;
+  scene.add(line);
+  return line;
+}
+function refreshRoadLine(entry){
+  entry.line.geometry.setFromPoints(
+    entry.road.map(([x,z])=>new THREE.Vector3(x, hmapAt(x,z)+0.4, z)));
+  entry.line.geometry.attributes.position.needsUpdate=true;
+}
+function finishCurRoad(){
+  if(!curRoad||curRoad.road.length<2){if(curRoad){scene.remove(curRoad.line);}curRoad=null;return;}
+  curRoad.line.visible=false;
+  const pts=curRoad.road;
+  const roadW=+document.getElementById('brushSz').value;
+  const hw=roadW/2, depth=0.32;
+  // 保存地形快照用于撤销
+  const snap=hmap.slice();
+  // 轻微压低路面
+  for(let i=0;i<tPos.count;i++){
+    const vx=tPos.getX(i),vz=tPos.getZ(i);
+    let minD=Infinity;
+    for(let j=0;j<pts.length-1;j++){
+      const ax=pts[j][0],az=pts[j][1],bx=pts[j+1][0],bz=pts[j+1][1];
+      const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz;
+      if(l2<1e-6) continue;
+      const t=Math.max(0,Math.min(1,((vx-ax)*dx+(vz-az)*dz)/l2));
+      const d=Math.hypot(vx-(ax+t*dx),vz-(az+t*dz));
+      if(d<minD) minD=d;
+    }
+    if(minD<hw+1.5&&hmap[i]>-1.5){
+      // 梯形截面：中间平底，两侧线性斜坡
+      const k = minD<hw*0.6 ? 1.0 : Math.max(0,(hw+1.5-minD)/1.5);
+      hmap[i]-=depth*k;
+    }
+  }
+  // roadMask + 路边小土坡（地形顶点颜色渐变，自然融入地形）
+  if(!roadMask) roadMask=new Float32Array(tPos.count);
+  const maskSnap=roadMask.slice();
+  const fadeW=hw+6;
+  for(let i=0;i<tPos.count;i++){
+    const vx=tPos.getX(i),vz=tPos.getZ(i);
+    let minD2=Infinity;
+    for(let j=0;j<pts.length-1;j++){
+      const ax=pts[j][0],az=pts[j][1],bx=pts[j+1][0],bz=pts[j+1][1];
+      const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz;
+      if(l2<1e-6) continue;
+      const t=Math.max(0,Math.min(1,((vx-ax)*dx+(vz-az)*dz)/l2));
+      const d=Math.hypot(vx-(ax+t*dx),vz-(az+t*dz));
+      if(d<minD2) minD2=d;
+    }
+    // 路边小土坡（hw到hw+2.5处轻微抬高）
+    if(minD2>hw&&minD2<hw+2.5&&hmap[i]>-1.5){
+      const k=(minD2-hw)/2.5;
+      hmap[i]+=0.15*(1-k*k);
+    }
+    // roadMask平滑渐变
+    if(minD2<fadeW) roadMask[i]=Math.max(roadMask[i],Math.max(0,1-minD2/fadeW));
+  }
+  refreshTerrain();
+  roads.push(pts);
+  roadWidths.push(roadW);
+  roadTerrainSnaps.push({terrain:snap,mask:maskSnap});
+  roadLines.push(curRoad);
+  curRoad=null;
+  drawRoadsToCanvas();
+}
+
+function setMode(m){
+  mode=m;
+  ['tView','tSculpt','tPlace','tRoad'].forEach(id=>{
+    const btn=document.getElementById(id);if(!btn)return;
+    const t=id.replace('t','').toLowerCase();
+    btn.classList.toggle('active',t===m);
+  });
+  if(m==='view') document.getElementById('tView').classList.add('active');
+  if(m!=='place') disarm();
+  const showSculpt=m==='sculpt';
+  document.getElementById('sculptTools').style.display=showSculpt?'flex':'none';
+  document.getElementById('sculptSep').style.display=showSculpt?'block':'none';
+  document.getElementById('roadTools').style.display=m==='road'?'flex':'none';
+  if(m!=='sculpt') flattenTarget=null;
+  if(m!=='road'&&curRoad) finishCurRoad();
+  updateHud(m);
+}
+document.getElementById('tView').onclick=()=>setMode('view');
+document.getElementById('tSculpt').onclick=()=>setMode('sculpt');
+document.getElementById('tPlace').onclick=()=>setMode('place');
+document.getElementById('tRoad').onclick=()=>setMode('road');
+document.getElementById('roadColorPicker').oninput=e=>{roadColor=e.target.value;drawRoadsToCanvas();refreshTerrain();};
+document.getElementById('tRef').onclick=()=>{refGroup.visible=!refGroup.visible;document.getElementById('tRef').classList.toggle('active',refGroup.visible);};
+const waterYEl=document.getElementById('waterY'),waterYV=document.getElementById('waterYV');
+waterYEl.oninput=()=>{const v=+waterYEl.value;waterYV.textContent=v.toFixed(1);wMesh.position.y=v;};
+document.getElementById('tExport').onclick=()=>{
+  finishCurRoad();
+  const data={
+    terrain:Array.from(hmap),
+    waterY:+document.getElementById('waterY').value,
+    roads:roads.map(r=>r.map(([x,z])=>[+x.toFixed(2),+z.toFixed(2)])),
+    roadWidths:roadWidths.slice(),
+    roadColor,
+    objects:placed.map(o=>({path:o.path,x:+o.mesh.position.x.toFixed(2),y:+o.mesh.position.y.toFixed(2),z:+o.mesh.position.z.toFixed(2),ry:+(o.mesh.rotation.y*180/Math.PI).toFixed(1),scale:+o.mesh.scale.x.toFixed(3)}))
+  };
+  const a=document.createElement('a');
+  a.href='data:application/json,'+encodeURIComponent(JSON.stringify(data));
+  a.download='map.json'; a.click();
+};
+document.getElementById('tImport').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  f.text().then(txt=>{
+    const data=JSON.parse(txt);
+    if(data.terrain&&data.terrain.length===hmap.length){
+      if(data.roadMask&&data.roadMask.length===hmap.length) roadMask=new Float32Array(data.roadMask);
+      else roadMask=null;
+      hmap.set(data.terrain);refreshTerrain();
+    }
+    if(data.waterY!=null){const wy=document.getElementById('waterY');wy.value=data.waterY;document.getElementById('waterYV').textContent=(+data.waterY).toFixed(1);wMesh.position.y=data.waterY;}
+    placed.forEach(o=>scene.remove(o.mesh));placed.length=0;selectedObj=null;
+    (data.objects||[]).forEach(o=>{loadModel(o.path).then(mdl=>{if(!mdl)return;const mesh=mdl.clone();mesh.position.set(o.x,o.y,o.z);mesh.rotation.y=o.ry*Math.PI/180;mesh.scale.setScalar(o.scale);scene.add(mesh);placed.push({mesh,path:o.path});});});
+    // 恢复道路
+    roadLines.forEach(e=>scene.remove(e.line));roadLines.length=0;roads.length=0;roadWidths.length=0;
+    if(data.roadColor){roadColor=data.roadColor;const inp=document.getElementById('roadColorPicker');if(inp)inp.value=roadColor;}
+    (data.roads||[]).forEach((r,i)=>{if(r.length<2)return;const line=buildRoadLine(r,roadMats.done);line.visible=false;roads.push(r);roadWidths.push((data.roadWidths||[])[i]??8);roadLines.push({line,road:r});});
+    drawRoadsToCanvas();
+  });
+  e.target.value='';
+};
+
+// ── Raycasting ────────────────────────────────────────────────
+function getMouse(e){const r=canvas.getBoundingClientRect();return new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);}
+const _floor=new THREE.Mesh(new THREE.PlaneGeometry(600,600),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));
+_floor.rotation.x=-Math.PI/2; scene.add(_floor);
+function getTerrainPt(e){
+  raycaster.setFromCamera(getMouse(e),camera);
+  const h=raycaster.intersectObject(tMesh);
+  if(h.length) return h[0].point;
+  // 地图边缘兜底：落在平地上
+  const h2=raycaster.intersectObject(_floor);
+  return h2.length?h2[0].point:null;
+}
+function getPlacedAt(e){raycaster.setFromCamera(getMouse(e),camera);const h=raycaster.intersectObjects(placed.map(o=>o.mesh),true);if(!h.length)return null;let o=h[0].object;while(o.parent&&!placed.find(p=>p.mesh===o))o=o.parent;return placed.find(p=>p.mesh===o)||null;}
+
+// ── Sculpt mode ───────────────────────────────────────────────
+let sculptOp='raise'; // 'raise' | 'lower' | 'flatten' | 'setheight'
+let flattenTarget=null;
+['Raise','Lower','Flat','SetH'].forEach(n=>{
+  document.getElementById('sBrush'+n).onclick=()=>{
+    sculptOp=n==='Flat'?'flatten':n==='SetH'?'setheight':n.toLowerCase();
+    ['Raise','Lower','Flat','SetH'].forEach(x=>document.getElementById('sBrush'+x).classList.toggle('active',x===n));
+    document.getElementById('setHLabel').style.display=n==='SetH'?'flex':'none';
+  };
+});
+const setHEl=document.getElementById('setHVal'),setHV=document.getElementById('setHV');
+setHEl.oninput=()=>setHV.textContent=(+setHEl.value).toFixed(1);
+
+function sculpt(e){
+  const pt=getTerrainPt(e); if(!pt) return;
+  const r=+document.getElementById('brushSz').value;
+  const str=+document.getElementById('brushStr').value*0.05;
+  if(sculptOp==='flatten'){
+    // 先算笔刷范围内的加权平均高度
+    let wsum=0,hsum=0;
+    for(let i=0;i<tPos.count;i++){
+      const dx=tPos.getX(i)-pt.x,dz=tPos.getZ(i)-pt.z,d=Math.sqrt(dx*dx+dz*dz);
+      if(d>=r) continue;
+      const w=0.5+0.5*Math.cos(d/r*Math.PI);
+      wsum+=w; hsum+=hmap[i]*w;
+    }
+    if(wsum<0.001) return;
+    const avg=hsum/wsum;
+    // 再把每个顶点推向这个局部均值
+    for(let i=0;i<tPos.count;i++){
+      const dx=tPos.getX(i)-pt.x,dz=tPos.getZ(i)-pt.z,d=Math.sqrt(dx*dx+dz*dz);
+      if(d>=r) continue;
+      const w=0.5+0.5*Math.cos(d/r*Math.PI);
+      hmap[i]+=(avg-hmap[i])*Math.min(1,str*3*w);
+    }
+  } else {
+    for(let i=0;i<tPos.count;i++){
+      const dx=tPos.getX(i)-pt.x,dz=tPos.getZ(i)-pt.z,d=Math.sqrt(dx*dx+dz*dz);
+      if(d>=r) continue;
+      const w=0.5+0.5*Math.cos(d/r*Math.PI);
+      if(sculptOp==='raise') hmap[i]+=str*w;
+      else if(sculptOp==='setheight'){const tgt=+document.getElementById('setHVal').value;hmap[i]+=(tgt-hmap[i])*Math.min(1,str*3*w);}
+      else hmap[i]-=str*w;
+    }
+  }
+  refreshTerrain();
+}
+
+// Sculpt cursor circle
+const cursorGeo=new THREE.RingGeometry(0,1,32);
+const cursorMesh=new THREE.Mesh(cursorGeo,new THREE.MeshBasicMaterial({color:0xffdd44,side:THREE.DoubleSide,depthTest:false,transparent:true,opacity:0.6}));
+cursorMesh.rotation.x=-Math.PI/2; cursorMesh.visible=false; scene.add(cursorMesh);
+
+// ── Mouse ─────────────────────────────────────────────────────
+let spaceDown=false,ctrlDown=false;
+let panDown=false,orbitDown=false,rmbDown=false,rmbMoved=false,mmbDown=false,lx=0,ly=0;
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&document.activeElement.tagName!=='INPUT'){spaceDown=true;e.preventDefault();}
+  if(e.code==='ControlLeft'||e.code==='ControlRight') ctrlDown=true;
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space') spaceDown=false;
+  if(e.code==='ControlLeft'||e.code==='ControlRight') ctrlDown=false;
+});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('mousedown',e=>{
+  if(e.button===2){rmbDown=true;rmbMoved=false;lx=e.clientX;ly=e.clientY;e.preventDefault();}
+  if(e.button===1){mmbDown=true;lx=e.clientX;ly=e.clientY;e.preventDefault();}
+  if(e.button===0){
+    if(spaceDown){panDown=true;lx=e.clientX;ly=e.clientY;e.preventDefault();return;}
+    if(ctrlDown){orbitDown=true;lx=e.clientX;ly=e.clientY;e.preventDefault();return;}
+    if(mode==='road'){
+      if(spaceDown||ctrlDown) return;
+      const pt=getTerrainPt(e); if(!pt) return;
+      const line=buildRoadLine([[pt.x,pt.z]],roadMats.active);
+      curRoad={line,road:[[pt.x,pt.z]]};
+      roadPainting=true;
+      return;
+    }
+    if(mode==='sculpt'){
+      if(sculptOp==='flatten'&&flattenTarget===null){
+        const pt=getTerrainPt(e);
+        if(pt) flattenTarget=pt.y;
+      }
+      undoPush('terrain');
+      sculpting=true;sculpt(e);return;
+    }
+    if(mode==='place'&&armedPath){
+      const pt=getTerrainPt(e);
+      if(pt){loadModel(armedPath).then(mdl=>{if(!mdl)return;const mesh=mdl.clone();mesh.position.copy(pt);mesh.rotation.y=+pRot.value*Math.PI/180;mesh.scale.setScalar(pSc.value/100);scene.add(mesh);const entry={mesh,path:armedPath};placed.push(entry);selectedObj=entry;undoPush('place',entry);});}
+      return;
+    }
+    const obj=getPlacedAt(e); selectedObj=obj||null;
+    if(selectedObj){pRot.value=Math.round(selectedObj.mesh.rotation.y*180/Math.PI%360);pRotV.textContent=pRot.value+'°';pSc.value=Math.round(selectedObj.mesh.scale.x*100);pScV.textContent=(pSc.value/100).toFixed(1)+'x';}
+  }
+});
+document.addEventListener('mousemove',e=>{
+  if(panDown){
+    const f=camR*0.004;
+    const fwd=new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
+    const right=new THREE.Vector3().crossVectors(fwd,new THREE.Vector3(0,1,0)).normalize();
+    camTgt.addScaledVector(right,-(e.clientX-lx)*f);
+    camTgt.addScaledVector(fwd,(e.clientY-ly)*f);
+    lx=e.clientX;ly=e.clientY;camUpdate(); return;
+  }
+  if(orbitDown){
+    camTheta-=(e.clientX-lx)*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+(e.clientY-ly)*0.007));
+    lx=e.clientX;ly=e.clientY;camUpdate(); return;
+  }
+  if(rmbDown){
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)>2||Math.abs(dy)>2) rmbMoved=true;
+    camTheta-=dx*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+dy*0.007));
+    lx=e.clientX;ly=e.clientY;camUpdate();
+  }
+  if(mmbDown){
+    const f=camR*0.004;
+    const fwd=new THREE.Vector3(); camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
+    const right=new THREE.Vector3().crossVectors(fwd,new THREE.Vector3(0,1,0)).normalize();
+    camTgt.addScaledVector(right,-(e.clientX-lx)*f);
+    camTgt.addScaledVector(fwd,(e.clientY-ly)*f);
+    lx=e.clientX;ly=e.clientY;camUpdate();
+  }
+  if(roadPainting&&e.buttons===1&&mode==='road'){
+    const pt=getTerrainPt(e);
+    if(pt&&curRoad){
+      const last=curRoad.road[curRoad.road.length-1];
+      if(Math.hypot(pt.x-last[0],pt.z-last[1])>1.5){ // 每隔1.5单位采一个点
+        curRoad.road.push([pt.x,pt.z]);
+        refreshRoadLine(curRoad);
+      }
+    }
+  }
+  if(sculpting&&e.buttons===1) sculpt(e);
+  if(ghost){const pt=getTerrainPt(e);if(pt){ghost.position.copy(pt);ghost.position.y+=0.05;}}
+  if(mode==='sculpt'){
+    const pt=getTerrainPt(e);
+    const r=+document.getElementById('brushSz').value;
+    cursorMesh.visible=!!pt;
+    if(pt){cursorMesh.position.set(pt.x,pt.y+0.1,pt.z);cursorMesh.scale.setScalar(r);}
+  } else cursorMesh.visible=false;
+});
+document.addEventListener('mouseup',e=>{
+  if(e.button===0){
+    panDown=false;orbitDown=false;sculpting=false;
+    if(roadPainting){roadPainting=false;finishCurRoad();}
+  }
+  if(e.button===2){
+    if(!rmbMoved&&mode==='place'&&armedPath){const r=Math.floor(Math.random()*360);pRot.value=r;pRotV.textContent=r+'°';applyGhostTransform();}
+    // 右键单击道路模式：结束当前段，下次拖鼠标开始新段
+    if(!rmbMoved&&mode==='road') finishCurRoad();
+    rmbDown=false;
+  }
+  if(e.button===1)mmbDown=false;
+});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(mode==='place'&&armedPath){
+    const v=Math.max(10,Math.min(500,+pSc.value+(e.deltaY>0?-10:10)));
+    pSc.value=v;pScV.textContent=(v/100).toFixed(1)+'x';applyGhostTransform();
+    return;
+  }
+  camR=Math.max(8,Math.min(280,camR*(e.deltaY>0?1.1:0.91)));camUpdate();
+},{passive:false});
+
+// ── Undo ─────────────────────────────────────────────────────
+const undoStack=[];
+function undoPush(type,data){
+  if(type==='terrain') undoStack.push({type,snap:hmap.slice()});
+  else if(type==='place') undoStack.push({type,entry:data});
+  if(undoStack.length>30) undoStack.shift();
+}
+function undoStep(){
+  const u=undoStack.pop(); if(!u) return;
+  if(u.type==='terrain'){hmap.set(u.snap);refreshTerrain();}
+  else if(u.type==='place'){const e=u.entry;scene.remove(e.mesh);placed.splice(placed.indexOf(e),1);if(selectedObj===e)selectedObj=null;}
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') disarm();
+  if(e.ctrlKey&&e.key==='z'){
+    e.preventDefault();
+    if(roads.length>0&&roadLines.length===roads.length){
+      const last=roadLines.pop();scene.remove(last.line);roads.pop();roadWidths.pop();
+      const snap=roadTerrainSnaps.pop();
+      if(snap){hmap.set(snap.terrain);if(snap.mask)roadMask=snap.mask.slice();else roadMask=null;refreshTerrain();}
+      drawRoadsToCanvas(); // 撤销后刷新canvas
+    } else undoStep();
+    return;
+  }
+  if((e.key==='Delete'||e.key==='Backspace')&&selectedObj&&document.activeElement.tagName!=='INPUT'){
+    undoPush('place',selectedObj);
+    scene.remove(selectedObj.mesh);placed.splice(placed.indexOf(selectedObj),1);selectedObj=null;
+  }
+});
+
+// ── Render ────────────────────────────────────────────────────
+function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function loop(){requestAnimationFrame(loop);renderer.render(scene,camera);}
+window.addEventListener('resize',resize);
+resize(

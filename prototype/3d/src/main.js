@@ -100,10 +100,10 @@ document.addEventListener('keydown',()=>SFX.resume(),{once:true});
 document.addEventListener('mousedown',()=>SFX.resume(),{once:true});
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x1c1714);
-scene.fog=new THREE.Fog(0x1c1714,42,130);
+scene.background=new THREE.Color(0xbbd0df);
+// scene.fog=new THREE.Fog(0xbbd0df,60,220); // 已关闭远景雾
 
-const camera=new THREE.PerspectiveCamera(45,1,0.1,200);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,900);
 const cameraRig={
   yaw:0,
   pitch:THREE.MathUtils.degToRad(43),
@@ -142,13 +142,62 @@ sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.near=1; sun.shadow.camera.f
 const sc=60; sun.shadow.camera.left=-sc; sun.shadow.camera.right=sc; sun.shadow.camera.top=sc; sun.shadow.camera.bottom=-sc;
 sun.shadow.bias=-0.0005; scene.add(sun);
 
-// 地面（polygonOffset 防止脚底/阴影共面闪烁）
-const floorMat=new THREE.MeshStandardMaterial({color:0x47403a,roughness:0.95});
-floorMat.polygonOffset=true; floorMat.polygonOffsetFactor=1; floorMat.polygonOffsetUnits=1;
-const floor=new THREE.Mesh(new THREE.PlaneGeometry(140,140),floorMat);
-floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
-const grid=new THREE.GridHelper(140,70,0x5a4d42,0x3a332e); grid.position.y=0.02; scene.add(grid);
-grid.visible=false;
+// ── 地形系统 ──────────────────────────────────────────────────
+function terrainH(x, z){
+  const vd = Math.hypot(x * 0.75, (z - 40) * 0.6);
+  const flat = Math.min(1, Math.max(0, 1 - (vd - 18) / 22));
+  let h = (Math.sin(x*0.07)*Math.cos(z*0.05)*2.8
+         + Math.sin(x*0.13+0.9)*Math.sin(z*0.09+1.3)*1.6
+         + Math.sin((x+z)*0.08+2.2)*0.7) * (1 - flat);
+  // 北部山脉 (z>75 逐渐升高)
+  const mBlend = Math.max(0, (z - 75) / 55);
+  h += mBlend * mBlend * 22 + Math.sin(x * 0.12 + 1.2) * mBlend * 5;
+  // 南部断崖 (z<-12 急降10)
+  h -= Math.max(0, Math.min(1, (-z - 12) / 5)) * 10;
+  // 东侧河流谷地 (蜿蜒, 距村>28才生效)
+  const rFade = Math.min(1, Math.max(0, (vd - 28) / 14));
+  h -= Math.max(0, 1 - Math.abs(x - (50 + Math.sin(z * 0.035) * 10)) / 10) * 3.5 * rFade;
+  return h;
+}
+{
+  const SZ=260, SEG=130;
+  const tg=new THREE.PlaneGeometry(SZ,SZ,SEG,SEG);
+  tg.rotateX(-Math.PI/2);
+  const pos=tg.attributes.position;
+  const cols=[];
+  // 顶点颜色提亮，作为贴图的色调调制层（草地区域趋近白色让贴图本色显现）
+  const cDark=new THREE.Color(0x446070),cLow=new THREE.Color(0xf0efe8),cHigh=new THREE.Color(0xeae8e0),cRock=new THREE.Color(0xe8e8e6),cSnow=new THREE.Color(0xf0eef4);
+  for(let i=0;i<pos.count;i++){
+    const hv=terrainH(pos.getX(i),pos.getZ(i));
+    pos.setY(i,hv);
+    let c;
+    if(hv<-1) c=cDark.clone().lerp(cLow,Math.min(1,(hv+6)/5));
+    else if(hv<5) c=cLow.clone().lerp(cHigh,Math.min(1,(hv+1)/6));
+    else if(hv<10) c=cHigh.clone().lerp(cRock,(hv-5)/5);
+    else c=cRock.clone().lerp(cSnow,Math.min(1,(hv-10)/10));
+    cols.push(c.r,c.g,c.b);
+  }
+  tg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+  tg.computeVertexNormals();
+  const _tl=new THREE.TextureLoader();
+  const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png');
+  [grassTex,rockTex,mountTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
+  const tm=new THREE.MeshLambertMaterial({vertexColors:true});
+  tm.onBeforeCompile=s=>{
+    s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};
+    s.vertexShader=s.vertexShader
+      .replace('void main() {','varying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+      .replace('\t#include <project_vertex>','\t#include <project_vertex>\nvWY=position.y;\nvMyUv=uv;\nvNY=normal.y;');
+    s.fragmentShader=s.fragmentShader
+      .replace('void main() {','uniform sampler2D tGrass,tRock,tMount;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+      .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\ndiffuseColor.rgb*=mix(mix(g,r,rb),m,mb);}');
+  };
+  tm.polygonOffset=true; tm.polygonOffsetFactor=1; tm.polygonOffsetUnits=1;
+  const mesh=new THREE.Mesh(tg,tm); mesh.receiveShadow=true; scene.add(mesh);
+  // 水面 — 河流/断崖低洼自动"注水"
+  const wm=new THREE.Mesh(new THREE.PlaneGeometry(260,260),new THREE.MeshLambertMaterial({color:0x3a7a9a,transparent:true,opacity:0.82}));
+  wm.rotation.x=-Math.PI/2; wm.position.y=-2.1; scene.add(wm);
+}
 
 const gltfLoader = GLTFLoader ? new GLTFLoader() : null;
 const modelCache = new Map();
@@ -248,7 +297,7 @@ function addGroundPatch(x,z,w,d,top=0,color=0x5a5241){
   return m;
 }
 function terrainYAt(x,z){
-  let top=0;
+  let top=terrainH(x,z);
   for(const a of terrainAreas){
     if(x>=a.minx && x<=a.maxx && z>=a.minz && z<=a.maxz) top=Math.max(top,a.top);
   }
@@ -393,6 +442,7 @@ function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   addSign('HOME',p.x,p.z,rot,top);
   return root;
 }
+const FOREST='../assets/vendor/kaykit_forest/';
 function addTree(x,z,scale=1,path='Tree_2_B_Color1.gltf'){
   placeGroundModel(FOREST+path,x,z,{scale,rot:Math.random()*Math.PI*2,groundCenter:true});
 }
@@ -405,8 +455,213 @@ function addPrimitiveRock(x,z,s=1){
   m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
 }
 
-// Ground plan: test arena — flat grass only
-addGroundPatch(0,0,80,80,0,0x4f5941);
+function buildSky(){
+  // ── 天空穹顶 (大气散射 shader) ────────────────────────────
+  const SKY_SUN_DIR=new THREE.Vector3(12,26,10).normalize();
+  const skyMat=new THREE.ShaderMaterial({
+    side:THREE.BackSide,depthWrite:false,
+    uniforms:{uSunDir:{value:SKY_SUN_DIR}},
+    vertexShader:`
+      varying vec3 vDir;
+      void main(){
+        vDir=normalize((modelMatrix*vec4(position,0.0)).xyz);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+        gl_Position.z=gl_Position.w;
+      }`,
+    fragmentShader:`
+      uniform vec3 uSunDir;
+      varying vec3 vDir;
+      void main(){
+        vec3 d=normalize(vDir);
+        float up=max(d.y,0.0);
+        vec3 sky=mix(vec3(0.62,0.78,0.92),vec3(0.12,0.28,0.65),pow(up,0.55));
+        float haze=exp(-abs(d.y)*3.5);
+        sky=mix(sky,vec3(0.92,0.87,0.80),haze*0.38);
+        float sun=max(dot(d,uSunDir),0.0);
+        sky+=vec3(1.0,0.95,0.75)*pow(sun,80.0)*1.8;
+        sky+=vec3(1.0,0.85,0.60)*pow(sun,5.0)*0.12;
+        gl_FragColor=vec4(sky,1.0);
+      }`
+  });
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(850,16,8),skyMat);
+  sky.renderOrder=-1; scene.add(sky);
+
+  // ── 太阳 ────────────────────────────────────────────────────
+  const SD=new THREE.Vector3(12,26,10).normalize().multiplyScalar(700);
+  const sun=new THREE.Mesh(new THREE.CircleGeometry(22,24),new THREE.MeshBasicMaterial({color:0xfffce0}));
+  sun.position.copy(SD); sun.lookAt(0,0,0); scene.add(sun);
+  const glow=new THREE.Mesh(new THREE.CircleGeometry(36,24),new THREE.MeshBasicMaterial({color:0xfff4c0,transparent:true,opacity:0.22}));
+  glow.position.copy(SD); glow.lookAt(0,0,0); scene.add(glow);
+
+  // ── 远山 ────────────────────────────────────────────────────
+  for(const[mx,mz,mh,mc] of [
+    [0,220,65,0x5a6b58],[160,200,55,0x526258],[-190,230,60,0x4e5f55],
+    [300,180,85,0x4a5870],[-320,190,80,0x485570],[80,400,115,0x3e4d65],[-100,380,105,0x3a4960]
+  ]){
+    const g=new THREE.ConeGeometry(mh*0.65+25,mh,5,1);
+    const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:mc,fog:false}));
+    m.position.set(mx,mh/2-10,mz); scene.add(m);
+  }
+
+  // ── 云 ──────────────────────────────────────────────────────
+  const cmat=new THREE.MeshLambertMaterial({color:0xfafcff});
+  const clouds=[];
+  for(const[cx,cy,cz] of [
+    [100,85,-90],[-160,105,55],[40,95,-170],[-80,90,125],
+    [200,80,45],[-200,100,-110],[0,115,195],[160,95,175]
+  ]){
+    const g=new THREE.Group();
+    for(let i=0;i<6;i++){
+      const r=7+Math.random()*6;
+      const b=new THREE.Mesh(new THREE.SphereGeometry(r,7,5),cmat);
+      b.position.set((Math.random()-.5)*22,(Math.random()-.5)*7,(Math.random()-.5)*14);
+      g.add(b);
+    }
+    g.position.set(cx,cy,cz); scene.add(g);
+    clouds.push({g,baseX:cx,phase:Math.random()*Math.PI*2});
+  }
+
+  // ── 飞鸟 ─────────────────────────────────────────────────────
+  const bmat=new THREE.LineBasicMaterial({color:0x1a1a1a});
+  const birds=[];
+  for(const[bx,by,bz] of [[80,48,-40],[-65,52,85],[130,44,110],[-110,58,-65]]){
+    const g=new THREE.Group();
+    for(let b=0;b<5;b++){
+      const pts=[new THREE.Vector3(-1.4,0,-.7),new THREE.Vector3(0,0,0),new THREE.Vector3(1.4,0,-.7)];
+      const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),bmat);
+      line.position.set((Math.random()-.5)*10,(Math.random()-.5)*3,(Math.random()-.5)*8);
+      line.userData.ph=Math.random()*Math.PI*2;
+      g.add(line);
+    }
+    g.position.set(bx,by,bz); scene.add(g);
+    birds.push({g,baseY:by,phase:Math.random()*Math.PI*2,dir:Math.random()*Math.PI*2,spd:2.5+Math.random()*2});
+  }
+  return {clouds,birds};
+}
+function updateSky(dt,t){
+  for(const c of skyData.clouds)
+    c.g.position.x=c.baseX+Math.sin(t*0.04+c.phase)*50;
+  for(const bd of skyData.birds){
+    bd.g.position.x+=Math.cos(bd.dir)*bd.spd*dt;
+    bd.g.position.z+=Math.sin(bd.dir)*bd.spd*dt;
+    bd.g.position.y=bd.baseY+Math.sin(t*1.5+bd.phase)*1.8;
+    if(Math.hypot(bd.g.position.x,bd.g.position.z)>260) bd.dir+=Math.PI;
+    bd.g.children.forEach(bird=>{bird.rotation.x=Math.sin(t*5+bird.userData.ph)*0.35;});
+  }
+}
+
+let skyData;
+function buildNewVillage(){
+  function wb(px,py,pz,w,h,d,c=0xc9b487){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c,0.88));
+    m.position.set(px,py+h/2,pz);m.castShadow=true;m.receiveShadow=true;mapRoot.add(m);
+  }
+  function roofAt(px,py,pz,w,d,ph,c=0x6d3a30,ry=0){
+    const r=makeGableRoof(w,d,ph,c);r.position.set(px,py,pz);r.rotation.y=ry;r.castShadow=true;mapRoot.add(r);
+  }
+  function fencePost(px,pz){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.2,0.16),mat(0x9a7040,0.85));
+    p.position.set(px,0.6,pz);mapRoot.add(p);
+  }
+  function fenceRail(x1,z1,x2,z2,broken=false){
+    const cx=(x1+x2)/2,cz=(z1+z2)/2,len=Math.hypot(x2-x1,z2-z1);
+    // 正确角度：让box的X轴对准(x2-x1, z2-z1)方向
+    const ang=Math.atan2(-(z2-z1),x2-x1);
+    fencePost(x1,z1);fencePost(x2,z2);
+    if(!broken)for(const ry of[0.45,0.95]){
+      const r=new THREE.Mesh(new THREE.BoxGeometry(len,0.09,0.08),mat(0xa07840,0.85));
+      r.position.set(cx,ry,cz);r.rotation.y=ang;mapRoot.add(r);
+    }
+  }
+  function lamp(px,pz){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(0.14,3.4,0.14),mat(0x3a2a1a,0.7));
+    p.position.set(px,1.7,pz);mapRoot.add(p);
+    const lb=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.42),mat(0xf8e060,0.3));
+    lb.position.set(px,3.5,pz);mapRoot.add(lb);
+    const pl=new THREE.PointLight(0xffcc66,1.1,9);pl.position.set(px,3.5,pz);scene.add(pl);
+  }
+  function prop(file,px,pz,sc=1){
+    placeGroundModel('../assets/vendor/fantasy_props/'+file,px,pz,{scale:sc,groundCenter:true});
+  }
+
+  // ── terrain: 主通道全部y=0，丘陵感用颜色区分，不做高度差 ────
+  // terrain mesh handles grass — no background patches needed
+  // 主街砖地
+  for(const[sx,sz,sw,sd]of[[-1,4,7,10],[1,15,8,14],[3,30,8,14],[0,46,8,16],[-2,62,7,16]])
+    addGroundPatch(sx,sz,sw,sd,0,0x8a7a65);
+  addGroundPatch(-4,60,22,18,0,0x8a7a65); // 广场
+
+  // ── church 教堂 ──────────────────────────────────────────────
+  {const cx=0,cz=72;
+  wb(cx,0,cz,12,7.0,18,0xa89d8a);roofAt(cx,7.0,cz,13.4,19.4,2.2,0x4a2e28);
+  wb(cx,0,cz-9.5,5.0,10.0,5.0,0xb0a594); // tower
+  const tr=makeGableRoof(6.0,6.0,2.8,0x3a2420);tr.position.set(cx,10.0,cz-9.5);tr.rotation.y=Math.PI/4;tr.castShadow=true;mapRoot.add(tr);
+  wb(cx,11.5,cz-9.5,0.18,1.6,0.18,0xe8d8a0);wb(cx,12.2,cz-9.5,1.1,0.15,0.15,0xe8d8a0);
+  addCollider(cx,cz,12.8,18.8,0,7.0);addCollider(cx,cz-9.5,5.2,5.2,0,10.0);}
+
+  // ── elder 村长家 L-shape ───────────────────────────────────
+  {const ex=-20,ez=60;
+  wb(ex,0,ez,13,5.6,10,0xb8a888);roofAt(ex,5.6,ez,14.4,11.4,1.8,0x5a3228);
+  wb(ex+9,0,ez-8,8,5.0,8,0xb0a080);roofAt(ex+9,5.0,ez-8,9.4,9.4,1.6,0x5a3228);
+  addCollider(ex,ez,13.8,10.8,0,5.6);addCollider(ex+9,ez-8,8.8,8.8,0,5.0);}
+
+  // ── inn 旅馆 L-shape ───────────────────────────────────────
+  {const ix=20,iz=30;
+  wb(ix,0,iz,14,5.6,9,0xc8b07a);roofAt(ix,5.6,iz,15.4,10.4,1.8,0x6a3626);
+  wb(ix+5,0,iz-8,8,5.0,8,0xc0a872);roofAt(ix+5,5.0,iz-8,9.4,9.4,1.6,0x6a3626);
+  addCollider(ix,iz,14.8,9.8,0,5.6);addCollider(ix+5,iz-8,8.8,8.8,0,5.0);}
+
+  // ── blacksmith 铁匠铺 ─────────────────────────────────────
+  {const bx=-17,bz=20;
+  wb(bx,0,bz,11,5.2,9,0x9a9080);roofAt(bx,5.2,bz,12.4,10.4,1.6,0x3e3028);
+  for(const ppx of[bx-2,bx+2]){const p=new THREE.Mesh(new THREE.BoxGeometry(0.2,3.8,0.2),mat(0x5a3a1a,0.8));p.position.set(ppx,1.9,bz+5.5);mapRoot.add(p);}
+  wb(bx,3.8,bz+5.5,5.0,0.2,2.8,0x5a3a1a);
+  addCollider(bx,bz,11.8,9.8,0,5.2);}
+
+  // ── shop 商店 ─────────────────────────────────────────────
+  {const sx=18,sz=44;
+  wb(sx,0,sz,9,4.8,8,0xc8b888);roofAt(sx,4.8,sz,10.4,9.4,1.5,0x6d3a30);
+  addCollider(sx,sz,9.8,8.8,0,4.8);}
+
+  // ── residences 民居 ──────────────────────────────────────
+  for(const[hx,hz]of[[-13,10],[-18,52],[15,54]]){
+    wb(hx,0,hz,8,4.4,7,0xc4aa7a);roofAt(hx,4.4,hz,9.4,8.4,1.4,0x703830);
+    addCollider(hx,hz,8.8,7.8,0,4.4);
+    fenceRail(hx-4,hz-3.5,hx+4,hz-3.5);
+    fenceRail(hx-4,hz-3.5,hx-4,hz-9.5);
+    fenceRail(hx+4,hz-3.5,hx+4,hz-9.5);
+    fenceRail(hx-4,hz-9.5,hx+1,hz-9.5);
+    fenceRail(hx+1,hz-9.5,hx+4,hz-9.5,true);
+    for(let c=0;c<3;c++){
+      const bx2=hx+(Math.random()-0.5)*5,bz2=hz-4.5-Math.random()*4;
+      const bdy=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.28,0.44),mat(0xf0e8d0,0.9));
+      bdy.position.set(bx2,0.14,bz2);mapRoot.add(bdy);
+      const hd=new THREE.Mesh(new THREE.BoxGeometry(0.19,0.19,0.19),mat(0xf0e0c8,0.9));
+      hd.position.set(bx2,0.38,bz2-0.26);mapRoot.add(hd);
+    }
+  }
+
+  // ── 路边篱笆 ─────────────────────────────────────────────
+  fenceRail(-5,6,-5,16);fenceRail(-5,18,-5,26,true);fenceRail(-5,26,-5,36);
+  fenceRail(6,26,6,36);fenceRail(6,37,6,42,true);fenceRail(6,43,6,54);
+
+  // ── 路灯 ───────────────────────────────────────────────────
+  for(const[lx,lz]of[[4,11],[-4,22],[4,34],[-4,46],[4,57],[-3,66]])lamp(lx,lz);
+
+  // ── 树木围村 ─────────────────────────────────────────────
+  for(const[tx,tz]of[[-30,10],[-36,26],[-32,44],[-30,60],[-24,76],[-10,84],[4,86],[18,80],[30,66],[32,50],[30,32],[28,16],[16,-4],[0,-8],[-16,2],[8,88],[-38,36],[34,40]])
+    addTree(tx,tz,0.9+Math.random()*0.4);
+
+  // ── 道具 ─────────────────────────────────────────────────
+  prop('Barrel_Apples.gltf',22,26.5);prop('Barrel.gltf',21,27.8);
+  prop('Anvil.gltf',-11,25);prop('Crate_Wooden.gltf',-19,21.5);
+  prop('FarmCrate_Apple.gltf',12,41);prop('FarmCrate_Carrot.gltf',13,42.2);
+  prop('Bench.gltf',4,63);
+}
+
+// ── village ──────────────────────────────────────────────────
+buildNewVillage();
+skyData = buildSky();
 
 // ============================================================
 //  练武木人桩
@@ -438,16 +693,58 @@ makeDummy(0,5,Math.PI);
 const monsters=[];
 
 // ─── WOLF ──────────────────────────────────────────────
-const wolf = makeWolf(THREE, scene, 5, 0, -5);
+let wolf = makeWolf(THREE, scene, 5, 0, -5);
 wolf.root.scale.setScalar(1.4);
 wolf.root.position.y = 0.72;
 wolf.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+// ── CUBE WOLF GLTF 加载（异步替换程序化狼）──────────────
+function makeCubeWolfObj(gltfScene, clips, loader_THREE){
+  const root = gltfScene;
+  root.scale.setScalar(1.35);
+  root.rotation.y = Math.PI; // 修正朝向
+  root.position.set(5, 0, -5);
+  scene.add(root);
+  root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+  const mixer = new loader_THREE.AnimationMixer(root);
+  const clipMap = {};
+  for(const c of clips) clipMap[c.name] = c;
+  const STATE_MAP = {idle:'Idle',wander:'Walk',run:'Run',pounce:'Jump_Start',
+    bite:'Headbutt',hurt:'Idle',death:'Death',howl:'Idle'};
+  let curAction = null, curState = 'idle';
+  function playClip(name, loop=true){
+    const clip = clipMap[name]; if(!clip) return;
+    const newAction = mixer.clipAction(clip);
+    newAction.setLoop(loop?loader_THREE.LoopRepeat:loader_THREE.LoopOnce, Infinity);
+    newAction.clampWhenFinished = !loop;
+    if(curAction && curAction !== newAction){ curAction.fadeOut(0.2); }
+    newAction.reset().fadeIn(0.2).play();
+    curAction = newAction;
+  }
+  mixer.addEventListener('finished', ()=>{ curState='idle'; });
+  playClip('Idle', true);
+  // 材质 flash 用第一个mesh
+  const firstMesh = (() => { let m=null; root.traverse(o=>{if(!m&&o.isMesh)m=o;}); return m; })();
+  return {
+    root,
+    J: { body: { children: [firstMesh||{material:{emissive:{setHex:()=>{}},emissiveIntensity:0}}] } },
+    get state(){ return curState; },
+    setState(name){
+      curState = name;
+      const clipName = STATE_MAP[name]||'Idle';
+      const loop = !['pounce','bite','hurt','death'].includes(name);
+      playClip(clipName, loop);
+    },
+    update(dt){ mixer.update(dt); }
+  };
+}
+
+
 // ── WOLF AI ─────────────────────────────────────────
 const wolfAI = {
-  hp:5, state:'patrol', attackCool:0, stateTimer:0,
-  wx:5, wz:-5,
-  patrolTarget:{x:5,z:-5}, walking:false,
-  spawnX:5, spawnZ:-5, patrolRadius:6,
+  hp:15, state:'patrol', attackCool:0, stateTimer:0,
+  wx:0, wz:-40, facing:0,
+  patrolTarget:{x:0,z:-40}, walking:false,
+  spawnX:0, spawnZ:-40, patrolRadius:12, territoryR:12, alertR:22,
   hittable:{x:5,z:-5,r:1.8,flashT:0,shakeT:0}
 };
 wolfAI.hittable.mat  = wolf.J.body.children[0].material;
@@ -458,10 +755,24 @@ wolfAI.hittable.onHit = ()=>{
   if(wolfAI.state==='dead') return;
   wolfAI.hp--;
   wolf.setState('hurt');
-  if(wolfAI.hp<=0){ wolf.setState('death'); wolfAI.state='dead'; }
+  if(wolfAI.hp<=0){ wolf.setState('death'); wolfAI.state='dead'; wolfAI.hittable._dead=true; hittables.splice(hittables.indexOf(wolfAI.hittable),1); }
   else wolfAI.state='chase';
 };
 
+function lerpAngle(a,b,t){let d=b-a;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return a+d*Math.min(1,t);}
+
+
+// ── GLTF狼加载（放在wolfAI定义之后）──
+if(GLTFLoader){
+  new GLTFLoader().load('../assets/vendor/cube_world/Animals/glTF/Wolf.gltf', gltf => {
+    if(wolf && wolf.root) scene.remove(wolf.root);
+    wolf = makeCubeWolfObj(gltf.scene, gltf.animations, THREE);
+    wolfAI.hittable.mat  = wolf.J.body.children[0].material || {};
+    wolfAI.hittable.mesh = wolf.root;
+    wolfAI.wx = 0; wolfAI.wz = -40;
+    const box=new THREE.Box3().setFromObject(gltf.scene);console.log('wolf bbox',box.min,box.max);console.log('Cube Wolf loaded:', gltf.animations.map(a=>a.name));
+  });
+}
 function wolfPickPatrol(){
   const a=Math.random()*Math.PI*2, r=Math.random()*wolfAI.patrolRadius;
   wolfAI.patrolTarget={x:wolfAI.spawnX+Math.cos(a)*r, z:wolfAI.spawnZ+Math.sin(a)*r};
@@ -478,7 +789,7 @@ function updateWolf(dt){
   wolfAI.hittable.baseX=wx; wolfAI.hittable.baseZ=wz;
 
   // 扇形视野检测（120度，10格范围）
-  const faceX=-Math.sin(wolf.root.rotation.y), faceZ=-Math.cos(wolf.root.rotation.y);
+  const faceX=-Math.sin(wolfAI.facing), faceZ=-Math.cos(wolfAI.facing);
   const dot=dist>0.1?(faceX*dx+faceZ*dz)/dist:0;
   const canSee = dist<10 && dot>0.5; // cos(60°)=0.5 → 前方120°
 
@@ -493,35 +804,69 @@ function updateWolf(dt){
       const ptx=wolfAI.patrolTarget.x-wx, ptz=wolfAI.patrolTarget.z-wz;
       const pd=Math.hypot(ptx,ptz);
       if(pd>0.5){
-        wolf.root.rotation.y=Math.atan2(-ptx,-ptz);
+        wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-ptx,-ptz),1.0*dt);
         wolfAI.wx+=ptx/pd*1.5*dt;
         wolfAI.wz+=ptz/pd*1.5*dt;
         if(wolf.state!=='wander') wolf.setState('wander');
       } else { wolfAI.stateTimer=0; } // 到达目标，立即进入停顿
     } else {
       if(wolf.state!=='idle') wolf.setState('idle');
+      // 停顿时随机张望
+      if(!wolfAI._lookTarget) wolfAI._lookTarget=wolfAI.facing+(Math.random()-0.5)*2.0;
+      wolfAI.facing=lerpAngle(wolfAI.facing,wolfAI._lookTarget,0.8*dt);
     }
-    if(canSee){ wolfAI.state='look'; wolfAI.stateTimer=0.8; }
+    if(wolfAI.stateTimer<=0||wolfAI.walking) wolfAI._lookTarget=null;
+    if(canSee){ wolfAI.state='look'; wolfAI.stateTimer=2.0; }
 
   } else if(wolfAI.state==='look'){
     // 注视玩家
-    wolf.root.rotation.y=Math.atan2(-dx,-dz);
+    wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-dx,-dz),1.5*dt);
     if(wolf.state!=='idle') wolf.setState('idle');
     if(wolfAI.stateTimer<=0) wolfAI.state='chase';
 
   } else if(wolfAI.state==='chase'){
-    wolf.root.rotation.y=Math.atan2(-dx,-dz);
+    wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-dx,-dz),3.0*dt);
     if(dist>3.0){
       wolfAI.wx+=dx/dist*4.5*dt;
       wolfAI.wz+=dz/dist*4.5*dt;
-      if(wolf.state!=='run') wolf.setState('run');
+      if(wolf.state!=='run' && wolf.state!=='hurt' && wolf.state!=='bite' && wolf.state!=='pounce') wolf.setState('run');
     } else if(wolfAI.attackCool<=0){
       wolf.setState(Math.random()<0.5?'pounce':'bite');
       wolfAI.attackCool=2.2;
-      if(dist<2.8){ P.hp&&(P.hp-=1); }
+      if(dist<2.8 && P.iframe<=0){ P.hp&&(P.hp-=1); P.iframe=0.5; hitstop=0.12;
+        // 击退
+        const kb=2.5, kbx=-(dx/dist)*kb, kbz=-(dz/dist)*kb;
+        P.x+=kbx*0.15; P.z+=kbz*0.15;
+        // 屏幕红闪
+        const fl=document.getElementById('hitFlash')||Object.assign(document.createElement('div'),{id:'hitFlash',style:'position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 65%,rgba(220,0,0,0.55) 100%);pointer-events:none;transition:opacity 0.25s;z-index:999'});
+        if(!document.getElementById('hitFlash')) document.body.appendChild(fl);
+        fl.style.opacity='1'; setTimeout(()=>fl.style.opacity='0',80);
+        wolf.root.traverse(o=>{if(o.isMesh&&o.material?.emissive){o.material.emissive.setHex(0xff4400);o.material.emissiveIntensity=1.2;}});
+        setTimeout(()=>wolf.root.traverse(o=>{if(o.isMesh&&o.material?.emissive)o.material.emissiveIntensity=0;}),120);
+      }
     }
+    // 玩家离开领地→守边界
+    const pDs=Math.hypot(P.x-wolfAI.spawnX,P.z-wolfAI.spawnZ);
+    if(pDs>wolfAI.territoryR && wolf.state!=='pounce' && wolf.state!=='bite'){ wolfAI.state='border'; wolfAI.stateTimer=1.2; }
+
+  } else if(wolfAI.state==='border'){
+    // 移到领地边缘，面朝玩家
+    const sdx=P.x-wolfAI.spawnX,sdz=P.z-wolfAI.spawnZ,sd=Math.hypot(sdx,sdz)||1;
+    const tx=wolfAI.spawnX+sdx/sd*wolfAI.territoryR,tz=wolfAI.spawnZ+sdz/sd*wolfAI.territoryR;
+    const tdx=tx-wolfAI.wx,tdz=tz-wolfAI.wz,td=Math.hypot(tdx,tdz);
+    if(td>0.5){ wolfAI.wx+=tdx/td*2.5*dt; wolfAI.wz+=tdz/td*2.5*dt; wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-tdx,-tdz),2.0*dt); if(wolf.state!=='wander') wolf.setState('wander'); }
+    else{ wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-dx,-dz),1.5*dt); if(wolf.state!=='idle') wolf.setState('idle'); }
+    const pDsB=Math.hypot(P.x-wolfAI.spawnX,P.z-wolfAI.spawnZ);
+    if(wolfAI.stateTimer<=0 && pDsB<=wolfAI.territoryR-2) wolfAI.state='chase';
+    else if(pDsB>wolfAI.alertR) wolfAI.state='return';
+
+  } else if(wolfAI.state==='return'){
+    const rdx=wolfAI.spawnX-wolfAI.wx,rdz=wolfAI.spawnZ-wolfAI.wz,rd=Math.hypot(rdx,rdz);
+    if(rd>0.5){ wolfAI.wx+=rdx/rd*2.0*dt; wolfAI.wz+=rdz/rd*2.0*dt; wolfAI.facing=lerpAngle(wolfAI.facing,Math.atan2(-rdx,-rdz),2.0*dt); if(wolf.state!=='wander') wolf.setState('wander'); }
+    else{ wolfAI.state='patrol'; wolfAI.walking=false; wolfAI.stateTimer=1.0; }
   }
   wolf.root.position.x=wolfAI.wx; wolf.root.position.z=wolfAI.wz;
+  wolf.root.rotation.y=wolfAI.facing+Math.PI;
   wolf.update(dt);
 }
 
@@ -1496,7 +1841,7 @@ addEventListener('gamepaddisconnected',e=>{if(gpIndex===e.gamepad.index)gpIndex=
 function padStatus(){const el=document.getElementById('padState');if(gpIndex!==null){el.textContent='已连接 ✓';el.className='on';}else{el.textContent='未连接';el.className='';}}
 const btnKb=document.getElementById('btnKeyboard'),btnGp=document.getElementById('btnGamepad');
 function setMode(m){inputMode=m;btnKb.classList.toggle('active',m==='keyboard');btnGp.classList.toggle('active',m==='gamepad');}
-let invertX=false, invertY=false;
+let invertX=true, invertY=false;
 const btnInvX=document.getElementById('btnInvertX'), btnInvY=document.getElementById('btnInvertY');
 if(btnInvX) btnInvX.addEventListener('click',()=>{ invertX=!invertX; btnInvX.classList.toggle('active',invertX); });
 if(btnInvY) btnInvY.addEventListener('click',()=>{ invertY=!invertY; btnInvY.classList.toggle('active',invertY); });
@@ -1539,7 +1884,10 @@ function pollInput(){
   Actions.heavyHeld=aHeavy;Actions.heavyReleased=(!aHeavy)&&prev.heavy;
   prev.attack=aAtk;prev.jump=aJump;prev.dodge=aDodge;prev.heavy=aHeavy;prev.taunt=aTaunt;
 }
-function autoPad(){if(gpIndex===null)return;const gp=navigator.getGamepads()[gpIndex];if(!gp)return;if((gp.buttons.some(b=>b.pressed)||gp.axes.some(a=>Math.abs(a)>0.35))&&inputMode!=='gamepad')setMode('gamepad');}
+function autoPad(){
+  // 主动扫描（兜底，防止gamepadconnected未触发）
+  if(gpIndex===null){const pads=navigator.getGamepads();for(let i=0;i<pads.length;i++){if(pads[i]){gpIndex=pads[i].index;padStatus();break;}}}
+  if(gpIndex===null)return;const gp=navigator.getGamepads()[gpIndex];if(!gp)return;if((gp.buttons.some(b=>b.pressed)||gp.axes.some(a=>Math.abs(a)>0.35))&&inputMode!=='gamepad')setMode('gamepad');}
 
 // ============================================================
 //  玩家状态
@@ -1722,7 +2070,7 @@ function startSlash(type,ratio=0){
 }
 // 当前 (x,z) 处的支撑高度（地面0 或 站在某个平台顶）
 function groundHeightAt(x,z){
-  let g=0;
+  let g=terrainH(x,z);
   for(const p of platforms){
     if(x>=p.minx && x<=p.maxx && z>=p.minz && z<=p.maxz){ if(p.top>g) g=p.top; }
   }
@@ -1758,7 +2106,7 @@ function tryHitObjects(hitR){
   const hx=P.x+fx*reach, hz=P.z+fz*reach;
   for(const o of hittables){
     const dx=hx-o.x, dz=hz-o.z;
-    if(dx*dx+dz*dz < (o.r+hitR)*(o.r+hitR)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); }
+    if(dx*dx+dz*dz < (o.r+hitR)*(o.r+hitR)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); if(o.onHit) o.onHit(); }
   }
   for(const d of dummies){
     const dx=hx-d.x, dz=hz-d.z;
@@ -1835,7 +2183,7 @@ function inThrustBox(ox,oz,or){
   return along>-0.3 && along<GRID_*3 && side<GRID_*0.5+(or||0);
 }
 function tryThrustHit(){
-  for(const o of hittables){ if(inThrustBox(o.x,o.z,o.r)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); } }
+  for(const o of hittables){ if(inThrustBox(o.x,o.z,o.r)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); if(o.onHit) o.onHit(); } }
   for(const d of dummies){
     if(inThrustBox(d.x,d.z,d.r)){
       if(d._thrustCd>0) continue;
@@ -1858,7 +2206,7 @@ const SPIN_RADIUS=2.8;
 function tryRingHit(){
   for(const o of hittables){
     const dx=o.x-P.x, dz=o.z-P.z;
-    if(Math.hypot(dx,dz) < SPIN_RADIUS+o.r){ o.flashT=0.2; o.shakeT=0.2; }
+    if(Math.hypot(dx,dz) < SPIN_RADIUS+o.r){ o.flashT=0.2; o.shakeT=0.2; if(o.onHit) o.onHit(); }
   }
   for(const d of dummies){
     const dx=d.x-P.x, dz=d.z-P.z;
@@ -1997,7 +2345,7 @@ function update(dt){
   // 跳跃
   if(Actions.jump && !P.jumping && P.state!=='dodge' && !P.move && onGround){ P.jumping=true; P.vy=JUMP_V; }
   // 垂直物理：落到当前位置的支撑高度(地面/平台顶)
-  if(P.jumping || P.y>gH+0.001){
+  if(P.jumping || P.y>gH+0.25){
     P.jumping=true;                      // 走出平台边缘 → 进入下落
     P.y+=P.vy*dt; P.vy-=GRAVITY*dt;
     const land=groundHeightAt(P.x,P.z);
@@ -2663,6 +3011,5 @@ function updateHUD(){
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();padStatus();
 document.getElementById('loading').style.display='none';
-function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);updateWolf(dt);updateCamera(dt);updateHUD();renderer.render(scene,camera);requestAnimationFrame(loop);}
-loop();
-} // end main(THREE
+function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);try{updateWolf(dt);}catch(e){console.error("wolf err:",e);}
+if(skyData) updateSky(dt, clock.getElapsedTime());updateCamera
