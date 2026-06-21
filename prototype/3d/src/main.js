@@ -157,8 +157,12 @@ function terrainH(x, z){
   // 东侧河流谷地 (蜿蜒, 距村>28才生效)
   const rFade = Math.min(1, Math.max(0, (vd - 28) / 14));
   h -= Math.max(0, 1 - Math.abs(x - (50 + Math.sin(z * 0.035) * 10)) / 10) * 3.5 * rFade;
+  // 瀑布源头水潭 (x≈44, z≈111)
+  const _pdx=x-44,_pdz=z-111;
+  h -= Math.max(0,(1-Math.sqrt((_pdx/4.5)**2+((_pdz>0?_pdz/2.5:_pdz/7)**2)))*22);
   return h;
 }
+let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tNorm,tCaust;
 {
   const SZ=260, SEG=130;
   const tg=new THREE.PlaneGeometry(SZ,SZ,SEG,SEG);
@@ -189,14 +193,55 @@ function terrainH(x, z){
       .replace('void main() {','varying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
       .replace('\t#include <project_vertex>','\t#include <project_vertex>\nvWY=position.y;\nvMyUv=uv;\nvNY=normal.y;');
     s.fragmentShader=s.fragmentShader
-      .replace('void main() {','uniform sampler2D tGrass,tRock,tMount;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
-      .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\ndiffuseColor.rgb*=mix(mix(g,r,rb),m,mb);}');
+      .replace('void main() {','uniform sampler2D tGrass,tRock,tMount;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nfloat H(vec2 q){return fract(sin(dot(q,vec2(127.1,311.7)))*43758.5);}\nvoid main() {')
+      .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7;vec2 _p=vMyUv*260./18.,_f=fract(_p),_i=floor(_p),_s=_f*_f*(3.-2.*_f);float n=mix(mix(H(_i),H(_i+vec2(1,0)),_s.x),mix(H(_i+vec2(0,1)),H(_i+vec2(1,1)),_s.x),_s.y);float sr=smoothstep(.2,.5,1.-vNY+(n-.5)*.4),hr=smoothstep(3.,12.,vWY+(n-.5)*8.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);diffuseColor.rgb*=mix(mix(g,r,rb),m,mb);}');
   };
   tm.polygonOffset=true; tm.polygonOffsetFactor=1; tm.polygonOffsetUnits=1;
   const mesh=new THREE.Mesh(tg,tm); mesh.receiveShadow=true; scene.add(mesh);
-  // 水面 — 河流/断崖低洼自动"注水"
-  const wm=new THREE.Mesh(new THREE.PlaneGeometry(260,260),new THREE.MeshLambertMaterial({color:0x3a7a9a,transparent:true,opacity:0.82}));
-  wm.rotation.x=-Math.PI/2; wm.position.y=-2.1; scene.add(wm);
+  // ── 水体系统 (texture-based) ──────────────────────────────
+  const FALL_Y=1.0;
+  const _wtl2=new THREE.TextureLoader();
+  tWater=_wtl2.load('./textures/texture_water.png');
+  tFoam=_wtl2.load('./textures/texture_water_foam.png');
+  tWfall=_wtl2.load('./textures/texture_waterfall.png');
+  tMistTex=_wtl2.load('./textures/texture_waterfall_mist_splash.png');
+  tNorm=_wtl2.load('./textures/texture_water_normal.png');
+  tCaust=_wtl2.load('./textures/texture_caustics.png');
+  [tWater,tFoam,tWfall,tNorm,tCaust].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
+  function makeWaterMat(fx,fz,alpha){
+    const m=new THREE.ShaderMaterial({
+      uniforms:{uT:{value:0},tC:{value:tWater},tN:{value:tNorm},tF:{value:tFoam},uFl:{value:new THREE.Vector2(fx,fz)},uA:{value:alpha}},
+      vertexShader:`varying vec2 vUv;varying vec3 vN,vV;void main(){vUv=uv;vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
+      fragmentShader:`uniform float uT;uniform sampler2D tC,tN,tF;uniform vec2 uFl;uniform float uA;varying vec2 vUv;varying vec3 vN,vV;void main(){vec2 u=vUv*6.,u1=u+uFl*uT,u2=u-uFl*uT*.6+.5;vec3 n=normalize((texture2D(tN,u1).rgb+texture2D(tN,u2).rgb)*2.-2.);vec3 col=texture2D(tC,vUv*4.+n.xy*.05+uFl*uT*.4).rgb;col=mix(col,vec3(1.),texture2D(tF,u1*.5).a*.22);float fr=pow(1.-max(0.,dot(normalize(vN),normalize(vV))),3.)*.55;col=mix(col,vec3(.52,.76,.94),fr);gl_FragColor=vec4(col,uA+fr*.12);}`,
+      transparent:true,depthWrite:false,side:THREE.FrontSide
+    });
+    waterMats.push(m);return m;
+  }
+  const _wMain=new THREE.Mesh(new THREE.PlaneGeometry(260,260),makeWaterMat(0,.06,.78));
+  _wMain.rotation.x=-Math.PI/2;_wMain.position.y=-2.1;scene.add(_wMain);
+  const _wPool=new THREE.Mesh(new THREE.PlaneGeometry(10,7),makeWaterMat(.01,.01,.9));
+  _wPool.rotation.x=-Math.PI/2;_wPool.position.set(44,FALL_Y,111);scene.add(_wPool);
+  const _wRiver=new THREE.Mesh(new THREE.PlaneGeometry(3.5,22),makeWaterMat(0,.28,.72));
+  _wRiver.rotation.x=-Math.PI/2+Math.atan2(-2.1,22);_wRiver.position.set(44,-.8,96);scene.add(_wRiver);
+  const FALL_DROP=FALL_Y+2.1;
+  fallCurtainMat=new THREE.ShaderMaterial({
+    uniforms:{uT:{value:0},tWf:{value:tWfall}},
+    vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 uv=vec2(vUv.x*1.5,fract(vUv.y-uT*.65));vec4 c=texture2D(tWf,uv);float e=smoothstep(0.,.1,vUv.x)*smoothstep(1.,.9,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.9);}`,
+    transparent:true,side:THREE.DoubleSide,depthWrite:false
+  });
+  const _fcM=new THREE.Mesh(new THREE.PlaneGeometry(5,FALL_DROP,1,16),fallCurtainMat);
+  _fcM.position.set(44,FALL_Y-FALL_DROP/2,107);scene.add(_fcM);
+  const _caustMesh=new THREE.Mesh(new THREE.PlaneGeometry(18,26),new THREE.MeshBasicMaterial({map:tCaust,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false}));
+  _caustMesh.rotation.x=-Math.PI/2;_caustMesh.position.set(44,-2.05,94);scene.add(_caustMesh);
+  {const N=22,mp=new Float32Array(N*3);for(let i=0;i<N;i++){mp[i*3]=44+(Math.random()-.5)*6;mp[i*3+1]=-1+Math.random()*2;mp[i*3+2]=104+Math.random()*6;}const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(mp,3));mistPS=new THREE.Points(pg,new THREE.PointsMaterial({map:tMistTex,size:3.2,sizeAttenuation:true,transparent:true,opacity:.28,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(mistPS);}
+  {const S=64,rp=[],ri=[];for(let i=0;i<=S;i++){const a=i/S*Math.PI,c=Math.cos(a),s=Math.sin(a);rp.push(44+c*10,s*10+.5,104,44+c*8,s*8+.5,104);}for(let i=0;i<S;i++){const b=i*2;ri.push(b,b+1,b+2,b+1,b+3,b+2);}const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(rp),3));const ru=new Float32Array((S+1)*4);for(let i=0;i<=S;i++){ru[i*4]=i/S;ru[i*4+1]=1;ru[i*4+2]=i/S;ru[i*4+3]=0;}rg.setAttribute('uv',new THREE.BufferAttribute(ru,2));rg.setIndex(ri);scene.add(new THREE.Mesh(rg,new THREE.ShaderMaterial({vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec2 vUv;void main(){float h=vUv.x*5.;vec3 c;if(h<1.)c=mix(vec3(1.,.1,.1),vec3(1.,.55,0.),h);else if(h<2.)c=mix(vec3(1.,.55,0.),vec3(.9,.9,0.),h-1.);else if(h<3.)c=mix(vec3(.9,.9,0.),vec3(.1,.75,.1),h-2.);else if(h<4.)c=mix(vec3(.1,.75,.1),vec3(.1,.4,.9),h-3.);else c=mix(vec3(.1,.4,.9),vec3(.5,.1,.8),h-4.);float a=smoothstep(0.,.06,vUv.x)*smoothstep(1.,.94,vUv.x)*smoothstep(0.,.35,vUv.y)*smoothstep(1.,.65,vUv.y)*.25;gl_FragColor=vec4(c,a);}`,transparent:true,depthWrite:false,side:THREE.DoubleSide})));}
+}
+function updateWater(t){
+  for(const m of waterMats)if(m.uniforms?.uT)m.uniforms.uT.value=t;
+  if(fallCurtainMat)fallCurtainMat.uniforms.uT.value=t;
+  if(tCaust)tCaust.offset.set((t*.025)%1,(t*.018)%1);
+  if(mistPS){const p=mistPS.geometry.attributes.position.array,N=p.length/3;for(let i=0;i<N;i++){p[i*3+1]+=.004;if(p[i*3+1]>2.5){p[i*3]=44+(Math.random()-.5)*6;p[i*3+1]=-1.5;p[i*3+2]=104+Math.random()*6;}}mistPS.geometry.attributes.position.needsUpdate=true;}
 }
 
 const gltfLoader = GLTFLoader ? new GLTFLoader() : null;
@@ -2982,8 +3027,7 @@ function updateCamera(dt){
   cameraRig.targetPitch=THREE.MathUtils.clamp(cameraRig.targetPitch,minPitch,maxPitch);
   cameraRig.yaw += angleDelta(cameraRig.yaw,cameraRig.targetYaw)*Math.min(1,dt*12);
   cameraRig.pitch = THREE.MathUtils.lerp(cameraRig.pitch,cameraRig.targetPitch,Math.min(1,dt*12));
-  const tgt=new THREE.Vector3(P.x,(indoor?2.25:1.7)+P.y*0.6,P.z);   // 跟随高度(室内看上半身，减少墙面糊屏)
-  _camTarget.copy(tgt);
+  const tgt=new THREE.Vector3(P.x,(indoor?2.25:1.7)+P.y*0.6,P.z);   // 跟随高度(室�  _camTarget.copy(tgt);
   const clearDist=cameraClearDistance(_camTarget,cameraRig.distance,indoor?cameraRig.indoorMinDistance:cameraRig.minDistance);
   cameraRig.currentDistance=THREE.MathUtils.lerp(cameraRig.currentDistance,clearDist,Math.min(1,dt*14));
   _camIdeal.copy(_camTarget).add(cameraOffset(cameraRig.currentDistance));
@@ -3012,4 +3056,4 @@ function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.
 addEventListener('resize',resize);resize();padStatus();
 document.getElementById('loading').style.display='none';
 function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);try{updateWolf(dt);}catch(e){console.error("wolf err:",e);}
-if(skyData) updateSky(dt, clock.getElapsedTime());updateCamera
+if(skyData) updateSky(dt, clock.getElapsedTime());updateWater(clock.getElapsedTime());updateCamera(dt);renderer.render(scene,camera);requestAnimationFrame(loop);}

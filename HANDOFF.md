@@ -6,7 +6,7 @@
 ## 一句话项目
 复古风 3D 动作游戏原型。主角"老实人"（火柴人/方块人，程序化骨骼驱动），第三人称可旋转视角。
 讽刺中国式亲密关系/婚恋压力的轻肉鸽 ARPG，敌人是"没事/随便/呵呵"等阴阳怪气词怪。
-**当前阶段：连招树已修复，aJupiter(旋风坠)重做完成。下一步：用Blender MCP做第一个词怪敌人。**
+**当前阶段（2026-06-18）：程序化狼怪已加进游戏，能巡逻/发现玩家/追击/攻击。下一步：完善狼AI手感，加血条伤害系统，或继续做其他怪物。**
 
 ## 连招树（当前正确版本）
 - gL1→轻=gL2, gL1→重=gThrust(突刺)
@@ -114,6 +114,14 @@ WASD移动 / Q/E旋转镜头 / R/F俯仰 / 左键轻击 / 按住右键蓄力重�
 - 用户看不到的视觉细节(尤其左右方向、3D旋转正负)经常要调，做完主动提示"哪几个点可能要调"。
 - 不擅长的别硬接：精细手工建模(Blender捏脸)绝对不要碰，那是上一个工具(Codex)翻车的坑。程序化骨骼/几何才是对的路。
 - **省token**：用户token烧得多。单回合别做太多次工具调用(会产生大量无意义"call"垃圾输出且费token)，改动前先想全方案，合并编辑。
+
+## 树贴图待实现（下一个会话直接接手）
+- `prototype/3d/textures/` 里已有两张新贴图：`texture_foliage.png`（1024×1024 RGBA透明）和 `texture_tree_bark.png`（1024×1024 RGBA）
+- **KayKit 树不可复用**：4棵树全是单网格+单atlas `forest_texture.png`，bark和foliage UV混在一起，无法分离贴图
+- **确认方案**：写 `makeProcTree(x,z)` 程序化树，替换现有 `addTree`：
+  - 树干：CylinderGeometry + `texture_tree_bark.png`（tileable，repeat wrapping）
+  - 树冠：3组交叉 PlaneGeometry + `texture_foliage.png`（RGBA，`alphaTest:0.5`，双面）
+  - 用户已认可方案，等待实现
 
 ## 当前已知小问题
 - 体力条still空转(摆设)

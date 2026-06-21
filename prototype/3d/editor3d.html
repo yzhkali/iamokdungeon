@@ -145,12 +145,14 @@ const CATALOG=[
 // ── Scene ─────────────────────────────────────────────────────
 const canvas=document.getElementById('c'),mainDiv=document.getElementById('main');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+let sceneRT=new THREE.WebGLRenderTarget(1,1);let reflRT=new THREE.WebGLRenderTarget(1,1);const reflCam=new THREE.PerspectiveCamera();reflCam.matrixAutoUpdate=false;const _reflM=new THREE.Matrix4();
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x5ab4e8); // 明亮蓝天，无雾感
+const skyMesh=new THREE.Mesh(new THREE.SphereGeometry(490,16,8),new THREE.MeshBasicMaterial({color:0x5ab4e8,side:THREE.BackSide}));scene.add(skyMesh);
 
 const camera=new THREE.PerspectiveCamera(45,1,0.1,900);
 let camR=100,camTheta=0.3,camPhi=0.5;
@@ -206,17 +208,17 @@ function refreshTerrain(){
 }
 refreshTerrain();
 const _tl=new THREE.TextureLoader();
-const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png');
-[grassTex,rockTex,mountTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
+const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png'),mudTex=_tl.load('./textures/mud-riverbank-tile-512.png');
+[grassTex,rockTex,mountTex,mudTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
 const tMat=new THREE.MeshLambertMaterial({vertexColors:true});
 tMat.onBeforeCompile=s=>{
-  s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};
+  s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};s.uniforms.tMud={value:mudTex};
   s.vertexShader=s.vertexShader
     .replace('void main() {','varying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
     .replace('\t#include <project_vertex>','\t#include <project_vertex>\nvWY=position.y;\nvMyUv=uv;\nvNY=normal.y;');
   s.fragmentShader=s.fragmentShader
-    .replace('void main() {','uniform sampler2D tGrass,tRock,tMount;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
-    .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\ndiffuseColor.rgb*=mix(mix(g,r,rb),m,mb);}');
+    .replace('void main() {','uniform sampler2D tGrass,tRock,tMount,tMud;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+    .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7,md=texture2D(tMud,u).rgb;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\nfloat noise=g.r*3.-1.5;\nvec3 base=mix(mix(g,r,rb),m,mb);float mudb=1.-smoothstep(-3.,1.5,vWY+noise);diffuseColor.rgb*=mix(base,md,mudb);}');
 };
 tMat.polygonOffset=true; tMat.polygonOffsetFactor=1;
 const tMesh=new THREE.Mesh(tGeo,tMat); tMesh.receiveShadow=true; scene.add(tMesh);
@@ -267,10 +269,79 @@ function drawRoadsToCanvas(){
   roadTex.needsUpdate=true;
 }
 // water
-const wMesh=new THREE.Mesh(new THREE.PlaneGeometry(260,260),new THREE.MeshLambertMaterial({color:0x3a7aaa,transparent:true,opacity:0.8}));
+const _wTL=new THREE.TextureLoader();
+const _tNA=_wTL.load('./textures/water_normal_a.png');
+const _tNB=_wTL.load('./textures/water_normal_b.png');
+const _tUV=_wTL.load('./textures/water_uv.png');
+const _tFoam=_wTL.load('./textures/water_foam_godot.png');
+const _tCaust=_wTL.load('./textures/texture_caustics.png');
+const _tFoam2=_wTL.load('./textures/water_foam_godot.png');
+[_tNA,_tNB,_tUV,_tFoam,_tCaust,_tFoam2].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
+const wSurfMat=new THREE.ShaderMaterial({
+  uniforms:{uT:{value:0},uWaves:{value:1},uWaterY:{value:-2},tNA:{value:_tNA},tNB:{value:_tNB},tUV:{value:_tUV},tF:{value:_tFoam},tCaust:{value:_tCaust},tFoam2:{value:_tFoam2},tScene:{value:null},tReflect:{value:null},uRes:{value:new THREE.Vector2()},tHmap:{value:null},uDeep:{value:new THREE.Color(0x5a8f9a)},uShallow:{value:new THREE.Color(0x92b4b8)},uSun:{value:new THREE.Vector3(.5,1.,.3).normalize()}},
+  vertexShader:`uniform float uT;uniform float uWaves;varying vec2 vWsUv;varying vec3 vN,vV;vec3 gw(vec3 p,float s,float l,float sp,float d){vec2 dv=normalize(vec2(cos(3.14159*(d*2.-1.)),sin(3.14159*(d*2.-1.))));float k=6.28318/l,f=k*(dv.x*p.x+dv.y*p.z-sp*uT),a=s/k;return vec3(dv.x*(a*cos(f)),a*sin(f),dv.y*(a*cos(f)));}void main(){vec4 wp=modelMatrix*vec4(position,1.);vec3 wpos=wp.xyz;if(uWaves>0.){wpos+=gw(wpos,.035,22.,.7,.3)*uWaves;wpos+=gw(wpos,.028,15.,1.,2.67)*uWaves;wpos+=gw(wpos,.022,30.,.45,3.9)*uWaves;wpos+=gw(wpos,.015,12.,1.3,2.7)*uWaves;}vWsUv=wpos.xz*.08;vN=normalize(normalMatrix*normal);vec4 mv=viewMatrix*vec4(wpos,1.);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
+  fragmentShader:`uniform float uT;uniform float uWaterY;uniform sampler2D tNA,tNB,tUV,tF,tCaust,tHmap,tFoam2,tScene,tReflect;uniform vec2 uRes;uniform vec3 uDeep,uShallow,uSun;varying vec2 vWsUv;varying vec3 vN,vV;void main(){vec2 uvOff=vec2(.05,.04)*uT;vec2 uvShift=.04*(texture2D(tUV,vWsUv*.25+uvOff).rg*2.-1.);vec2 uv=vWsUv+uvShift;vec3 N=normalize((texture2D(tNA,uv-uvOff*2.).rgb*.75+texture2D(tNB,uv+uvOff).rgb*.25)*2.-1.);vec3 nP=normalize(vN+vec3(N.x,0.,N.y)*.35);float fr=clamp(pow(1.-max(0.,dot(nP,normalize(vV))),1.5)+.04*sin(vWsUv.y*7.+uT*1.4),0.,1.);vec2 hmUV=clamp((vWsUv/0.08+130.)/260.,vec2(.001),vec2(.999));float terrainY=texture2D(tHmap,hmUV).r;float wDepth=max(0.,uWaterY-terrainY);float dB=clamp(1.-exp((wDepth-.3)*-1.2),0.,1.);vec2 scUV=gl_FragCoord.xy/uRes;vec2 refUV=clamp(scUV+N.xy*.25/max(.2,wDepth+.02),vec2(.001),vec2(.999));vec3 sceneCol=texture2D(tScene,refUV).rgb;vec3 dyeCol=mix(uShallow,uDeep,dB);float sceneOk=smoothstep(.04,.35,sceneCol.r+sceneCol.g+sceneCol.b);vec3 refracted=mix(dyeCol,sceneCol,sceneOk*clamp(.75-dB*.45,0.,1.));vec3 col=mix(refracted,dyeCol,dB*.6);float hue=fr*2.8+uT*.08;col=mix(col,vec3(sin(hue)*.5+.5,sin(hue+2.09)*.5+.5,sin(hue+4.18)*.5+.5),.1*fr);vec3 H=normalize(normalize(uSun)+normalize(vV));float sp=pow(max(0.,dot(nP,H)),120.);col+=vec3(1.,.98,.9)*smoothstep(.38,.42,sp)*.7;float sp2=pow(max(0.,dot(nP,H)),600.);col+=vec3(1.,1.,.95)*sp2*1.2;float bl=abs(fract(uT*.045)*2.-1.);vec2 cWob=N.xy*.12;col+=vec3(.5,.85,1.)*mix(texture2D(tCaust,vWsUv*1.8+vec2(.025,.018)*uT+cWob).a,texture2D(tCaust,vWsUv*1.8-vec2(.018,.025)*(uT+.5)-cWob).a,bl)*.18;vec2 reflUV=vec2(gl_FragCoord.x/uRes.x,gl_FragCoord.y/uRes.y)+N.xy*.04;reflUV=clamp(reflUV,vec2(.001),vec2(.999));vec3 reflCol=texture2D(tReflect,reflUV).rgb;float rBrt=dot(reflCol,vec3(.3,.59,.11));float rOk=smoothstep(.04,.2,rBrt);col=mix(col,reflCol*1.5+vec3(.02,.04,.06),fr*.45*rOk);float foamMask=1.-clamp(wDepth/.3,0.,1.);vec2 fuv1=vWsUv*2.2+vec2(.06,.18)*uT+N.xy*.1,fuv2=vWsUv*1.7+vec2(-.09,.05)*uT-N.xy*.08;float ft=(texture2D(tFoam2,fuv1).r+texture2D(tFoam2,fuv2).r)*.5;float foam=smoothstep(.65,.9,ft)*foamMask;col=mix(col,dyeCol*1.1,foamMask*.35);col=mix(col,vec3(.96,.98,1.),foam*.7);gl_FragColor=vec4(col,mix(.22,.97,fr*.8+dB*.2));}`,
+  transparent:true,side:THREE.FrontSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2
+});
+const wMesh=new THREE.Mesh(new THREE.PlaneGeometry(260,260,60,60),wSurfMat);
 wMesh.rotation.x=-Math.PI/2; wMesh.position.y=-2.1; scene.add(wMesh);
+const hmapTex=new THREE.DataTexture(null,131,131,THREE.RedFormat,THREE.FloatType);
+hmapTex.wrapS=hmapTex.wrapT=THREE.ClampToEdgeWrapping;
+hmapTex.minFilter=hmapTex.magFilter=THREE.LinearFilter;hmapTex.flipY=false;
+function updateHmapTex(){hmapTex.image={data:hmap,width:131,height:131};hmapTex.needsUpdate=true;}
+wSurfMat.uniforms.tHmap.value=hmapTex;
+wSurfMat.uniforms.tScene.value=sceneRT.texture;wSurfMat.uniforms.tReflect.value=reflRT.texture;
+const _tWfall=new THREE.TextureLoader().load('./textures/texture_waterfall.png');
+_tWfall.wrapS=_tWfall.wrapT=THREE.RepeatWrapping;
+const wfMat=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(vUv.x,fract(vUv.y+uT*.65));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.1,vUv.x)*smoothstep(1.,.9,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.9);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wfMat2=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(vUv.x,fract(vUv.y+(uT+.45)*.65));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.15,vUv.x)*smoothstep(1.,.85,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.7);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wfMat3=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(1.-vUv.x,fract(vUv.y+uT*.55));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.12,vUv.x)*smoothstep(1.,.88,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.6);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wfMat4=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(vUv.x+0.4,fract(vUv.y+(uT+.2)*.72));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.1,vUv.x)*smoothstep(1.,.9,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.65);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wfMat5=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(1.-vUv.x+0.3,fract(vUv.y+(uT+.1)*.5));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.12,vUv.x)*smoothstep(1.,.88,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.6);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wfMat6=new THREE.ShaderMaterial({uniforms:{uT:{value:0},tWf:{value:_tWfall}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uT;uniform sampler2D tWf;varying vec2 vUv;void main(){vec2 u=vec2(vUv.x+0.7,fract(vUv.y+uT*.45));vec4 c=texture2D(tWf,u);float e=smoothstep(0.,.1,vUv.x)*smoothstep(1.,.9,vUv.x);gl_FragColor=vec4(c.rgb,c.a*e*.55);}`,transparent:true,side:THREE.DoubleSide,depthWrite:false});
+const wSurfs=[],wfSurfs=[];
+function makeWaterPath(pts,w){
+  const wy=wMesh.position.y,abv=pts.filter(p=>p.y>=wy-0.05);
+  if(abv.length<2)return null;
+  const arc=[0];for(let i=1;i<abv.length;i++){const p=abv[i],q=abv[i-1];arc.push(arc[i-1]+Math.hypot(p.x-q.x,p.z-q.z));}
+  const TILE=w*1.2,v=[],ix=[],uvs=[];
+  for(let i=0;i<abv.length;i++){
+    const p=abv[i];let tx=0,tz=1;
+    if(i<abv.length-1){const nx=abv[i+1].x-p.x,nz=abv[i+1].z-p.z,nl=Math.hypot(nx,nz)||1;tx=nx/nl;tz=nz/nl;}
+    else if(i>0){const nx=p.x-abv[i-1].x,nz=p.z-abv[i-1].z,nl=Math.hypot(nx,nz)||1;tx=nx/nl;tz=nz/nl;}
+    const hw=(p.w||w)/2,u=arc[i]/TILE;
+    v.push(p.x-tz*hw,p.y+0.04,p.z+tx*hw,p.x+tz*hw,p.y+0.04,p.z-tx*hw);uvs.push(u,0,u,1);
+  }
+  for(let i=0;i<abv.length-1;i++){const b=i*2;ix.push(b,b+2,b+1,b+1,b+2,b+3);}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
+  g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uvs),2));
+  g.setIndex(ix);g.computeVertexNormals();
+  const m=new THREE.Mesh(g,wSurfMat);m.renderOrder=2;scene.add(m);return m;
+}
+function makeWaterfallPath(pts,fh){
+  const SEGS=12,zFwd=fh*0.55,v=[],ix=[],uvs=[];
+  for(let j=0;j<=SEGS;j++){const t=j/SEGS,dy=-fh*t*t,dz=-zFwd*t;for(let i=0;i<pts.length;i++){const p=pts[i];v.push(p.x,p.y+dy,p.z+dz);uvs.push(i/(pts.length-1||1),1-t);}}
+  for(let j=0;j<SEGS;j++)for(let i=0;i<pts.length-1;i++){const a=j*pts.length+i,b=a+1,c=a+pts.length,dd=c+1;ix.push(a,c,b,b,c,dd);}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
+  g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uvs),2));
+  g.setIndex(ix);g.computeVertexNormals();
+  const m=new THREE.Mesh(g,wfMat);scene.add(m);
+  const g2=g.clone();const p2=g2.attributes.position.array;for(let i=0;i<p2.length;i+=3)p2[i+2]+=0.28;g2.attributes.position.needsUpdate=true;
+  const m2=new THREE.Mesh(g2,wfMat2);scene.add(m2);
+  const g3=g.clone();const p3=g3.attributes.position.array;for(let i=0;i<p3.length;i+=3)p3[i+2]-=0.22;g3.attributes.position.needsUpdate=true;
+  const m3=new THREE.Mesh(g3,wfMat3);scene.add(m3);
+  const g4=g.clone();const p4=g4.attributes.position.array;for(let i=0;i<p4.length;i+=3)p4[i+2]+=0.52;g4.attributes.position.needsUpdate=true;
+  const m4=new THREE.Mesh(g4,wfMat4);scene.add(m4);
+  const g5=g.clone();const p5=g5.attributes.position.array;for(let i=0;i<p5.length;i+=3){p5[i+1]-=0.3;p5[i+2]-=0.15;}g5.attributes.position.needsUpdate=true;
+  const m5=new THREE.Mesh(g5,wfMat5);scene.add(m5);
+  const g6=g.clone();const p6=g6.attributes.position.array;for(let i=0;i<p6.length;i+=3){p6[i+1]-=0.55;p6[i+2]+=0.1;}g6.attributes.position.needsUpdate=true;
+  const m6=new THREE.Mesh(g6,wfMat6);scene.add(m6);
+  m._layers=[m2,m3,m4,m5,m6];return m;
+}
 // 自动从 localStorage 恢复上次地形
-try{const b64=localStorage.getItem('e3d_hmap');if(b64){const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const restored=new Float32Array(bytes.buffer);if(restored.length===hmap.length){hmap.set(restored);refreshTerrain();}const wy=localStorage.getItem('e3d_wy');if(wy!=null){document.getElementById('waterY').value=wy;document.getElementById('waterYV').textContent=(+wy).toFixed(1);wMesh.position.y=+wy;}}}catch(e){}
+try{const b64=localStorage.getItem('e3d_hmap');if(b64){const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const restored=new Float32Array(bytes.buffer);if(restored.length===hmap.length){hmap.set(restored);refreshTerrain();updateHmapTex();}const wy=localStorage.getItem('e3d_wy');if(wy!=null){document.getElementById('waterY').value=wy;document.getElementById('waterYV').textContent=(+wy).toFixed(1);wMesh.position.y=+wy;}}}catch(e){}
 window._terrainReady=true; // 从此之后的 refreshTerrain() 才会写 localStorage
 
 // Reference person (~1.8m tall, labelled)
@@ -514,6 +585,10 @@ document.getElementById('tImport').onchange=e=>{
     if(data.roadColor){roadColor=data.roadColor;const inp=document.getElementById('roadColorPicker');if(inp)inp.value=roadColor;}
     (data.roads||[]).forEach((r,i)=>{if(r.length<2)return;const line=buildRoadLine(r,roadMats.done);line.visible=false;roads.push(r);roadWidths.push((data.roadWidths||[])[i]??8);roadLines.push({line,road:r});});
     drawRoadsToCanvas();
+    wSurfs.forEach(s=>{if(s.mesh)scene.remove(s.mesh);});wSurfs.length=0;
+    (data.waterSurfs||[]).forEach(s=>{const mesh=makeWaterPath(s.pts,s.w||5);if(mesh)wSurfs.push({pts:s.pts,w:s.w||5,mesh});});
+    wfSurfs.forEach(s=>{if(s.mesh){scene.remove(s.mesh);(s.mesh._layers||[s.mesh._layer2]).filter(Boolean).forEach(l=>scene.remove(l));}});wfSurfs.length=0;
+    (data.wfSurfs||[]).forEach(s=>{const mesh=makeWaterfallPath(s.pts,s.fh);wfSurfs.push({...s,mesh});});
   });
   e.target.value='';
 };
@@ -729,7 +804,13 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── Render ────────────────────────────────────────────────────
-function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
-function loop(){requestAnimationFrame(loop);renderer.render(scene,camera);}
+function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const pw=w*renderer.getPixelRatio(),ph=h*renderer.getPixelRatio();sceneRT.setSize(pw,ph);reflRT.setSize(pw,ph);if(wSurfMat)wSurfMat.uniforms.uRes.value.set(pw,ph);}
+const _clk=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _wy=wMesh.position.y;_reflM.set(1,0,0,0, 0,-1,0,2*_wy, 0,0,1,0, 0,0,0,1);reflCam.projectionMatrix.copy(camera.projectionMatrix);reflCam.matrixWorld.multiplyMatrices(_reflM,camera.matrixWorld);reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(reflRT);renderer.render(scene,reflCam);renderer.setRenderTarget(sceneRT);renderer.render(scene,camera);renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(null);wMesh.visible=true;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=true;});renderer.render(scene,camera);}
 window.addEventListener('resize',resize);
-resize(
+resize();
+document.getElementById('loading').style.display='none';
+loop();
+</script>
+</body>
+</html>
