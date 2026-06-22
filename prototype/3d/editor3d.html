@@ -181,6 +181,7 @@ for(let i=0;i<tPos.count;i++) hmap[i]=terrainH(tPos.getX(i),tPos.getZ(i));
 const cD=new THREE.Color(0x446070),cL=new THREE.Color(0xf0efe8),cH=new THREE.Color(0xeae8e0),cR=new THREE.Color(0xe8e8e6),cS=new THREE.Color(0xf0eef4);
 const cRoad=new THREE.Color(0x735f45), cRoadE=new THREE.Color(0x665540);
 let roadMask=null;
+let hmapVirgin=null;
 let roadColor='#7d7260';
 function _roadRGB(){const rgb=parseInt(roadColor.slice(1),16);return[(rgb>>16)/255,((rgb>>8)&255)/255,(rgb&255)/255];}
 function refreshTerrain(){
@@ -479,6 +480,7 @@ function finishCurRoad(){
   const hw=roadW/2, depth=0.32;
   // 保存地形快照用于撤销
   const snap=hmap.slice();
+  if(!hmapVirgin)hmapVirgin=hmap.slice();
   // 轻微压低路面
   for(let i=0;i<tPos.count;i++){
     const vx=tPos.getX(i),vz=tPos.getZ(i);
@@ -494,7 +496,7 @@ function finishCurRoad(){
     if(minD<hw+1.5&&hmap[i]>-1.5){
       // 梯形截面：中间平底，两侧线性斜坡
       const k = minD<hw*0.6 ? 1.0 : Math.max(0,(hw+1.5-minD)/1.5);
-      hmap[i]-=depth*k;
+      hmap[i]=Math.min(hmap[i],hmapVirgin[i]-depth*k);
     }
   }
   // roadMask + 路边小土坡（地形顶点颜色渐变，自然融入地形）
