@@ -146,7 +146,8 @@ const CATALOG=[
 // ── Scene ─────────────────────────────────────────────────────
 const canvas=document.getElementById('c'),mainDiv=document.getElementById('main');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-let sceneRT=new THREE.WebGLRenderTarget(1,1);let reflRT=new THREE.WebGLRenderTarget(1,1);const reflCam=new THREE.PerspectiveCamera();reflCam.matrixAutoUpdate=false;const _reflM=new THREE.Matrix4();
+let sceneRT=new THREE.WebGLRenderTarget(1,1);let reflRT=new THREE.WebGLRenderTarget(1,1);const reflCam=new THREE.PerspectiveCamera();
+const _reflClip=new THREE.Plane(new THREE.Vector3(0,1,0),0);reflCam.matrixAutoUpdate=false;const _reflM=new THREE.Matrix4();
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -155,7 +156,7 @@ const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x5ab4e8); // 明亮蓝天，无雾感
 const skyMesh=new THREE.Mesh(new THREE.SphereGeometry(490,16,8),new THREE.MeshBasicMaterial({color:0x5ab4e8,side:THREE.BackSide}));scene.add(skyMesh);
 
-const camera=new THREE.PerspectiveCamera(45,1,0.1,900);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,2000);
 let camR=100,camTheta=0.3,camPhi=0.5;
 const camTgt=new THREE.Vector3(0,0,40);
 function camUpdate(){
@@ -818,10 +819,23 @@ document.addEventListener('keydown',e=>{
   }
 });
 
+// ── Clouds ────────────────────────────────────────────────────
+// ── Cloud layers (2 flat planes, UV-scrolled) ──────────
+// ── Cloud sphere (inside sky dome, visible at all angles) ──────
+const _cloudTL=new THREE.TextureLoader();
+function _mkCloudSphere(file,radius,spd,op){
+  const t=_cloudTL.load('./textures/'+file);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,1.5);
+  const m=new THREE.MeshBasicMaterial({map:t,blending:THREE.AdditiveBlending,color:new THREE.Color(op,op,op),transparent:true,depthWrite:false,side:THREE.BackSide});
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,16),m);
+  scene.add(mesh);return {mesh,spd};
+}
+const _clouds=[_mkCloudSphere('cloud_01.png',700,.0004,.7),_mkCloudSphere('cloud_03.png',550,.0007,.4)];
 // ── Render ────────────────────────────────────────────────────
 function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const pw=w*renderer.getPixelRatio(),ph=h*renderer.getPixelRatio();sceneRT.setSize(pw,ph);reflRT.setSize(pw,ph);if(wSurfMat)wSurfMat.uniforms.uRes.value.set(pw,ph);}
 const _clk=new THREE.Clock();
-function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _wy=wMesh.position.y;_reflM.set(1,0,0,0, 0,-1,0,2*_wy, 0,0,1,0, 0,0,0,1);reflCam.projectionMatrix.copy(camera.projectionMatrix);reflCam.matrixWorld.multiplyMatrices(_reflM,camera.matrixWorld);reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(reflRT);renderer.render(scene,reflCam);renderer.setRenderTarget(sceneRT);renderer.render(scene,camera);renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(null);wMesh.visible=true;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=true;});renderer.render(scene,camera);}
+function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;_clouds.forEach(c=>{c.mesh.rotation.y+=c.spd;c.mesh.position.copy(camera.position);});
+wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _wy=wMesh.position.y;_reflM.set(1,0,0,0, 0,-1,0,2*_wy, 0,0,1,0, 0,0,0,1);reflCam.projectionMatrix.copy(camera.projectionMatrix);reflCam.matrixWorld.multiplyMatrices(_reflM,camera.matrixWorld);reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();renderer.setClearColor(0x5ab4e8,1);_reflClip.constant=-_wy;renderer.clippingPlanes=[_reflClip];renderer.setRenderTarget(reflRT);renderer.render(scene,reflCam);renderer.clippingPlanes=[];renderer.setRenderTarget(sceneRT);renderer.render(scene,camera);renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(null);wMesh.visible=true;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=true;});renderer.render(scene,camera);}
 window.addEventListener('resize',resize);
 resize();
 document.getElementById('loading').style.display='none';
