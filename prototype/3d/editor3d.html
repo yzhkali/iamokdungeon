@@ -95,11 +95,12 @@ body{display:flex;flex-direction:column;height:100vh;background:#111;font-family
   </div>
 </div>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/loaders/GLTFLoader.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"}}
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/loaders/GLTFLoader.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js","three/addons/objects/Sky.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/objects/Sky.js"}}
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 
 // ── Terrain fn (matches game) ─────────────────────────────────
 function terrainH(x,z){
@@ -166,9 +167,21 @@ function camUpdate(){
 }
 camUpdate();
 
+// ── Sky ──────────────────────────────────────────────
+const sky=new Sky();sky.scale.setScalar(450000);scene.add(sky);
+const skyUni=sky.material.uniforms;
+skyUni['turbidity'].value=3;
+skyUni['rayleigh'].value=0.8;
+skyUni['mieCoefficient'].value=0.005;
+skyUni['mieDirectionalG'].value=0.92;
+const sunPos=new THREE.Vector3();
+const phi=THREE.MathUtils.degToRad(75); // 太阳仰角（90=正头顶）
+const theta=THREE.MathUtils.degToRad(180);
+sunPos.setFromSphericalCoords(1,phi,theta);
+skyUni['sunPosition'].value.copy(sunPos);
 scene.add(new THREE.HemisphereLight(0xc8d8e8,0x5a5040,1.0));
 const sun=new THREE.DirectionalLight(0xfff2d8,1.1);
-sun.position.set(12,26,10); sun.castShadow=true; scene.add(sun);
+sun.position.copy(sunPos).multiplyScalar(200); sun.castShadow=true; scene.add(sun);
 
 // ── Terrain (mutable heightmap) ───────────────────────────────
 const SZ=260,SEG=130;
@@ -214,15 +227,17 @@ const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./text
 [grassTex,rockTex,mountTex,mudTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
 const roadStoneTex=new THREE.TextureLoader().load('./textures/cobblestone-road-image2-retry2-tile-512.png',()=>{if(roads.length)drawRoadsToCanvas();});
 roadStoneTex.wrapS=roadStoneTex.wrapT=THREE.RepeatWrapping;
+const roadGenTex=new THREE.TextureLoader().load('./textures/generated.png');
+roadGenTex.wrapS=roadGenTex.wrapT=THREE.RepeatWrapping;
 const tMat=new THREE.MeshLambertMaterial({vertexColors:true});
 tMat.onBeforeCompile=s=>{
-  s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};s.uniforms.tMud={value:mudTex};s.uniforms.tRoadStone={value:roadStoneTex};s.uniforms.tRoadMask={value:roadMaskTex};
+  s.uniforms.tGrass={value:grassTex};s.uniforms.tRock={value:rockTex};s.uniforms.tMount={value:mountTex};s.uniforms.tMud={value:mudTex};s.uniforms.tRoadStone={value:roadStoneTex};s.uniforms.tRoadMask={value:roadMaskTex};s.uniforms.tGenerated={value:roadGenTex};
   s.vertexShader=s.vertexShader
     .replace('void main() {','varying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
     .replace('\t#include <project_vertex>','\t#include <project_vertex>\nvWY=position.y;\nvMyUv=uv;\nvNY=normal.y;');
   s.fragmentShader=s.fragmentShader
-    .replace('void main() {','uniform sampler2D tGrass,tRock,tMount,tMud,tRoadStone,tRoadMask;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
-    .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7,md=texture2D(tMud,u).rgb;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\nfloat noise=g.r*3.-1.5;\nvec3 base=mix(mix(g,r,rb),m,mb);float mudb=1.-smoothstep(-3.,1.5,vWY+noise);vec3 terrain=mix(base,md,mudb);float rm=texture2D(tRoadMask,vMyUv).r;float rnoise=g.r*0.28+g.b*0.12;float rmn=rm-rnoise*0.22;float eNoise=(texture2D(tGrass,vMyUv*80.).r*2.-1.)*.18;float roadEdge=smoothstep(.35,.58,rmn+eNoise);float stoneW=smoothstep(.60,.82,rmn);vec3 rs=texture2D(tRoadStone,vMyUv*48.).rgb;vec3 road=mix(md*1.3,rs,stoneW);diffuseColor.rgb*=mix(terrain,road,roadEdge);}');
+    .replace('void main() {','uniform sampler2D tGrass,tRock,tMount,tMud,tRoadStone,tRoadMask,tGenerated;\nvarying vec2 vMyUv;\nvarying float vWY;\nvarying float vNY;\nvoid main() {')
+    .replace('\t#include <color_fragment>','#ifdef USE_COLOR\n  diffuseColor.rgb*=vColor.rgb;\n#endif\n{vec2 u=vMyUv*24.0;vec3 g=texture2D(tGrass,u).rgb,r=texture2D(tRock,u).rgb,m=texture2D(tMount,u).rgb*1.7,md=texture2D(tMud,u).rgb;\nfloat sr=smoothstep(.25,.55,1.-vNY),hr=smoothstep(3.,12.,vWY+g.r*4.-2.),rb=max(sr,hr),mb=smoothstep(18.,24.,vWY);\nfloat noise=g.r*3.-1.5;\nvec3 base=mix(mix(g,r,rb),m,mb);float mudb=1.-smoothstep(-3.,1.5,vWY+noise);vec3 terrain=mix(base,md,mudb);vec2 rmSample=texture2D(tRoadMask,vMyUv).rg;float rm=rmSample.r;float junc=rmSample.g;float hFade=1.-smoothstep(0.,8.,vWY);float rnoise=g.r*0.32+g.b*0.14+hFade*0.12;float rmn=rm-rnoise*0.28;float eNoise=(texture2D(tGrass,vMyUv*80.).r*2.-1.)*.22;float roadEdge=smoothstep(.35,.62,rmn+eNoise);float stoneW=smoothstep(.60,.85,rmn)*(1.-hFade*.65);vec3 rs=texture2D(tRoadStone,vMyUv*48.).rgb;vec3 roadMud=mix(terrain,md,0.65+hFade*0.25);float crackW=smoothstep(.55,.35,rs.r)*0.4;vec3 stoneWithGrass=mix(rs,g*0.8,crackW);vec3 gen=texture2D(tGenerated,vMyUv*56.).rgb;float waterMud=1.-smoothstep(-3.,0.5,vWY);float stoneWAdj=stoneW*(1.-waterMud*.95);vec3 waterRoadMud=mix(terrain,mix(md,gen,waterMud*.9),0.65+hFade*0.25);vec3 road=mix(waterRoadMud,stoneWithGrass,stoneWAdj);float jBlend=clamp(junc+eNoise*.4,0.,1.)*roadEdge;vec3 roadFinal=mix(road,gen,jBlend*.85);diffuseColor.rgb*=mix(terrain,roadFinal,roadEdge);float _luma=dot(diffuseColor.rgb,vec3(.3,.59,.11));diffuseColor.rgb=mix(vec3(_luma),diffuseColor.rgb,1.0+mudb*0.35);}');
 };
 tMat.polygonOffset=true; tMat.polygonOffsetFactor=1;
 const tMesh=new THREE.Mesh(tGeo,tMat); tMesh.receiveShadow=true; scene.add(tMesh);
@@ -281,7 +296,8 @@ const _rmX=_rmC.getContext('2d');
 roadMaskTex=new THREE.CanvasTexture(_rmC);
 roadMaskTex.wrapS=roadMaskTex.wrapT=THREE.ClampToEdgeWrapping;
 roadMaskTex.minFilter=roadMaskTex.magFilter=THREE.LinearFilter;
-function updateRoadMaskTex(){const d=_rmX.createImageData(131,131);if(roadMask){for(let i=0;i<131*131;i++){d.data[i*4]=roadMask[i]*255|0;d.data[i*4+3]=255;}}_rmX.putImageData(d,0,0);roadMaskTex.needsUpdate=true;}
+let junctionMask=null;
+function updateRoadMaskTex(){const d=_rmX.createImageData(131,131);for(let i=0;i<131*131;i++){d.data[i*4]=roadMask?roadMask[i]*255|0:0;d.data[i*4+1]=junctionMask?junctionMask[i]*255|0:0;d.data[i*4+3]=255;}_rmX.putImageData(d,0,0);roadMaskTex.needsUpdate=true;}
 wSurfMat.uniforms.tHmap.value=hmapTex;
 wSurfMat.uniforms.tScene.value=sceneRT.texture;wSurfMat.uniforms.tReflect.value=reflRT.texture;
 const _tWfall=new THREE.TextureLoader().load('./textures/texture_waterfall.png');
@@ -562,10 +578,7 @@ document.getElementById('tExport').onclick=()=>{
   a.href='data:application/json,'+encodeURIComponent(JSON.stringify(data));
   a.download='map.json'; a.click();
 };
-document.getElementById('tImport').onchange=e=>{
-  const f=e.target.files[0]; if(!f) return;
-  f.text().then(txt=>{
-    const data=JSON.parse(txt);
+function applyMapData(data){
     if(data.terrain&&data.terrain.length===hmap.length){
       if(data.roadMask&&data.roadMask.length===hmap.length) roadMask=new Float32Array(data.roadMask);
       else roadMask=null;
@@ -578,15 +591,22 @@ document.getElementById('tImport').onchange=e=>{
     roadLines.forEach(e=>scene.remove(e.line));roadLines.length=0;roads.length=0;roadWidths.length=0;
     if(data.roadColor){roadColor=data.roadColor;const inp=document.getElementById('roadColorPicker');if(inp)inp.value=roadColor;}
     (data.roads||[]).forEach((r,i)=>{if(r.length<2)return;const line=buildRoadLine(r,roadMats.done);line.visible=false;roads.push(r);roadWidths.push((data.roadWidths||[])[i]??8);roadLines.push({line,road:r});});
-    if(!roadMask&&roads.length){roadMask=new Float32Array(tPos.count);roads.forEach((pts,ri)=>{const hw=(roadWidths[ri]||8)/2,fw=hw+6;for(let i=0;i<tPos.count;i++){const vx=tPos.getX(i),vz=tPos.getZ(i);let md=1e9;for(let j=0;j<pts.length-1;j++){const ax=pts[j][0],az=pts[j][1],bx=pts[j+1][0],bz=pts[j+1][1],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz;if(l2<1e-6)continue;const t=Math.max(0,Math.min(1,((vx-ax)*dx+(vz-az)*dz)/l2));md=Math.min(md,Math.hypot(vx-(ax+t*dx),vz-(az+t*dz)));}if(md<fw)roadMask[i]=Math.max(roadMask[i],Math.max(0,1-md/fw));}});if(roadMaskTex)updateRoadMaskTex();}
+    if(!roadMask&&roads.length){roadMask=new Float32Array(tPos.count);junctionMask=new Float32Array(tPos.count);const roadCount=new Float32Array(tPos.count);roads.forEach((pts,ri)=>{const hw=(roadWidths[ri]||8)/2,fw=hw+6;for(let i=0;i<tPos.count;i++){const vx=tPos.getX(i),vz=tPos.getZ(i);let md=1e9;for(let j=0;j<pts.length-1;j++){const ax=pts[j][0],az=pts[j][1],bx=pts[j+1][0],bz=pts[j+1][1],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz;if(l2<1e-6)continue;const t=Math.max(0,Math.min(1,((vx-ax)*dx+(vz-az)*dz)/l2));md=Math.min(md,Math.hypot(vx-(ax+t*dx),vz-(az+t*dz)));}if(md<fw){roadMask[i]=Math.max(roadMask[i],Math.max(0,1-md/fw));if(md<hw+5)roadCount[i]++;}}});for(let i=0;i<tPos.count;i++)junctionMask[i]=Math.min(1,(roadCount[i]-1)*.7);if(roadMaskTex)updateRoadMaskTex();}
     drawRoadsToCanvas();
     wSurfs.forEach(s=>{if(s.mesh)scene.remove(s.mesh);});wSurfs.length=0;
     (data.waterSurfs||[]).forEach(s=>{const mesh=makeWaterPath(s.pts,s.w||5);if(mesh)wSurfs.push({pts:s.pts,w:s.w||5,mesh});});
     wfSurfs.forEach(s=>{if(s.mesh){scene.remove(s.mesh);(s.mesh._layers||[s.mesh._layer2]).filter(Boolean).forEach(l=>scene.remove(l));}});wfSurfs.length=0;
     (data.wfSurfs||[]).forEach(s=>{const mesh=makeWaterfallPath(s.pts,s.fh);wfSurfs.push({...s,mesh});});
+}
+document.getElementById('tImport').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  f.text().then(txt=>{
+    applyMapData(JSON.parse(txt));
   });
   e.target.value='';
 };
+const autoLoadMap=new URLSearchParams(location.search).get('load');
+if(autoLoadMap) fetch(autoLoadMap).then(r=>r.json()).then(applyMapData).catch(console.error);
 
 // ── Raycasting ────────────────────────────────────────────────
 function getMouse(e){const r=canvas.getBoundingClientRect();return new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);}
