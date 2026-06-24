@@ -154,7 +154,7 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x5ab4e8); // 明亮蓝天，无雾感
-const skyMesh=new THREE.Mesh(new THREE.SphereGeometry(490,16,8),new THREE.MeshBasicMaterial({color:0x5ab4e8,side:THREE.BackSide}));scene.add(skyMesh);
+// skyMesh removed — Sky addon handles background
 
 const camera=new THREE.PerspectiveCamera(45,1,0.1,2000);
 let camR=100,camTheta=0.3,camPhi=0.5;
@@ -168,21 +168,24 @@ function camUpdate(){
 }
 camUpdate();
 
-// ── Sky ──────────────────────────────────────────────
-const sky=new Sky();sky.scale.setScalar(450000);scene.add(sky);
-const skyUni=sky.material.uniforms;
-skyUni['turbidity'].value=3;
-skyUni['rayleigh'].value=0.8;
-skyUni['mieCoefficient'].value=0.005;
-skyUni['mieDirectionalG'].value=0.92;
+// ── Sky (自定义渐变天空，颜色直接控制) ───────────────────────
+// 参考海平面摄影：顶部深蓝→中段中蓝→地平线浅蓝白
+const _skyDome=new THREE.Mesh(new THREE.SphereGeometry(450000,16,8),new THREE.ShaderMaterial({
+  side:THREE.BackSide,depthWrite:false,fog:false,
+  uniforms:{
+    uTop:  {value:new THREE.Color(0.18,0.42,0.75)},  // 顶部深蓝 #2E6BC0
+    uMid:  {value:new THREE.Color(0.38,0.65,0.88)},  // 中段蓝 #60A6E0
+    uHor:  {value:new THREE.Color(0.72,0.85,0.94)},  // 地平线浅蓝白 #B8D9F0
+  },
+  vertexShader:`varying vec3 vDir;void main(){vDir=normalize((modelMatrix*vec4(position,0.)).xyz);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`,
+  fragmentShader:`uniform vec3 uTop,uMid,uHor;varying vec3 vDir;void main(){float y=clamp(normalize(vDir).y,0.,1.);vec3 c=mix(uHor,uMid,smoothstep(-0.1,0.15,y));c=mix(c,uTop,smoothstep(0.15,1.,y));gl_FragColor=vec4(c,1.);}`
+}));
+_skyDome.renderOrder=-1;scene.add(_skyDome);
 const sunPos=new THREE.Vector3();
-const phi=THREE.MathUtils.degToRad(75); // 太阳仰角（90=正头顶）
-const theta=THREE.MathUtils.degToRad(180);
-sunPos.setFromSphericalCoords(1,phi,theta);
-skyUni['sunPosition'].value.copy(sunPos);
+sunPos.setFromSphericalCoords(1,THREE.MathUtils.degToRad(30),THREE.MathUtils.degToRad(120));
 scene.add(new THREE.HemisphereLight(0xc8d8e8,0x5a5040,1.0));
 const sun=new THREE.DirectionalLight(0xfff2d8,1.1);
-sun.position.copy(sunPos).multiplyScalar(200); sun.castShadow=true; scene.add(sun);
+sun.position.copy(sunPos).multiplyScalar(200);sun.castShadow=true;scene.add(sun);
 
 // ── Terrain (mutable heightmap) ───────────────────────────────
 const SZ=260,SEG=130;
@@ -729,13 +732,13 @@ document.addEventListener('mousemove',e=>{
     lx=e.clientX;ly=e.clientY;camUpdate(); return;
   }
   if(orbitDown){
-    camTheta-=(e.clientX-lx)*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+(e.clientY-ly)*0.007));
+    camTheta-=(e.clientX-lx)*0.007;camPhi=Math.max(0.001,Math.min(Math.PI-0.001,camPhi+(e.clientY-ly)*0.007));/*天空调试：原限制0.08~1.5*/
     lx=e.clientX;ly=e.clientY;camUpdate(); return;
   }
   if(rmbDown){
     const dx=e.clientX-lx,dy=e.clientY-ly;
     if(Math.abs(dx)>2||Math.abs(dy)>2) rmbMoved=true;
-    camTheta-=dx*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+dy*0.007));
+    camTheta-=dx*0.007;camPhi=Math.max(0.001,Math.min(Math.PI-0.001,camPhi+dy*0.007));/*天空调试：原限制0.08~1.5*/
     lx=e.clientX;ly=e.clientY;camUpdate();
   }
   if(mmbDown){
@@ -819,22 +822,41 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-// ── Clouds ────────────────────────────────────────────────────
-// ── Cloud layers (2 flat planes, UV-scrolled) ──────────
-// ── Cloud sphere (inside sky dome, visible at all angles) ──────
-const _cloudTL=new THREE.TextureLoader();
-function _mkCloudSphere(file,radius,spd,op){
-  const t=_cloudTL.load('./textures/'+file);
-  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,1.5);
-  const m=new THREE.MeshBasicMaterial({map:t,blending:THREE.AdditiveBlending,color:new THREE.Color(op,op,op),transparent:true,depthWrite:false,side:THREE.BackSide});
-  const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,16),m);
-  scene.add(mesh);return {mesh,spd};
+// ── Cloud layers (天空球内壁云层) ──────────────────────────────
+// 原理：云球半径 < skyMesh半径(490)，BackSide从内部可见，透明区透出天空
+function _mkCirrusTex(){
+  const W=1024,H=512,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  for(let i=0;i<32;i++){
+    const cx=Math.random()*W,cy=Math.random()*H,len=80+Math.random()*300,thick=3+Math.random()*12,ang=(Math.random()-.5)*0.45,op=0.15+Math.random()*0.4;
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(ang);
+    const g=ctx.createRadialGradient(0,0,0,0,0,len/2);
+    g.addColorStop(0,`rgba(255,255,255,${op})`);g.addColorStop(0.5,`rgba(255,255,255,${op*0.25})`);g.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=g;ctx.scale(1,Math.max(thick/len,0.02));ctx.beginPath();ctx.arc(0,0,len/2,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,1);return t;
 }
-const _clouds=[_mkCloudSphere('cloud_01.png',700,.0004,.7),_mkCloudSphere('cloud_03.png',550,.0007,.4)];
+function _mkCloudDome(tex,renderOrd,scrollX,scrollZ){
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uMap:{value:tex},uOff:{value:new THREE.Vector2()}},
+    vertexShader:`varying vec3 vDir;void main(){vDir=normalize((modelMatrix*vec4(position,0.)).xyz);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`,
+    fragmentShader:`uniform sampler2D uMap;uniform vec2 uOff;varying vec3 vDir;void main(){vec3 d=normalize(vDir);if(d.y<-0.02){gl_FragColor=vec4(0.);return;}float fade=smoothstep(-0.02,0.15,d.y);float sc=1./(abs(d.y)+0.12);vec2 uv=d.xz*sc*0.3+uOff;vec4 c=texture2D(uMap,uv);gl_FragColor=vec4(c.rgb,c.a*fade);}`,
+    transparent:true,depthWrite:false,depthTest:true,depthFunc:THREE.LessEqualDepth,side:THREE.BackSide,fog:false
+  });
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(450000,32,16),mat);
+  mesh.renderOrder=renderOrd;scene.add(mesh);
+  return {mesh,t:tex,mat,ox:0,oz:0,sx:scrollX,sz:scrollZ};
+}
+const _cirrusTex=new THREE.TextureLoader().load('./textures/cloud_cirrus.png?v='+Date.now());
+_cirrusTex.wrapS=_cirrusTex.wrapT=THREE.RepeatWrapping;
+const _cloudLayers=[
+  _mkCloudDome(_cirrusTex,1,.000025,.00001),
+];
 // ── Render ────────────────────────────────────────────────────
 function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const pw=w*renderer.getPixelRatio(),ph=h*renderer.getPixelRatio();sceneRT.setSize(pw,ph);reflRT.setSize(pw,ph);if(wSurfMat)wSurfMat.uniforms.uRes.value.set(pw,ph);}
 const _clk=new THREE.Clock();
-function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;_clouds.forEach(c=>{c.mesh.rotation.y+=c.spd;c.mesh.position.copy(camera.position);});
+function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;for(const cl of _cloudLayers){cl.ox+=cl.sx;cl.oz+=cl.sz;cl.mat.uniforms.uOff.value.set(cl.ox,cl.oz);}
 wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _wy=wMesh.position.y;_reflM.set(1,0,0,0, 0,-1,0,2*_wy, 0,0,1,0, 0,0,0,1);reflCam.projectionMatrix.copy(camera.projectionMatrix);reflCam.matrixWorld.multiplyMatrices(_reflM,camera.matrixWorld);reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();renderer.setClearColor(0x5ab4e8,1);_reflClip.constant=-_wy;renderer.clippingPlanes=[_reflClip];renderer.setRenderTarget(reflRT);renderer.render(scene,reflCam);renderer.clippingPlanes=[];renderer.setRenderTarget(sceneRT);renderer.render(scene,camera);renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(null);wMesh.visible=true;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=true;});renderer.render(scene,camera);}
 window.addEventListener('resize',resize);
 resize();
@@ -842,4 +864,4 @@ document.getElementById('loading').style.display='none';
 loop();
 </script>
 </body>
-</html>
+<
