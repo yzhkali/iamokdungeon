@@ -129,4 +129,16 @@ kf("R_UpperArm",0,rx=0); kf("R_UpperArm",15,rx=D(-160)); kf("R_UpperArm",16,rx=D
 # 左臂甩飞
 kf("L_UpperArm",0,rx=0,rz=0); kf("L_UpperArm",18,rx=D(-145),rz=D(35)); kf("L_UpperArm",19,rx=D(-145),rz=D(35))
 # 头极限扭转
-kf("Head",0,rx=0,rz=0); kf("Head",22,rx=D(25),rz=D(-50)); kf("Head",23,rx=D(25),rz=D(-50)
+kf("Head",0,rx=0,rz=0); kf("Head",22,rx=D(25),rz=D(-50)); kf("Head",23,rx=D(25),rz=D(-50))
+# 整体倒塌
+kf("Root",22,rx=0,rz=0,lx=0,ly=0,lz=0)
+kf("Root",32,rx=D(20),rz=D(15),lx=0,ly=0.05,lz=-0.15)  # SNAP前倒
+kf("Root",33,rx=D(20),rz=D(15),lx=0,ly=0.05,lz=-0.15)  # 停
+kf("Root",40,rx=D(50),rz=D(25),lx=0,ly=0.1,lz=-0.45)
+kf("Root",55,rx=D(80),rz=D(30),lx=0,ly=0.12,lz=-0.65)  # 倒地
+kf("Hips",0,rx=0); kf("Hips",40,rx=D(25)); kf("Hips",55,rx=D(40))
+nla(a,440)
+
+arm.animation_data.action = None
+bpy.context.scene.frame_set(0)
+print("8个动画完成：Idle/Walk/Attack/AttackHeavy/AttackUltimate/Leap/Hurt/Death")

@@ -732,13 +732,13 @@ document.addEventListener('mousemove',e=>{
     lx=e.clientX;ly=e.clientY;camUpdate(); return;
   }
   if(orbitDown){
-    camTheta-=(e.clientX-lx)*0.007;camPhi=Math.max(0.001,Math.min(Math.PI-0.001,camPhi+(e.clientY-ly)*0.007));/*天空调试：原限制0.08~1.5*/
+    camTheta-=(e.clientX-lx)*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+(e.clientY-ly)*0.007));
     lx=e.clientX;ly=e.clientY;camUpdate(); return;
   }
   if(rmbDown){
     const dx=e.clientX-lx,dy=e.clientY-ly;
     if(Math.abs(dx)>2||Math.abs(dy)>2) rmbMoved=true;
-    camTheta-=dx*0.007;camPhi=Math.max(0.001,Math.min(Math.PI-0.001,camPhi+dy*0.007));/*天空调试：原限制0.08~1.5*/
+    camTheta-=dx*0.007;camPhi=Math.max(0.08,Math.min(1.5,camPhi+dy*0.007));
     lx=e.clientX;ly=e.clientY;camUpdate();
   }
   if(mmbDown){
@@ -837,11 +837,12 @@ function _mkCirrusTex(){
   }
   const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,1);return t;
 }
-function _mkCloudDome(tex,renderOrd,scrollX,scrollZ){
+function _mkCloudDome(tex,renderOrd,scrollX,scrollZ,fragOverride){
+  const frag=fragOverride||`uniform sampler2D uMap;uniform vec2 uOff;varying vec3 vDir;void main(){vec3 d=normalize(vDir);if(d.y<-0.02){gl_FragColor=vec4(0.);return;}float fade=smoothstep(-0.02,0.15,d.y);float sc=1./(abs(d.y)+0.12);vec2 uv=d.xz*sc*0.3+uOff;vec4 c=texture2D(uMap,uv);gl_FragColor=vec4(c.rgb,c.a*fade);}`;
   const mat=new THREE.ShaderMaterial({
     uniforms:{uMap:{value:tex},uOff:{value:new THREE.Vector2()}},
     vertexShader:`varying vec3 vDir;void main(){vDir=normalize((modelMatrix*vec4(position,0.)).xyz);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`,
-    fragmentShader:`uniform sampler2D uMap;uniform vec2 uOff;varying vec3 vDir;void main(){vec3 d=normalize(vDir);if(d.y<-0.02){gl_FragColor=vec4(0.);return;}float fade=smoothstep(-0.02,0.15,d.y);float sc=1./(abs(d.y)+0.12);vec2 uv=d.xz*sc*0.3+uOff;vec4 c=texture2D(uMap,uv);gl_FragColor=vec4(c.rgb,c.a*fade);}`,
+    fragmentShader:frag,
     transparent:true,depthWrite:false,depthTest:true,depthFunc:THREE.LessEqualDepth,side:THREE.BackSide,fog:false
   });
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(450000,32,16),mat);
@@ -850,13 +851,34 @@ function _mkCloudDome(tex,renderOrd,scrollX,scrollZ){
 }
 const _cirrusTex=new THREE.TextureLoader().load('./textures/cloud_cirrus.png?v='+Date.now());
 _cirrusTex.wrapS=_cirrusTex.wrapT=THREE.RepeatWrapping;
-const _cloudLayers=[
-  _mkCloudDome(_cirrusTex,1,.000025,.00001),
+const _cumulusTex=new THREE.TextureLoader().load('./textures/cloud_cumulus.png?v='+Date.now());
+_cumulusTex.wrapS=_cumulusTex.wrapT=THREE.RepeatWrapping;
+// 积云 billboard：正对相机的平面，无投影变形
+function _mkCloudBillboard(tex,angle,r,h,w,bh){
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uMap:{value:tex}},
+    vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform sampler2D uMap;varying vec2 vUv;void main(){vec4 c=texture2D(uMap,vUv);if(c.a<0.08)discard;float bt=smoothstep(0.55,0.0,vUv.y)*0.35;c.rgb=mix(c.rgb,vec3(0.72,0.85,0.94),bt);gl_FragColor=vec4(c.rgb,1.);}`,
+    side:THREE.DoubleSide,fog:false
+  });
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,bh),mat);
+  mesh.position.set(r*Math.cos(angle),h,r*Math.sin(angle));
+  scene.add(mesh);
+  return{mesh,angle,r,h,speed:.000008};
+}
+const _cloudTL=new THREE.TextureLoader();
+const _ct=[1,2,3,4].map(i=>{const t=_cloudTL.load(`./textures/cloud_cumulus_${i}.png?v=`+Date.now());t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
+const _cloudBillboards=[
+  _mkCloudBillboard(_ct[0],.35,1000,330,1300,900),
+  _mkCloudBillboard(_ct[2],1.80,1050,330,1300,900),
+  _mkCloudBillboard(_ct[1],3.30,1020,330,1300,900),
+  _mkCloudBillboard(_ct[3],5.00,1080,330,1300,900),
 ];
+const _cloudLayers=[_mkCloudDome(_cirrusTex,1,.000025,.00001)];
 // ── Render ────────────────────────────────────────────────────
 function resize(){const w=mainDiv.clientWidth,h=mainDiv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const pw=w*renderer.getPixelRatio(),ph=h*renderer.getPixelRatio();sceneRT.setSize(pw,ph);reflRT.setSize(pw,ph);if(wSurfMat)wSurfMat.uniforms.uRes.value.set(pw,ph);}
 const _clk=new THREE.Clock();
-function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;for(const cl of _cloudLayers){cl.ox+=cl.sx;cl.oz+=cl.sz;cl.mat.uniforms.uOff.value.set(cl.ox,cl.oz);}
+function loop(){requestAnimationFrame(loop);const t=_clk.getElapsedTime();if(wSurfMat){wSurfMat.uniforms.uT.value=t;wSurfMat.uniforms.uWaterY.value=wMesh.position.y;}wfMat.uniforms.uT.value=wfMat2.uniforms.uT.value=wfMat3.uniforms.uT.value=wfMat4.uniforms.uT.value=wfMat5.uniforms.uT.value=wfMat6.uniforms.uT.value=t;for(const cl of _cloudLayers){cl.ox+=cl.sx;cl.oz+=cl.sz;cl.mat.uniforms.uOff.value.set(cl.ox,cl.oz);}for(const cb of _cloudBillboards){cb.angle+=cb.speed;cb.mesh.position.x=cb.r*Math.cos(cb.angle);cb.mesh.position.z=cb.r*Math.sin(cb.angle);const dx=camera.position.x-cb.mesh.position.x,dz=camera.position.z-cb.mesh.position.z;cb.mesh.rotation.y=Math.atan2(dx,dz);}
 wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _wy=wMesh.position.y;_reflM.set(1,0,0,0, 0,-1,0,2*_wy, 0,0,1,0, 0,0,0,1);reflCam.projectionMatrix.copy(camera.projectionMatrix);reflCam.matrixWorld.multiplyMatrices(_reflM,camera.matrixWorld);reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();renderer.setClearColor(0x5ab4e8,1);_reflClip.constant=-_wy;renderer.clippingPlanes=[_reflClip];renderer.setRenderTarget(reflRT);renderer.render(scene,reflCam);renderer.clippingPlanes=[];renderer.setRenderTarget(sceneRT);renderer.render(scene,camera);renderer.setClearColor(0x5ab4e8,1);renderer.setRenderTarget(null);wMesh.visible=true;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=true;});renderer.render(scene,camera);}
 window.addEventListener('resize',resize);
 resize();
@@ -864,4 +886,9 @@ document.getElementById('loading').style.display='none';
 loop();
 </script>
 </body>
-<
+</html>
+display='none';
+loop();
+</script>
+</body>
+</html>

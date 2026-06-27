@@ -6,7 +6,9 @@
 ## 一句话项目
 复古风 3D 动作游戏原型。主角"老实人"（火柴人/方块人，程序化骨骼驱动），第三人称可旋转视角。
 讽刺中国式亲密关系/婚恋压力的轻肉鸽 ARPG，敌人是"没事/随便/呵呵"等阴阳怪气词怪。
-**当前阶段（2026-06-24）：editor3d.html 天空系统完成并提交。自定义渐变天空 shader + cloud_cirrus.png 卷云 dome。下一步：把天空效果移植到 main.js（替换 buildSky），或继续做其他积云层/云影层，或回到游戏本体战斗内容。**
+**当前阶段（2026-06-25）：map15 完整移植到 main.js。
+已完成：terrain heightmap / ROOM=130 / 完整地形shader(mud+road+junction) / road mask+junction / roadColor / 水面反射系统(reflRT+sceneRT双pass) / 瀑布5层 / 河道(waterSurfs) / 天空渐变dome / 卷云(cloud_cirrus)+积云billboard / 相机重写 / 清理彩虹水帘雾气鸟狼等旧残留
+下一步：云可见性微调、提交git（等lock释放后`git add -u && git commit`）**
 
 ## 连招树（当前正确版本）
 - gL1→轻=gL2, gL1→重=gThrust(突刺)
@@ -125,4 +127,4 @@ WASD移动 / Q/E旋转镜头 / R/F俯仰 / 左键轻击 / 按住右键蓄力重�
 
 ## 当前已知小问题
 - 体力条still空转(摆设)
-- 状态HUD等细节已修过几个bug(蓄力百分比用HEAVY_CHARGE_TIME、ph
+- 状态HUD等细节已修过几个bug(蓄力百分比用HEAVY_CHARGE_TIME、phase==='hold'判断、闪避重置chargeFull)

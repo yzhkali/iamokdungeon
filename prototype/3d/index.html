@@ -126,10 +126,11 @@
   }
 }
 </script>
-<script type="module" src="./src/main.js?v=1781722483"></script>
+<script type="module" src="./src/main.js?v=1781722499"></script>
 <audio id="bgm" src="./assets/sounds/bgm.mp3" loop preload="auto"></audio>
 <script>
 const _bgm=document.getElementById('bgm'),_btn=document.getElementById('btnBGM');
+_bgm.volume=0.5;
 let _bgmStarted=false;
 function _bgmStart(){if(_bgmStarted)return;_bgmStarted=true;_bgm.play().catch(()=>{});}
 document.addEventListener('keydown',_bgmStart,{once:true});
