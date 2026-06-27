@@ -747,26 +747,13 @@ function buildGrass(){
   window._grassMats=[];
   function bh(x,z){const fx=(x+130)/2,fz=(z+130)/2,ix=Math.max(0,Math.min(129,Math.floor(fx))),iz=Math.max(0,Math.min(129,Math.floor(fz))),tx=fx-ix,tz=fz-iz,S=131;return(_mapH[iz*S+ix]??0)*(1-tx)*(1-tz)+(_mapH[iz*S+ix+1]??0)*tx*(1-tz)+(_mapH[(iz+1)*S+ix]??0)*(1-tx)*tz+(_mapH[(iz+1)*S+ix+1]??0)*tx*tz;}
   // GPU Gems Ch7.3.2: 3张交叉面，贴图512x512正方形→W=H
-  // [name, count, size, windStr, yMin, yMax, bottomOffset(贴图底部留白比例)]
+  // [name, count, size, windStr, yMin, yMax, bottomOffset, cellSize(>0=网格排布连成片)]
   const TYPES=[
-    ['foliage_card_02_short_turf',   5000,2.4,0.12,-5,20,0.20],
-    ['foliage_card_01_tall_meadow',  1200,3.5,0.40, 0,16,0.00],
-    ['foliage_card_03_sedge_thin',    900,2.8,0.50,-3, 8,0.02],
-    ['foliage_card_04_dry_straw',     700,3.0,0.60, 4,18,0.02],
-    ['foliage_card_05_broadleaf_low', 600,2.5,0.18, 0,14,0.08],
-    ['foliage_card_06_white_wildflowers',350,2.2,0.25,0,14,0.05],
-    ['foliage_card_07_yellow_wildflowers',350,2.2,0.25,0,14,0.03],
-    ['foliage_card_08_purple_wildflowers',280,2.2,0.25,0,14,0.04],
-    ['foliage_extra_01_grass_seedheads', 700,3.0,0.70,2,16,0.04],
-    ['foliage_extra_02_rush_wetland',    500,3.2,0.50,-5,2,0.04],
-    ['foliage_extra_03_reed_tall',       400,4.0,0.55,-5,1,0.00],
-    ['foliage_extra_04_feather_grass',   550,3.0,0.80,2,15,0.02],
-    ['foliage_extra_05_clover_ground',   500,2.2,0.12,0,13,0.14],
-    ['foliage_extra_06_daisy_white',     250,2.0,0.18,0,13,0.04],
-    ['foliage_extra_07_dandelion_yellow',250,2.0,0.18,0,13,0.05],
-    ['foliage_extra_08_bluebells',       200,2.0,0.25,0,12,0.04],
-    ['foliage_extra_09_red_poppy',       180,2.0,0.18,0,12,0.04],
-    ['foliage_extra_10_pink_clover_bloom',180,2.0,0.20,0,12,0.06],
+    ['foliage_card_02_short_turf',   8000,1.8,0.12,-5,20,0.20,1.5],
+    ['foliage_card_05_broadleaf_low',2800,2.2,0.18, 0,14,0.08,2.2],
+    ['foliage_card_06_white_wildflowers',1800,2.0,0.25,0,14,0.05,2.8],
+    ['foliage_extra_05_clover_ground',2200,2.0,0.12, 0,13,0.14,2.2],
+    ['foliage_card_03_sedge_thin',   1800,2.4,0.50,-3, 8,0.02,2.5],
   ];
   // 3交叉面几何体，ofs=底部留白高度→下移让草根贴地
   function makeCross(S,ofs){
@@ -799,19 +786,34 @@ void main(){vec4 c=texture2D(uTex,vUv);
   if(c.a*fade<0.35)discard;
   gl_FragColor=vec4(c.rgb*mix(0.88,1.0,vUv.y),c.a*fade);}`;
   const dm=new THREE.Object3D();
-  for(const [name,cnt,S,ws,yMn,yMx,bot] of TYPES){
+  for(const [name,cnt,S,ws,yMn,yMx,bot,cell] of TYPES){
     const geo=makeCross(S,bot*S);
     const mat=new THREE.ShaderMaterial({uniforms:{uTex:{value:_tl.load('./textures/'+name+'.png')},uTime:{value:0},uWind:{value:ws}},
       vertexShader:VS,fragmentShader:FS,side:THREE.DoubleSide,depthWrite:true,transparent:true});
     window._grassMats.push(mat);
     const mesh=new THREE.InstancedMesh(geo,mat,cnt);mesh.frustumCulled=false;
-    let n=0,tries=0;
-    while(n<cnt&&tries++<cnt*6){
-      const x=(Math.random()-.5)*250,z=(Math.random()-.5)*250,y=bh(x,z);
-      if(y<yMn||y>yMx)continue;
-      dm.position.set(x,y-.05,z);dm.rotation.y=Math.random()*Math.PI*2;
-      dm.scale.setScalar(.8+Math.random()*.5);dm.updateMatrix();
-      mesh.setMatrixAt(n++,dm.matrix);
+    let n=0;
+    if(cell>0){
+      // 网格抖动排布：连成片
+      const cells=Math.ceil(250/cell);
+      outer:for(let ix=0;ix<cells;ix++){for(let iz=0;iz<cells;iz++){
+        if(n>=cnt)break outer;
+        const x=-125+ix*cell+(Math.random()-.5)*cell*.8;
+        const z=-125+iz*cell+(Math.random()-.5)*cell*.8;
+        const y=bh(x,z);if(y<yMn||y>yMx)continue;
+        dm.position.set(x,y-.05,z);dm.rotation.y=Math.random()*Math.PI*2;
+        dm.scale.setScalar(.85+Math.random()*.3);dm.updateMatrix();
+        mesh.setMatrixAt(n++,dm.matrix);
+      }}
+    } else {
+      let tries=0;
+      while(n<cnt&&tries++<cnt*6){
+        const x=(Math.random()-.5)*250,z=(Math.random()-.5)*250,y=bh(x,z);
+        if(y<yMn||y>yMx)continue;
+        dm.position.set(x,y-.05,z);dm.rotation.y=Math.random()*Math.PI*2;
+        dm.scale.setScalar(.8+Math.random()*.5);dm.updateMatrix();
+        mesh.setMatrixAt(n++,dm.matrix);
+      }
     }
     mesh.count=n;mesh.instanceMatrix.needsUpdate=true;scene.add(mesh);
   }
@@ -3166,7 +3168,7 @@ reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();
 _reflClip.constant=-_wY;
 renderer.setRenderTarget(reflRT);renderer.clippingPlanes=[_reflClip];renderer.render(scene,reflCam);
 renderer.setRenderTarget(null);renderer.clippingPlanes=[];
-// ── 最终渲染 ───────────────────────────────────────────────
+// ── 最终渲染 ────────────────────────────────────
 renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();
 }
