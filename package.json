@@ -6,10 +6,11 @@
   "scripts": {
     "check:assets": "node scripts/check-assets.mjs",
     "check:vendor-subset": "node scripts/check-vendor-subset.mjs",
+    "check:player-data": "node scripts/check-player-data.mjs",
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:server": "node scripts/check-server.mjs",
     "check:browser": "node scripts/check-browser.mjs",
-    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:syntax && npm run check:server && npm run check:browser",
+    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:syntax && npm run check:server && npm run check:browser",
     "serve": "node scripts/static-server.mjs prototype/3d",
     "prepush": "git diff --check && npm run validate"
   }

@@ -23,6 +23,8 @@
 - `prototype/3d/src/core/modelLoader.js`：GLTF 缓存、预处理和放置。
 - `prototype/3d/src/world/sky.js`：天空 dome、云层和更新。
 - `prototype/3d/src/world/grass.js`：草卡实例化和风动更新。
+- `prototype/3d/src/player/clips.js`：角色关键帧动画数据。
+- `prototype/3d/src/player/moves.js`：连招树和招式时序数据。
 - `prototype/3d/src/wolf.js`：程序化狼模型。
 - `prototype/3d/maps/map15.json`：当前唯一运行地图。
 - `prototype/3d/assets/vendor/`：保留的第三方运行子集，来源见 `prototype/3d/assets/vendor/NOTICE.md`。
@@ -45,12 +47,12 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 当前已知风险
 
-- `main.js` 已拆出低风险模块，但玩家、战斗、姿态、输入、HUD、相机和主循环仍在主文件中。继续拆分时先抽纯数据和边界清晰的控制器，不要直接大改战斗循环。
+- `main.js` 已拆出低风险模块和玩家纯数据表，但玩家状态、战斗、姿态执行、输入、HUD、相机和主循环仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
 - 部分保留工具页仍是历史工具，但已经纳入资产检查、语法检查和浏览器 smoke；后续迁移或清理仍需保持这些验证通过。
 - 不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量，除非是在修明确 bug。
 
 ## 下一步建议
 
-1. 继续小步模块化：`CLIPS`、`MOVES`、地图 HUD、输入控制器、相机和主循环。
+1. 继续小步模块化：输入控制器、地图 HUD、相机和主循环。
 2. 每个模块化切片都跑 `npm run validate` 或 `npm run prepush`，再提交。
 3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证并完成只读复查。
