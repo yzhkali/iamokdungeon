@@ -4,6 +4,7 @@ import { createPlayerRig } from '../prototype/3d/src/player/rig.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const characterPoseJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/characterPose.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -225,7 +226,8 @@ assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*
 assert(/getYawRotationY\s*:\s*\(\s*\)\s*=>\s*yaw\.rotation\.y/.test(mainJs), 'ghost afterimages should keep using rig yaw');
 assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(mainJs), 'sword trail should use rig weapon and weaponTip');
 assert(/rig\s*:\s*\{\s*RArm\s*,\s*LArm\s*,\s*RLeg\s*,\s*LLeg\s*,\s*chest\s*,\s*headGrp\s*,\s*rWrist\s*,\s*body\s*\}/.test(mainJs), 'pose clip controller should receive the rig joints');
-assert(/weaponSocket\.rotation\.x\s*=\s*GRIP_DEFAULT\s*\+\s*\(GRIP_SPEAR-GRIP_DEFAULT\)\*gm/.test(mainJs), 'poseCharacter should use rig grip constants');
+assert(/createCharacterPoseController\s*\(\s*\{[\s\S]*gripDefault\s*:\s*GRIP_DEFAULT[\s\S]*gripSpear\s*:\s*GRIP_SPEAR/.test(mainJs), 'main.js should pass rig grip constants to character pose');
+assert(/weaponSocket\.rotation\.x\s*=\s*gripDefault\s*\+\s*\(gripSpear\s*-\s*gripDefault\)\s*\*\s*gm/.test(characterPoseJs), 'character pose should use rig grip constants');
 
 assert(!mainJs.includes('const SKIN='), 'main.js should not retain inline player color constants');
 assert(!mainJs.includes('function jointedLimb'), 'main.js should not retain inline limb builder');

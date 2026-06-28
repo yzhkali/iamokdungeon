@@ -37,6 +37,7 @@ try {
   await expectStatus(origin, '/src/loop.js', 200);
   await expectStatus(origin, '/src/rendering/waterReflection.js', 200);
   await expectStatus(origin, '/src/player/clips.js', 200);
+  await expectStatus(origin, '/src/player/characterPose.js', 200);
   await expectStatus(origin, '/src/player/ghostAfterimages.js', 200);
   await expectStatus(origin, '/src/player/moveTriggers.js', 200);
   await expectStatus(origin, '/src/player/moves.js', 200);

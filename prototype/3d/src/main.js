@@ -17,6 +17,7 @@ import { createPlayerState, clonePlayerTuning } from "./player/state.js";
 import { createGhostAfterimages } from "./player/ghostAfterimages.js";
 import { createPoseClipController } from "./player/poseClipController.js";
 import { createMoveTriggers } from "./player/moveTriggers.js";
+import { createCharacterPoseController } from "./player/characterPose.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
@@ -372,6 +373,36 @@ const {
   setShake: value => { shake = value; },
   resetDrillSpin: () => { _drillSpin = 0; }
 });
+const { poseCharacter } = createCharacterPoseController({
+  THREE,
+  player: P,
+  moves: MOVES,
+  rig: {
+    char,
+    body,
+    chest,
+    headGrp,
+    RArm,
+    LArm,
+    RLeg,
+    LLeg,
+    weaponSocket,
+    weapon,
+    jupiterBall,
+    chargeAura,
+    chargeAuraMat
+  },
+  poseClipController,
+  gripDefault: GRIP_DEFAULT,
+  gripSpear: GRIP_SPEAR,
+  heavyChargeTime: HEAVY_CHARGE_TIME,
+  getJupiterActive: () => jupiterActive,
+  setJupiterActive: value => { jupiterActive = value; },
+  getJupiterSpin: () => _jSpin,
+  setJupiterSpin: value => { _jSpin = value; },
+  getDrillSpin: () => _drillSpin,
+  setDrillSpin: value => { _drillSpin = value; }
+});
 const clock=new THREE.Clock();
 function update(dt){
   if(mapHud.isWorldMapOpen()){updateFx(dt);poseCharacter(dt);return;}
@@ -688,204 +719,6 @@ function updateFx(dt){
   ghostAfterimages.update(dt);
   targetFeedback.update(dt);
 }
-// ============================================================
-//  姿态
-// ============================================================
-function lerpRot(j,axis,target,k){ j.rotation[axis]=THREE.MathUtils.lerp(j.rotation[axis],target,k); }
-function poseCharacter(dt){
-  char.position.set(P.x,P.y,P.z);
-  poseClipController.resetJoints();
-  body.rotation.set(0,0,0); body.position.set(0,0,0);
-  poseClipController.resetDrivenState();   // 每帧重置动作驱动的身体下沉/前倾/握剑
-  let bob=0, lean=0;
-  const ph=P.runPhase;
-
-  // —— 基础层：跑步 / 待机（肘朝前弯=负，膝朝后弯=正；左右对侧协调）——
-  if(P.moving && !P.clip && P.state!=='dodge' && !P.jumping){
-    const sw=Math.sin(ph);
-    RLeg.root.rotation.x=sw*0.62;  LLeg.root.rotation.x=-sw*0.62;   // 步幅减小
-    RLeg.j2.rotation.x=Math.max(0,sw)*0.75+0.1;   // 抬腿时屈膝
-    LLeg.j2.rotation.x=Math.max(0,-sw)*0.75+0.1;
-    LArm.root.rotation.x=sw*0.55; RArm.root.rotation.x=-sw*0.55;  // 对侧摆臂(右腿前→左臂前)
-    LArm.j2.rotation.x=-(0.45+Math.max(0, sw)*0.4); // 肘朝前弯
-    RArm.j2.rotation.x=-(0.45+Math.max(0,-sw)*0.4);
-    bob=Math.abs(Math.sin(ph))*0.10; lean=0.13;
-  } else if(!P.clip && P.state==='idle' && !P.jumping){
-    const br=Math.sin(performance.now()/600)*0.04;
-    RLeg.j2.rotation.x=0.06; LLeg.j2.rotation.x=0.06;
-    LArm.root.rotation.x=0.04; RArm.root.rotation.x=0.04;
-    LArm.j2.rotation.x=-0.2; RArm.j2.rotation.x=-0.2;  // 肘自然朝前微弯
-    bob=br;
-  }
-
-  // —— 跳跃（角色物理右腿高抬腿前伸，左腿向后蹬伸；对侧手臂协调）——
-  if(P.jumping){
-    const up=P.vy;
-    // 右腿:髋前抬 + 屈膝(高抬腿)；左腿:髋后伸 + 膝微屈(蹬腿)
-    let rHip,rKnee,lHip,lKnee, armF;
-    if(up>2){ rHip=-1.2; rKnee=1.3; lHip=0.55; lKnee=0.25; armF=-1.0; lean=0.14; }       // 上升:最高抬腿
-    else if(up<-2){ rHip=-0.7; rKnee=0.7; lHip=0.35; lKnee=0.5; armF=-0.4; lean=-0.02; }  // 下落:腿收回准备落地
-    else { rHip=-1.0; rKnee=1.1; lHip=0.5; lKnee=0.3; armF=-0.8; lean=0.08; }             // 顶点
-    lerpRot(RLeg.root,'x',rHip,0.5); lerpRot(RLeg.j2,'x',rKnee,0.5);   // 物理右腿高抬前伸
-    lerpRot(LLeg.root,'x',lHip,0.5); lerpRot(LLeg.j2,'x',lKnee,0.5);   // 物理左腿后蹬
-    if(!P.clip){
-      // 对侧协调：右腿前伸 → 左臂前摆、右臂后摆（避免一顺边）
-      lerpRot(LArm.root,'x',armF,0.5);       lerpRot(LArm.j2,'x',-0.5,0.5);
-      lerpRot(RArm.root,'x',-armF*0.7,0.5);  lerpRot(RArm.j2,'x',-0.4,0.5);
-    }
-  }
-
-  // —— 重击蓄力姿态：半蹲 + 收紧蓄势(同大风车蓄力上半身) ——
-  if(P.charging){
-    const cr=Math.min(1,P.chargeT/HEAVY_CHARGE_TIME);
-    // 半蹲：下沉 + 屈膝(越蓄越低一点点)
-    bob=-0.18-0.08*cr;
-    RLeg.j2.rotation.x=0.5; LLeg.j2.rotation.x=0.5;
-    RLeg.root.rotation.x=-0.25; LLeg.root.rotation.x=-0.25;
-    // 上半身收紧蓄势：右手抬胸前肘内拐 / 左手后撤肘收紧 / 身体左转前倾
-    RArm.root.rotation.x=-1.0; RArm.root.rotation.z=0.35; RArm.j2.rotation.x=-1.75;
-    LArm.root.rotation.x=-1.4; LArm.root.rotation.z=0.2; LArm.j2.rotation.x=-2.35;
-    chest.rotation.y=0.5; lean=0.3;
-    // 半蹲走动：脚步随移动微摆，越蓄越慢
-    if(P.moving){
-      const sw=Math.sin(P.runPhase);
-      RLeg.root.rotation.x=-0.25+sw*0.3; LLeg.root.rotation.x=-0.25-sw*0.3;
-      bob += Math.abs(Math.sin(P.runPhase))*0.05;
-    }
-    // 蓄满：全身闪烁光环
-    if(P.chargeFull){
-      chargeAura.visible=true;
-      chargeAuraMat.opacity=0.25+0.35*Math.abs(Math.sin(performance.now()/60));
-    } else { chargeAura.visible=false; }
-  } else { chargeAura.visible=false; }
-
-  // —— 动作层：关键帧覆盖 ——
-  if(P.clip){
-    // 切招时从快照平滑过渡到新动作，消除"弹一下"的卡顿
-    const blend = (P.move && P.blendDur>0) ? (P.blendT/P.blendDur) : 1;
-    poseClipController.applyClip(P.clip, P.clipT, blend);
-  }
-
-  // —— 空中旋转砸 aSpin：整体绕X轴翻转 ——
-  let spinning=false;
-  if(P.move==='aSpin'){
-    body.rotation.x = P.spin*Math.PI*2;   // 翻一圈砸下
-    lean=0; spinning=true;
-  }
-  if(P.move!=='aJupiter' && jupiterActive){ jupiterActive=false; jupiterBall.visible=false; char.traverse(o=>{ if(o.isMesh) o.visible=true; }); body.rotation.x=0; }
-  // —— aJupiter：起手后仰→人球X轴高速旋转→蜘蛛侠落地 ——
-  if(P.move==='aJupiter' && !P._plungeDone){
-    if(!jupiterActive){ jupiterActive=true; _jSpin=0; }
-    if(P.moveT>=0.22){
-      _jSpin+=dt*46;
-      body.rotation.x=_jSpin;
-      // 动平衡：让旋转轴穿过重心(y=1.4)，消除脚底打圈感
-      const _c=1.8;
-      char.position.y+=_c*(1-Math.cos(_jSpin));
-      char.position.x-=_c*Math.sin(_jSpin)*Math.sin(P.facing);
-      char.position.z-=_c*Math.sin(_jSpin)*Math.cos(P.facing);
-      lean=0; spinning=true;
-    }
-  }
-  if(P.move==='aJupiter' && P._plungeDone){ body.rotation.x=0; }
-  // 人球阶段剑立于头顶
-  if(P.move==='aJupiter' && !P._plungeDone && P.moveT>=0.22){
-    if(!P._jupSword){ P._jupSword=true; body.attach(weapon); }
-    weapon.position.set(0,4.2,0); weapon.rotation.set(0,0,0);
-  } else if(P._jupSword){ P._jupSword=false; weaponSocket.attach(weapon); weapon.position.set(0,0,0); weapon.rotation.set(0,0,0); }
-  if(P.move==='aDrill'){
-    _drillSpin+=dt*90; body.rotation.y=_drillSpin; spinning=true;
-  }
-  // —— 大风车 gSpin / gSpinSlide / gSpinCharged：整体绕Y轴横扫(可多圈) ——
-  if(P.move==='gSpin' || P.move==='gSpinSlide' || P.move==='gSpinCharged'){
-    const turns = MOVES[P.move].spinTurns || 1;
-    body.rotation.y = -P.spin*Math.PI*2*turns;   // 顺时针转 turns 圈
-    spinning=true;                               // 头随身转(不做反向补偿)
-  }
-  // —— 侧身腾空飞踹 dKick：①整体朝左转90°(面朝屏左) ②上身往角色左侧倒(视觉=后倒) ③右腿水平前踹 ——
-  if(P.move==='dKick'){
-    const t=P.moveT;
-    // 转身90°：起手快速转过去，全程保持(放 body.rotation.y, 每帧重置不累积)
-    const yawT = Math.min(1, t/0.14);
-    body.rotation.y = -yawT*(Math.PI/2);   // 朝角色左转90°(面朝屏幕左) —— 转反了改正号
-    // 侧倒幅度：0→0.16 倒下, 0.16~0.42 保持(踹+滞空), 之后回正
-    let tilt;
-    if(t<0.16) tilt=t/0.16;
-    else if(t<0.42) tilt=1;
-    else tilt=Math.max(0,1-(t-0.42)/0.14);
-    body.rotation.z = tilt*1.25;        // 往角色后侧倒~72°(视觉=向后倒) —— 倒反了改符号(支撑腿那行一起翻)
-    RLeg.root.rotation.z = -tilt*1.25;   // 支撑右腿抵消侧倒, 大致保持竖直
-    // 侧倒使支撑腿根(x=-0.3)被甩低→脚穿地。按精确几何抬高body把脚补回地面(非线性, 直接算)
-    {
-      const cz=Math.cos(tilt*1.25), sz=Math.sin(tilt*1.25);
-      const rootY = -0.3*sz + 1.5*cz;     // body绕Z倒后 支撑腿根世界y (Ry不影响y)
-      bob += (1.46 - rootY);              // 1.46=竖直时脚底到根距离; 让脚底回到y=0
-    }
-    spinning=true;                      // 侧倒+转身时头跟着，不做反向补偿
-  }
-
-  // —— 升龙剑 dRise：起跳后整体绕X轴前空翻一圈(空中转一圈到顶点) ——
-  // —— 升龙剑 dRise：起跳后整体绕X轴前空翻一圈(空中转一圈到顶点) ——
-  if(P.move==='dRise' && P._launched && !P._plungeDone){
-    // 0.24起跳 → 0.56到顶，这段时间内绕竖直轴(头顶→脚)旋身一圈，之后保持(落地后不再旋转)
-    const k=Math.max(0,Math.min(1,(P.moveT-0.24)/0.32));
-    const COIL=-0.7;
-    body.rotation.y = -COIL - k*(Math.PI*2 - COIL);
-    spinning=true;
-  }
-  if(P.move==='dRise' && !P._launched){
-    body.rotation.y = 0.7*Math.min(1,P.moveT/0.24);
-  }
-
-  // —— 闪避：快速前冲弓步（物理右腿大跨、左腿蹬直、身体前压）——
-  if(P.state==='dodge'){
-    const k=P.roll;                       // 0→1 整个冲刺过程
-    const ease=Math.sin(Math.min(1,k)*Math.PI); // 中段最舒展
-    LLeg.root.rotation.x=0.9*ease+0.2; LLeg.j2.rotation.x=0.9*ease+0.1;
-    RLeg.root.rotation.x=-0.7*ease;    RLeg.j2.rotation.x=0.25*ease;
-    LArm.root.rotation.x=-0.6*ease; LArm.j2.rotation.x=-0.5;
-    RArm.root.rotation.x=0.5*ease;  RArm.j2.rotation.x=-0.5;
-    lean=0.35*ease;                        // 身体前压
-    bob=-0.12*ease;                        // 压低重心
-    chest.rotation.x=0.15*ease;
-  }
-
-  const drivenPose=poseClipController.getDrivenState();
-  // 动作驱动的身体下沉/前倾优先(弓步发力链)，否则用默认 bob/lean
-  body.position.y += (drivenPose.bodyY!==null)? drivenPose.bodyY : bob;
-  if(!spinning){
-    const targetLean = (drivenPose.bodyLean!==null)? drivenPose.bodyLean : lean;
-    body.rotation.x=THREE.MathUtils.lerp(body.rotation.x,targetLean,0.5);
-  }
-  if(drivenPose.bodyYaw!==null) body.rotation.y=THREE.MathUtils.lerp(body.rotation.y,drivenPose.bodyYaw,0.5);
-  if(drivenPose.bodySide!==null) body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,drivenPose.bodySide,0.5);
-
-  // 握剑姿态：gripMode 0=斜握默认 / 1=突刺枪式(剑沿小臂延长线)
-  const gm = (drivenPose.gripMode!==null)?drivenPose.gripMode:0;
-  weaponSocket.rotation.x = GRIP_DEFAULT + (GRIP_SPEAR-GRIP_DEFAULT)*gm;
-
-  // —— 头部反向补偿：躯干猛转时头仍大致注视正前方，只微微跟随 ——
-  // headGrp 继承 chest 的Y旋转；反向抵消70%，净跟随约30%
-  if(!spinning){
-    const followRatio=0.3;                 // 头净跟随躯干转动的比例
-    headGrp.rotation.y += -chest.rotation.y*(1-followRatio);
-    // 同理对躯干前后倾(chestX)做轻度补偿，让头不过度低/抬
-    headGrp.rotation.x += -chest.rotation.x*0.4;
-  }
-  // 旋风坠：剑脱离右手→在char根节点绕Y轴轨道，土星环效果；落地还手
-  if(P.move==='aDrill'){
-    if(!P._drillSword){ P._drillSword=true; char.attach(weapon); }
-    P._drillAng=(P._drillAng||0)+dt*30;
-    weapon.position.set(0.9*Math.cos(P._drillAng),0.95,0.9*Math.sin(P._drillAng));
-    weapon.rotation.set(0,P._drillAng+Math.PI*0.5,Math.PI*0.5);
-  } else if(P._drillSword){
-    P._drillSword=false; P._drillAng=0;
-    weaponSocket.attach(weapon);
-    weapon.position.set(0,0,0); weapon.rotation.set(0,0,0);
-  }
-  weapon.visible=true;   // 木棍一直握在手里
-}
-
 // HUD/渲染
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener("resize",resize);resize();padStatus();

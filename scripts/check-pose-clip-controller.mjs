@@ -4,6 +4,7 @@ import path from 'node:path';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
+const characterPoseJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/characterPose.js'), 'utf8');
 const modulePath = path.join(repoRoot, 'prototype/3d/src/player/poseClipController.js');
 
 function assert(condition, message) {
@@ -210,9 +211,9 @@ assert(mainJs.includes('createPoseClipController({'), 'main.js must construct th
 assert(/function\s+startMove\s*\([\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)/.test(moveTriggersJs), 'startMove should capture pose snapshots through the controller');
 assert(/mv\.recoverClip[\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)\s*;\s*P\.blendT\s*=\s*0\s*;\s*P\.blendDur\s*=\s*0\.12/.test(mainJs), 'recover clip transition should preserve snapshot timing and blend duration');
 assert(/mv\.landClip[\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)\s*;\s*P\.blendT\s*=\s*0\s*;\s*P\.blendDur\s*=\s*0\.10/.test(mainJs), 'land clip transition should preserve snapshot timing and blend duration');
-assert(/function\s+poseCharacter\s*\(\s*dt\s*\)\s*\{[\s\S]*poseClipController\.resetJoints\s*\(\s*\)[\s\S]*poseClipController\.resetDrivenState\s*\(\s*\)[\s\S]*poseClipController\.applyClip\s*\(\s*P\.clip\s*,\s*P\.clipT\s*,\s*blend\s*\)[\s\S]*const\s+drivenPose\s*=\s*poseClipController\.getDrivenState\s*\(\s*\)/.test(mainJs), 'poseCharacter should reset, apply clips, then consume driven pose through the controller');
-assert(/body\.position\.y\s*\+=\s*\(drivenPose\.bodyY!==null\)\?\s*drivenPose\.bodyY\s*:\s*bob/.test(mainJs), 'poseCharacter should preserve bodyY driven-value composition');
-assert(/const\s+gm\s*=\s*\(drivenPose\.gripMode!==null\)\?drivenPose\.gripMode:0/.test(mainJs), 'poseCharacter should preserve grip driven-value fallback');
+assert(/function\s+poseCharacter\s*\(\s*dt\s*\)\s*\{[\s\S]*poseClipController\.resetJoints\s*\(\s*\)[\s\S]*poseClipController\.resetDrivenState\s*\(\s*\)[\s\S]*poseClipController\.applyClip\s*\(\s*P\.clip\s*,\s*P\.clipT\s*,\s*blend\s*\)[\s\S]*const\s+drivenPose\s*=\s*poseClipController\.getDrivenState\s*\(\s*\)/.test(characterPoseJs), 'poseCharacter should reset, apply clips, then consume driven pose through the controller');
+assert(/body\.position\.y\s*\+=\s*\(drivenPose\.bodyY\s*!==\s*null\)\s*\?\s*drivenPose\.bodyY\s*:\s*bob/.test(characterPoseJs), 'poseCharacter should preserve bodyY driven-value composition');
+assert(/const\s+gm\s*=\s*\(drivenPose\.gripMode\s*!==\s*null\)\s*\?\s*drivenPose\.gripMode\s*:\s*0/.test(characterPoseJs), 'poseCharacter should preserve grip driven-value fallback');
 assert(!mainJs.includes('function resetJoints(){'), 'main.js should not retain inline resetJoints');
 assert(!mainJs.includes('function capturePoseSnapshot(){'), 'main.js should not retain inline capturePoseSnapshot');
 assert(!mainJs.includes('function applyClip(name,time,blend){'), 'main.js should not retain inline applyClip');
