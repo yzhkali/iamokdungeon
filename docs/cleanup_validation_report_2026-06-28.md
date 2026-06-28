@@ -40,6 +40,7 @@ Retained tool pages:
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
 - `prototype/3d/src/combat/attackBursts.js` owns slash/heavy burst visual meshes, dormant `startSlash` effective behavior, `doSlash`, `burstCircle`, and attack burst fade updates.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
+- `prototype/3d/src/combat/targetFeedback.js` owns hittable/dummy/monster hit flash, shake, tilt spring, and per-target hit cooldown decay.
 - `prototype/3d/src/combat/spaceSlash.js` owns dodge-cancel space-slash readiness, radial line spawning, fadeout, and cleanup.
 - `prototype/3d/src/combat/spinRings.js` owns big-spin ring geometry, delayed expansion, opacity fade, and cleanup while preserving the current dormant spawn behavior.
 - `prototype/3d/src/combat/swordBeam.js` owns sword beam spawning, projectile/crack movement, beam lifecycle, and crack fadeout cleanup while main keeps hit target side effects.
@@ -74,6 +75,7 @@ Root scripts:
 - `npm run check:player-state`
 - `npm run check:ghost-afterimages`
 - `npm run check:attack-bursts`
+- `npm run check:target-feedback`
 - `npm run check:hit-math`
 - `npm run check:space-slash`
 - `npm run check:spin-rings`

@@ -22,10 +22,11 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、闪避残影控制器、战斗/姿态纯数学辅助函数、攻击视觉爆发控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、闪避残影控制器、战斗/姿态纯数学辅助函数、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/combat/attackBursts.js`：轻击刀光/重击圆圈视觉对象、休眠 `startSlash` 语义、`doSlash`、`burstCircle` 和淡出更新。
 - `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
+- `prototype/3d/src/combat/targetFeedback.js`：柱子/狼 hittable、木人桩和怪物的受击红闪、摇晃、后仰弹簧和命中冷却衰减。
 - `prototype/3d/src/combat/spaceSlash.js`：闪避打断后的空间斩 ready 标记、辐射线生成、淡出和清理。
 - `prototype/3d/src/combat/swordBeam.js`：剑气弹幕、弹道裂缝生长、剑气生命周期和裂缝淡出清理。
 - `prototype/3d/src/combat/swordTrail.js`：剑刃挥砍拖尾几何、采样、段数上限和停止后淡出。
@@ -63,7 +64,7 @@ Windows 本地双击入口仍保留：
 ## Known Issues
 
 - 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
-- `main.js` 仍偏大，攻击视觉爆发、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理姿态执行、部分命中副作用和玩家 update 主流程边界。
+- `main.js` 仍偏大，攻击视觉爆发、目标受击反馈、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理姿态执行、部分命中副作用和玩家 update 主流程边界。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks

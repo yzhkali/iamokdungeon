@@ -21,6 +21,7 @@ import { createSwordBeamController } from "./combat/swordBeam.js";
 import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
 import { createSpinRings } from "./combat/spinRings.js";
 import { createAttackBursts } from "./combat/attackBursts.js";
+import { createTargetFeedback } from "./combat/targetFeedback.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -824,6 +825,13 @@ const ghostAfterimages=createGhostAfterimages({
   getYawRotationY:()=>yaw.rotation.y
 });
 
+const targetFeedback=createTargetFeedback({
+  getHittables:()=>hittables,
+  getDummies:()=>dummies,
+  getMonsters:()=>monsters,
+  random:Math.random
+});
+
 // ============================================================
 //  大风车"土星环"特效：从剑轨迹往外发散的同心圆扩散环
 // ============================================================
@@ -1506,48 +1514,7 @@ function updateFx(dt){
   attackBursts.update(dt);
   // 闪避残影淡出
   ghostAfterimages.update(dt);
-  // 柱子受击：红光闪烁 + 微微颤抖
-  for(const o of hittables){
-    if(o.flashT>0){
-      o.flashT-=dt;
-      const k=Math.max(0,o.flashT/0.18);
-      o.mat.emissive.setHex(0xff2a1a); o.mat.emissiveIntensity=k*1.4;
-    } else { o.mat.emissiveIntensity=0; }
-    if(o.shakeT>0){
-      o.shakeT-=dt;
-      const a=o.shakeT*0.9;
-      if(o.mesh){o.mesh.position.x=o.baseX+(Math.random()-0.5)*a;
-      o.mesh.position.z=o.baseZ+(Math.random()-0.5)*a;}
-    } else if(o.mesh){ o.mesh.position.x=o.baseX; o.mesh.position.z=o.baseZ; }
-  }
-  // 木人桩：后仰回弹(弹簧物理) + 红闪 + 剑气命中检测
-  for(const d of dummies){
-    // 弹簧回弹: 角度向0回弹，带阻尼
-    d.tiltVel += (-38*d.tilt - 6*d.tiltVel)*dt;
-    d.tilt += d.tiltVel*dt;
-    d.pivot.rotation.x = d.tilt*0.12;       // 后仰(绕底座)
-    if(d._beamCd>0) d._beamCd-=dt;
-    if(d._thrustCd>0) d._thrustCd-=dt;
-    // 红闪
-    if(d.flashT>0){
-      d.flashT-=dt; const k=Math.max(0,d.flashT/0.25);
-      for(const m of d.mats){ m.emissive.setHex(0xff3020); m.emissiveIntensity=k*1.2; }
-    } else { for(const m of d.mats) m.emissiveIntensity=0; }
-  }
-  // 小怪：占位受击反馈，先做红闪+轻微后仰，后续再接AI/血条/死亡
-  for(const m of monsters){
-    m.tiltVel += (-30*m.tilt - 5*m.tiltVel)*dt;
-    m.tilt += m.tiltVel*dt;
-    m.root.rotation.x = m.tilt*0.08;
-    if(m._beamCd>0) m._beamCd-=dt;
-    if(m._thrustCd>0) m._thrustCd-=dt;
-    if(m.flashT>0){
-      m.flashT-=dt; const k=Math.max(0,m.flashT/0.25);
-      for(const mat of m.mats){ if(mat?.emissive){ mat.emissive.setHex(0xff3020); mat.emissiveIntensity=k*1.25; } }
-    } else {
-      for(const mat of m.mats){ if(mat?.emissive) mat.emissiveIntensity=0; }
-    }
-  }
+  targetFeedback.update(dt);
 }
 // ============================================================
 //  姿态
