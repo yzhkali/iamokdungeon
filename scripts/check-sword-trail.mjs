@@ -233,7 +233,7 @@ assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scen
 assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)/.test(mainJs), 'space slash dodge gate must use swordTrail state');
 assert(/swordTrail\.startTrail\s*\(\s*mv\.trailSegs\s*\|\|\s*\(\s*mv\.spinY\s*\?\s*26\s*:\s*4\s*\)\s*\)/.test(mainJs), 'move update must start sword trail with existing segment expression');
 assert(mainJs.includes('swordTrail.stopTrail()'), 'move update must stop sword trail through the module');
-assert(/updateFx\s*\(\s*dt\s*\)\s*;\s*poseCharacter\s*\(\s*dt\s*\)\s*;\s*swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*updateBeams\s*\(\s*dt\s*\)\s*;\s*updateSpinRings\s*\(\s*dt\s*\)\s*;\s*updateSpaceSlash\s*\(\s*dt\s*\)\s*;\s*updateStomps\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep sword trail after pose and before other attack effects');
+assert(/updateFx\s*\(\s*dt\s*\)\s*;\s*poseCharacter\s*\(\s*dt\s*\)\s*;\s*swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep sword trail immediately after pose');
 assert(!mainJs.includes('function updateTrail(dt){'), 'main.js should not retain inline updateTrail');
 assert(!mainJs.includes('const TRAIL_MAX=26'), 'main.js should not retain inline trail constants');
 

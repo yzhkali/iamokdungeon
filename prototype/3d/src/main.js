@@ -15,6 +15,7 @@ import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 import { createGameLoop } from "./loop.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
 import { createSwordTrail } from "./combat/swordTrail.js";
+import { createSpaceSlash } from "./combat/spaceSlash.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -787,46 +788,10 @@ const chargeAuraMat=new THREE.MeshBasicMaterial({color:0xffe85a,transparent:true
 const chargeAura=new THREE.Mesh(new THREE.SphereGeometry(1.3,16,12),chargeAuraMat);
 chargeAura.position.y=1.6; chargeAura.visible=false; body.add(chargeAura);
 
-// ============================================================
-//  空间斩：剑攻击中用闪避打断 → 下次剑攻击命中处放辐射状空间斩
-// ============================================================
-let spaceSlashReady=false;
-const slashLines=[];
-function spawnSpaceSlash(x,y,z){
-  const N=14, segs=[];
-  for(let i=0;i<N;i++){
-    const ang=Math.random()*Math.PI*2, pit=(Math.random()-0.5)*1.7;
-    const len=1.6+Math.random()*2.4;
-    const dx=Math.cos(ang)*Math.cos(pit), dy=Math.sin(pit), dz=Math.sin(ang)*Math.cos(pit);
-    const off=(Math.random()-0.5)*0.4;
-    segs.push({ox:x+dx*off,oy:y+dy*off,oz:z+dz*off,dx,dy,dz,len,delay:Math.random()*0.12});
-  }
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*2*3),3));
-  const mat=new THREE.LineBasicMaterial({color:0xaef0ff,transparent:true,opacity:1,depthWrite:false,blending:THREE.AdditiveBlending});
-  const m=new THREE.LineSegments(geo,mat); m.frustumCulled=false; scene.add(m);
-  slashLines.push({mesh:m,mat,geo,segs,t:0,grow:0.10,hold:0.18,fade:0.22});
-}
-function updateSpaceSlash(dt){
-  for(let i=slashLines.length-1;i>=0;i--){
-    const s=slashLines[i]; s.t+=dt;
-    const pos=s.geo.attributes.position.array;
-    for(let j=0;j<s.segs.length;j++){
-      const g=s.segs[j];
-      let p=Math.max(0,Math.min(1,(s.t-g.delay)/s.grow));
-      const L=g.len*p;
-      pos[j*6+0]=g.ox; pos[j*6+1]=g.oy; pos[j*6+2]=g.oz;
-      pos[j*6+3]=g.ox+g.dx*L; pos[j*6+4]=g.oy+g.dy*L; pos[j*6+5]=g.oz+g.dz*L;
-    }
-    s.geo.attributes.position.needsUpdate=true;
-    const total=s.grow+s.hold+s.fade;
-    s.mat.opacity = (s.t<=s.grow+s.hold) ? 1 : Math.max(0,1-(s.t-s.grow-s.hold)/s.fade);
-    if(s.t>=total){ scene.remove(s.mesh); slashLines.splice(i,1); }
-  }
-}
+const spaceSlash = createSpaceSlash({ THREE, scene });
 // 命中钩子：带空间斩标记时，在命中点放空间斩并清除标记
 function onHitTarget(ox,oy,oz){
-  if(spaceSlashReady){ spawnSpaceSlash(ox,oy,oz); spaceSlashReady=false; hitstop=Math.max(hitstop,0.06); shake=Math.max(shake,0.2); }
+  if(spaceSlash.consumeHit(ox,oy,oz)){ hitstop=Math.max(hitstop,0.06); shake=Math.max(shake,0.2); }
   // 命中音效:骷髅→骨头脆响, 木桩→撞木声, 怪物(肉)→闷击声
   const nearDummy=dummies.some(d=>Math.hypot(d.x-ox,d.z-oz)<1.8);
   const nearMonster=monsters.some(m=>Math.hypot(m.x-ox,m.z-oz)<1.8);
@@ -1468,7 +1433,7 @@ function update(dt){
     let dx=inX,dz=inZ; if(inLen<0.01){dx=Math.sin(P.facing);dz=Math.cos(P.facing);}
     const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
     // 剑攻击中(挥砍主体段/剑影还在)用闪避打断 → 标记下次剑攻击触发空间斩
-    if(P.move && swordTrail.mesh.visible && swordTrail.isActive()){ spaceSlashReady=true; }
+    if(P.move && swordTrail.mesh.visible && swordTrail.isActive()){ spaceSlash.markReady(); }
     P.state='dodge';P.dodgeT=DODGE_DUR;P.dodgeDir.set(dx,0,dz);P.roll=0;
     SFX.dodge();
     P.iframe=DODGE_IFRAME;P.stamina-=DODGE_COST;P.facing=Math.atan2(dx,dz);
@@ -1725,7 +1690,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  swordTrail.updateTrail(dt); updateBeams(dt); updateSpinRings(dt); updateSpaceSlash(dt); updateStomps(dt);
+  swordTrail.updateTrail(dt); updateBeams(dt); updateSpinRings(dt); spaceSlash.update(dt); updateStomps(dt);
 }
 
 // ============================================================
