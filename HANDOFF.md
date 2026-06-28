@@ -1,6 +1,6 @@
 # I'm OK Dungeon（没事地下城）- 当前交接日志
 
-> 新会话先读 `READMEFIRST.md`，再读本文件。当前主目标是保持 3D 原型干净、可运行、可验证。
+> 新会话或 AI 代理先读 `AGENTS.md`，再读 `READMEFIRST.md` 和本文件。当前主目标是保持 3D 原型干净、可运行、可验证，并按小切片提交推送。
 
 ## 当前状态
 
@@ -79,6 +79,7 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 下一步建议
 
-1. 优先保持干净可运行：跑 `npm run validate` 或 `npm run prepush`，再提交。
-2. 短期不要继续大拆；只处理明确 bug、文档过期或低风险废弃文件。
-3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证。
+1. 先读 `AGENTS.md`，严格按“小切片、多子代理、单模块责任、验证后提交推送”的流程推进。
+2. 优先保持干净可运行：跑 `npm run validate` 或 `npm run prepush`，再提交。
+3. 短期不要继续大拆；只处理明确 bug、文档过期或低风险废弃文件。
+4. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证。

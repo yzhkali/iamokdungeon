@@ -167,17 +167,18 @@ Codex 应承担：
 
 ## 下一个建议任务
 
-如果新对话接手，请优先做这件事：
+如果新对话或 AI 代理接手，请优先做这件事：
 
-1. 先跑 `npm run prepush`，确认当前 3D 原型和工具页仍然通过验证。
-2. 用 `npm run serve` 打开 `prototype/3d/index.html`，确认主入口可玩。
-3. 继续读 `HANDOFF.md`、`docs/project_status_v0.md` 和 `docs/cleanup_validation_report_2026-06-28.md`。
-4. 后续只做小步、行为保持式改动；短期不要继续大拆，优先处理明确 bug、文档过期或低风险废弃文件。
-5. 每个切片都跑 `npm run validate` 或 `npm run prepush`，不要重新引入完整 vendor 源包或旧 2D 原型资产。
+1. 先读根目录 `AGENTS.md`，遵守其中的小切片、多子代理、禁止堆大文件、验证、提交和推送规则。
+2. 继续读 `HANDOFF.md`、`docs/project_status_v0.md` 和 `docs/cleanup_validation_report_2026-06-28.md`。
+3. 先跑 `npm run prepush`，确认当前 3D 原型和工具页仍然通过验证。
+4. 用 `npm run serve` 打开 `prototype/3d/index.html`，确认主入口可玩。
+5. 后续只做小步、行为保持式改动；短期不要继续大拆，优先处理明确 bug、文档过期或低风险废弃文件。
+6. 每个切片都跑 `npm run validate` 或 `npm run prepush`，不要重新引入完整 vendor 源包或旧 2D 原型资产。
 
 ## 重要提醒
 
-每次新对话开始时，先读本文件。不要重新扩大范围。先做能玩的最小版本，再逐步长大。
+每次新对话开始时，先读根目录 `AGENTS.md`，再读本文件。不要重新扩大范围。先做能玩的最小版本，再逐步长大。
 
 ## 图片生成流程（重要）
 
@@ -205,6 +206,8 @@ Codex 应承担：
 
 如果新对话接手，读完本文件后继续读：
 
+- `AGENTS.md`
+- `HANDOFF.md`
 - `docs/project_status_v0.md`
 这个文件记录当前进度、已知问题和下一步任务，避免对话卡住后丢失上下文。
 
