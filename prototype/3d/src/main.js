@@ -1,22 +1,10 @@
 import { makeWolf } from "./wolf.js";
-// ===== 多 CDN 自动回退加载 Three.js =====
-// jsdelivr 在国内常被墙/超慢，这里依次尝试多个源，哪个通用哪个
+// ===== 本地加载 Three.js =====
 const THREE_SOURCES = [
-  "three",                                  // 本地lib(importmap),离线首选
-  "https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js", // 国内淘宝镜像
-  "https://cdn.jsdmirror.com/npm/three@0.160.0/build/three.module.js",         // jsdelivr 国内镜像
-  "https://unpkg.com/three@0.160.0/build/three.module.js",
-  "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "https://esm.sh/three@0.160.0",
+  "three",
 ];
 const GLTF_LOADER_SOURCES = [
-  "three/addons/loaders/GLTFLoader.js",     // 本地lib(importmap)
-  "https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/loaders/GLTFLoader.js",
-  "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
-  "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
-  "https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
-  "https://esm.run/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
-  "https://cdn.skypack.dev/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+  "three/addons/loaders/GLTFLoader.js",
 ];
 const loadingEl = document.getElementById('loading');
 let THREE = null;
@@ -27,7 +15,7 @@ for(let i=0;i<THREE_SOURCES.length;i++){
   }catch(e){ /* 试下一个源 */ }
 }
 if(!THREE || !THREE.Scene){
-  loadingEl.innerHTML = '⚠️ 3D 引擎加载失败<br><span style="font-size:12px">所有 CDN 都连不上，可能是网络问题。<br>请检查网络，或告诉我，我把引擎打包到本地。</span>';
+  loadingEl.innerHTML = '⚠️ 3D 引擎加载失败<br><span style="font-size:12px">本地 Three.js 依赖加载失败，请确认 lib/three.module.js 存在。</span>';
   throw new Error('Three.js load failed');
 }
 
@@ -39,9 +27,11 @@ for(let i=0;i<GLTF_LOADER_SOURCES.length;i++){
     if(GLTFLoader) break;
   }catch(e){ /* 试下一个源 */ }
 }
-if(!GLTFLoader) console.warn('GLTFLoader load failed; vendor models will be skipped.');
+if(!GLTFLoader) console.warn('Local GLTFLoader load failed; vendor models will be skipped.');
 
-const _m15=await fetch('../maps/map15.json').then(r=>r.json());
+const _mapResp=await fetch(new URL('../maps/map15.json', import.meta.url));
+if(!_mapResp.ok) throw new Error(`Failed to load map15.json: ${_mapResp.status}`);
+const _m15=await _mapResp.json();
 const _mapH=new Float32Array(_m15.terrain);const _SZ=260,_SEG=130;
 console.log("MAP15 loaded, terrain points:",_mapH.length);
 main(THREE, GLTFLoader);
@@ -102,7 +92,7 @@ const SFX=(()=>{
     dodge(){ play(P+(Math.random()<.5?'dodge':'dodge2')+'.ogg',0.4); },
     rise(){ const ff=['swoshes/swosh-33','swoshes/swosh-26']; play(P+ff[_si++%2]+'.ogg',0.5); },
     drill(){   play(P+'stomp.ogg',0.9); },
-    chop(){    play(P+'swoshes/swosh-3.ogg',0.7); },
+    chop(){    play(P+'swoshes/swosh-03.ogg',0.7); },
   };
 })();
 document.addEventListener('keydown',()=>SFX.resume(),{once:true});
@@ -177,7 +167,7 @@ let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tN
   const _tl=new THREE.TextureLoader();
   const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png'),mudTex=_tl.load('./textures/mud-riverbank-tile-512.png');
   [grassTex,rockTex,mountTex,mudTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
-  const _roadGenTex=new THREE.TextureLoader().load('./textures/generated.png');
+  const _roadGenTex=new THREE.TextureLoader().load('./textures/texture_road.png');
   _roadGenTex.wrapS=_roadGenTex.wrapT=THREE.RepeatWrapping;
   const tm=new THREE.MeshLambertMaterial({vertexColors:true});
   tm.onBeforeCompile=s=>{
@@ -197,7 +187,7 @@ let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tN
   const _roadMaskTex=new THREE.CanvasTexture(_rmCanvas);
   _roadMaskTex.wrapS=_roadMaskTex.wrapT=THREE.ClampToEdgeWrapping;
   _roadMaskTex.minFilter=_roadMaskTex.magFilter=THREE.LinearFilter;
-  const _roadStoneTex=new THREE.TextureLoader().load('./textures/cobblestone-road-image2-retry2-tile-512.png');
+  const _roadStoneTex=new THREE.TextureLoader().load('./textures/texture_road.png');
   _roadStoneTex.wrapS=_roadStoneTex.wrapT=THREE.RepeatWrapping;
   function _buildRoadMask(){
     if(!_m15.roads||!_m15.roads.length) return;
@@ -603,7 +593,7 @@ function buildSky(){
     const mesh=new THREE.Mesh(new THREE.SphereGeometry(450000,32,16),mat);
     mesh.renderOrder=renderOrd;scene.add(mesh);return{mesh,mat,ox:0,oz:0,sx,sz};
   }
-  const _ct2=[1,2,3,4].map(i=>{const t=_cTL2.load('./textures/cloud_cumulus_'+i+'.png');t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
+  const _ct2=[1,2,3,4].map(()=>{const t=_cTL2.load('./textures/cloud_cumulus.png');t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
   function _mkBill(tex,angle,r,h,w,bh){
     const mat=new THREE.ShaderMaterial({uniforms:{uMap:{value:tex}},
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
@@ -788,7 +778,7 @@ void main(){vec4 c=texture2D(uTex,vUv);
   const dm=new THREE.Object3D();
   for(const [name,cnt,S,ws,yMn,yMx,bot,cell] of TYPES){
     const geo=makeCross(S,bot*S);
-    const mat=new THREE.ShaderMaterial({uniforms:{uTex:{value:_tl.load('./textures/'+name+'.png')},uTime:{value:0},uWind:{value:ws}},
+    const mat=new THREE.ShaderMaterial({uniforms:{uTex:{value:_tl.load('./textures/texture_foliage.png')},uTime:{value:0},uWind:{value:ws}},
       vertexShader:VS,fragmentShader:FS,side:THREE.DoubleSide,depthWrite:true,transparent:true});
     window._grassMats.push(mat);
     const mesh=new THREE.InstancedMesh(geo,mat,cnt);mesh.frustumCulled=false;
@@ -851,9 +841,6 @@ const monsters=[];
 
 // ─── WOLF ──────────────────────────────────────────────
 let wolf=null;
-if(wolf){wolf.root.scale.setScalar(1.4);
-wolf.root.position.y=0.72;
-wolf.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); }
 // ── CUBE WOLF GLTF 加载（异步替换程序化狼）──────────────
 function makeCubeWolfObj(gltfScene, clips, loader_THREE){
   const root = gltfScene;
@@ -902,14 +889,18 @@ const wolfAI = {
   wx:0, wz:-40, facing:0,
   patrolTarget:{x:0,z:-40}, walking:false,
   spawnX:0, spawnZ:-40, patrolRadius:12, territoryR:12, alertR:22,
-  hittable:{x:5,z:-5,r:1.8,flashT:0,shakeT:0}
+  hittable:{x:0,z:-40,r:1.8,flashT:0,shakeT:0}
 };
+wolf=makeWolf(THREE, scene, wolfAI.wx, 0.72, wolfAI.wz);
+if(wolf){wolf.root.scale.setScalar(1.4);
+wolf.root.position.set(wolfAI.wx,0.72,wolfAI.wz);
+wolf.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); }
 wolfAI.hittable.mat=wolf?wolf.J.body.children[0].material:{};
 wolfAI.hittable.mesh=wolf?wolf.root:null;
-wolfAI.hittable.baseX=5; wolfAI.hittable.baseZ=-5;
-hittables.push(wolfAI.hittable);
+wolfAI.hittable.baseX=wolfAI.wx; wolfAI.hittable.baseZ=wolfAI.wz;
+if(wolf) hittables.push(wolfAI.hittable);
 wolfAI.hittable.onHit = ()=>{
-  if(wolfAI.state==='dead') return;
+  if(!wolf || wolfAI.state==='dead') return;
   wolfAI.hp--;
   wolf.setState('hurt');
   if(wolfAI.hp<=0){ wolf.setState('death'); wolfAI.state='dead'; wolfAI.hittable._dead=true; hittables.splice(hittables.indexOf(wolfAI.hittable),1); }
@@ -982,9 +973,9 @@ function updateWolf(dt){if(!wolf)return;
     } else if(wolfAI.attackCool<=0){
       wolf.setState(Math.random()<0.5?'pounce':'bite');
       wolfAI.attackCool=2.2;
-      if(dist<2.8 && P.iframe<=0){ P.hp&&(P.hp-=1); P.iframe=0.5; hitstop=0.12;
+      if(dist<2.8 && P.iframe<=0 && !P.dead){ P.hp=Math.max(0,P.hp-1); P.dead=P.hp<=0; P.iframe=0.5; hitstop=0.12;
         // 击退
-        const kb=2.5, kbx=-(dx/dist)*kb, kbz=-(dz/dist)*kb;
+        const safeDist=Math.max(dist,0.001), kb=2.5, kbx=-(dx/safeDist)*kb, kbz=-(dz/safeDist)*kb;
         P.x+=kbx*0.15; P.z+=kbz*0.15;
         // 屏幕红闪
         const fl=document.getElementById('hitFlash')||Object.assign(document.createElement('div'),{id:'hitFlash',style:'position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 65%,rgba(220,0,0,0.55) 100%);pointer-events:none;transition:opacity 0.25s;z-index:999'});
@@ -2033,6 +2024,14 @@ function pollInput(){
   Actions.heavyHeld=aHeavy;Actions.heavyReleased=(!aHeavy)&&prev.heavy;
   prev.attack=aAtk;prev.jump=aJump;prev.dodge=aDodge;prev.heavy=aHeavy;prev.taunt=aTaunt;
 }
+function clearGameplayInputState(){
+  for(const code of Object.keys(keys)) keys[code]=false;
+  mouse.left=false;mouse.right=false;
+  Object.assign(Actions,{moveX:0,moveZ:0,attack:false,jump:false,dodge:false,heavyHeld:false,heavyReleased:false,taunt:false});
+  Object.assign(prev,{attack:false,jump:false,dodge:false,heavy:false,taunt:false});
+  cameraRig.stickX=0;cameraRig.stickY=0;
+  P.charging=false;P.chargeT=0;P.chargeFull=false;P.chargeFullT=0;P.chargeLock=false;
+}
 function autoPad(){
   // 主动扫描（兜底，防止gamepadconnected未触发）
   if(gpIndex===null){const pads=navigator.getGamepads();for(let i=0;i<pads.length;i++){if(pads[i]){gpIndex=pads[i].index;padStatus();break;}}}
@@ -2042,6 +2041,7 @@ function autoPad(){
 //  玩家状态
 // ============================================================
 const P={x:0,z:0,y:0,vy:0,facing:0,jumping:false,
+  hp:5,hpMax:5,dead:false,
   state:'idle',          // idle / attack / dodge / taunt
   clip:null, clipT:0, clipDur:0,
   // 连招机
@@ -2403,6 +2403,8 @@ function trySweepHit(){
 
 const clock=new THREE.Clock();
 function update(dt){
+  if(worldMapOverlay.classList.contains('open')){updateFx(dt);poseCharacter(dt);return;}
+  if(P.dead){clearGameplayInputState();updateFx(dt);poseCharacter(dt);return;}
   autoPad();pollInput();
   if(hitstop>0){hitstop-=dt;updateFx(dt);return;}
   if(P.iframe>0)P.iframe-=dt;
@@ -2695,13 +2697,14 @@ miniMapModeBtn.onclick=()=>{
   compassLabel.textContent=miniMapFollowFacing?'':'N';
 };
 document.getElementById('mapDockBtn').onclick=()=>{
+  clearGameplayInputState();
   worldMapOverlay.classList.add('open');
   drawWorldMap();
 };
-document.getElementById('closeWorldMap').onclick=()=>worldMapOverlay.classList.remove('open');
-worldMapOverlay.addEventListener('click',e=>{ if(e.target===worldMapOverlay) worldMapOverlay.classList.remove('open'); });
+document.getElementById('closeWorldMap').onclick=()=>{clearGameplayInputState();worldMapOverlay.classList.remove('open');};
+worldMapOverlay.addEventListener('click',e=>{ if(e.target===worldMapOverlay){clearGameplayInputState();worldMapOverlay.classList.remove('open');} });
 addEventListener('keydown',e=>{
-  if(e.code==='Escape' && worldMapOverlay.classList.contains('open')) worldMapOverlay.classList.remove('open');
+  if(e.code==='Escape' && worldMapOverlay.classList.contains('open')){clearGameplayInputState();worldMapOverlay.classList.remove('open');}
 });
 
 function colorToCss(color,alpha=1){
@@ -3139,7 +3142,8 @@ const stamBar=document.getElementById('stamBar'),stateEl=document.getElementById
 function updateHUD(){
   const r=P.stamina/P.staminaMax;stamBar.style.width=(r*100)+'%';stamBar.style.background=r<0.28?'#d9534f':'#5bc0de';
   let st;
-  if(P.state==='dodge') st='闪避冲刺';
+  if(P.dead) st='倒下';
+  else if(P.state==='dodge') st='闪避冲刺';
   else if(P.charging) st='蓄力 '+(Math.min(1,P.chargeT/HEAVY_CHARGE_TIME)*100|0)+'%'+(P.chargeFull?' 满!':'');
   else if(P.move) st='连招: '+P.move+(P.phase==='hold'?'(收势)':P.phase==='startup'?'(预备)':'');
   else if(P.state==='taunt') st='推眼镜';
