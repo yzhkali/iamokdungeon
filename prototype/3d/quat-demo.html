@@ -26,10 +26,10 @@ background:rgba(12,16,22,.8);border:1px solid #2a6a5a;border-radius:8px;padding:
 <script type="module">
 const loadingEl=document.getElementById('loading');
 let THREE=null;
-for(const s of["three","https://unpkg.com/three@0.160.0/build/three.module.js"]){try{THREE=await import(s);if(THREE?.Scene)break;}catch(e){}}
+try{THREE=await import("three");}catch(e){}
 if(!THREE){loadingEl.textContent='引擎加载失败';throw 0;}
 let GLTFLoader=null;
-for(const s of["three/addons/loaders/GLTFLoader.js","https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"]){try{const m=await import(s);GLTFLoader=m.GLTFLoader;if(GLTFLoader)break;}catch(e){}}
+try{const m=await import("three/addons/loaders/GLTFLoader.js");GLTFLoader=m.GLTFLoader;}catch(e){}
 
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});

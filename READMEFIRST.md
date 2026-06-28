@@ -6,6 +6,14 @@
 
 《没事地下城》/ **I’m OK Dungeon** 是一个复古像素风 ARPG / 轻肉鸽游戏：玩家进入由“中国式亲密关系”和中文互联网梗构成的地下城，和“没事”“随便”“你猜”“呵呵”等阴阳怪气词怪战斗，最终面对现实婚恋压力具象化的 Boss。
 
+## 当前可运行状态（2026-06-28）
+
+- 当前主入口：`prototype/3d/index.html`
+- 本地运行：`npm run serve`
+- 本地验证：`npm run validate`、`npm run check:browser`、`npm run prepush`
+- 当前只保留 3D 原型运行目录；早期 2D `prototype/index.html` 已清理。
+- 完整第三方 vendor 源包不再入库，只保留 `prototype/3d/assets/vendor/` 运行子集，来源见 `prototype/3d/assets/vendor/NOTICE.md`。
+
 ## 核心方向
 
 - 画面气质参考《Sea of Stars》的复古像素精致感，但第一阶段不能追求同等体量。
@@ -161,11 +169,11 @@ Codex 应承担：
 
 如果新对话接手，请优先做这件事：
 
-1. 在 `D:\I’m OK Dungeon` 下创建基础项目结构。
-2. 建立 `docs/`、`prototype/`、`assets/`、`exports/` 等目录。
-3. 写第一版 `docs/game_design_v0.md`，把本 README 的设定整理成正式 GDD 草案。
-4. 再选择技术方案：推荐先用网页 Canvas / Phaser 做可快速打开和录屏的原型。
-5. 开始做一个 1 房间战斗灰盒原型。
+1. 先跑 `npm run prepush`，确认当前 3D 原型和工具页仍然通过验证。
+2. 用 `npm run serve` 打开 `prototype/3d/index.html`，确认主入口可玩。
+3. 继续读 `HANDOFF.md`、`docs/project_status_v0.md` 和 `docs/cleanup_validation_report_2026-06-28.md`。
+4. 后续只做小步、行为保持式改动：优先整理 `main.js` 中的战斗副作用或姿态执行边界。
+5. 每个切片都跑 `npm run validate` 或 `npm run prepush`，不要重新引入完整 vendor 源包或旧 2D 原型资产。
 
 ## 重要提醒
 

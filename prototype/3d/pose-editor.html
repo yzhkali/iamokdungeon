@@ -35,7 +35,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#141010;font-family:
 <script type="module">
 const loadingEl=document.getElementById('loading');
 let THREE=null;
-for(const s of["three","https://unpkg.com/three@0.160.0/build/three.module.js"]){try{THREE=await import(s);if(THREE?.Scene)break;}catch(e){}}
+try{THREE=await import("three");}catch(e){}
 if(!THREE){loadingEl.textContent='引擎加载失败';throw 0;}
 
 const canvas=document.getElementById('c');
