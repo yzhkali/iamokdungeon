@@ -49,6 +49,7 @@ Retained tool pages:
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
 - `prototype/3d/src/loop.js` owns the main frame loop schedule, delta clamp, wolf error isolation, world/camera/HUD/grass/reflection/final-render order, and RAF rescheduling.
 - `prototype/3d/src/player/clips.js` owns animation clip data.
+- `prototype/3d/src/player/ghostAfterimages.js` owns dodge afterimage pool creation, snapshot timing, cadence, and fadeout.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/player/state.js` owns player initial state and movement/jump/dodge/charge tuning constants.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
@@ -70,6 +71,7 @@ Root scripts:
 - `npm run check:vendor-subset`
 - `npm run check:player-data`
 - `npm run check:player-state`
+- `npm run check:ghost-afterimages`
 - `npm run check:hit-math`
 - `npm run check:space-slash`
 - `npm run check:spin-rings`
@@ -95,6 +97,7 @@ Coverage:
 - Vendor subset check parses retained `.gltf` files and verifies `.bin` and texture dependency closure.
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
+- Ghost afterimages check verifies pool size, capsule geometry/material setup, direct scene registration, live player/yaw snapshotting, pool wraparound, first-frame and 0.04s dodge cadence, fade math, hidden no-op behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
 - Space slash check verifies ready-state consumption, line mesh/material/geometry setup, deterministic radial growth, offset handling, fadeout/removal, and main-module integration.
 - Spin rings check verifies ring geometry/material setup, delayed visibility, ease-out radius scaling, opacity fade, removal, five-ring saturn burst parameters, live player/radius dependency, dormant `spinSlash` behavior, and main-module integration.
@@ -119,10 +122,11 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (75 runtime assets, 31 source files).`
+- `Asset check passed (76 runtime assets, 32 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
+- `Ghost afterimages check passed.`
 - `Hit math check passed.`
 - `Space slash check passed.`
 - `Spin rings check passed.`
@@ -135,7 +139,7 @@ Important passing lines from the latest run:
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (42 files plus 9 inline scripts).`
+- `Syntax check passed (44 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -163,6 +167,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Spin rings requirement/boundary review: no behavior blocker. The reviewer identified exact ring geometry/material, delay semantics, ease-out scaling, opacity fade, cleanup, live player/radius dependencies, update order, and the currently dormant `spawnSaturnRings()` call site as required preservation points.
 - Spin rings testing-plan review: no blocker. The reviewer requested fake-Three coverage for creation, delayed update, removal, five-ring saturn burst parameters, main-module wiring, server route coverage, and updates to existing order assertions; `scripts/check-spin-rings.mjs` implements those checks and is included in `validate`.
 - Spin rings implementation review: no blocker. The reviewer confirmed geometry/material, `SPIN_RING_Y`, negative-delay timing, ease-out radius, opacity fade, reverse iteration, removal semantics, dormant `spinSlash` behavior, update order, and validation integration are preserved.
+- Ghost afterimages requirement/boundary review: no behavior blocker. The reviewer identified pool size/material/geometry, direct scene ownership, first-frame spawn, 0.04s cadence, spawn-before-movement/yaw update, snapshot values, fade math, and early-return/hitstop fade behavior as required preservation points.
+- Ghost afterimages testing-plan review: no blocker. The reviewer requested fake-Three coverage for pool construction, spawn snapshot/wraparound, dodge timer cadence, fade behavior, main-module integration, and static server route coverage; `scripts/check-ghost-afterimages.mjs` implements those checks and is included in `validate`.
 
 ## Repository Size Notes
 

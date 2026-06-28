@@ -9,6 +9,7 @@ import { createCameraController } from "./camera.js";
 import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
 import { createPlayerState, clonePlayerTuning } from "./player/state.js";
+import { createGhostAfterimages } from "./player/ghostAfterimages.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
@@ -826,10 +827,12 @@ function setHeavyCircle(radius, alongFront){
 }
 
 // 闪避残影池
-const ghostMat=()=>new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:0,depthWrite:false});
-const ghosts=[];
-for(let i=0;i<6;i++){ const g=new THREE.Mesh(new THREE.CapsuleGeometry(0.45,1.4,4,8),ghostMat()); g.visible=false; g.life=0; scene.add(g); ghosts.push(g); }
-let ghostTimer=0, ghostIdx=0;
+const ghostAfterimages=createGhostAfterimages({
+  THREE,
+  scene,
+  getPlayer:()=>P,
+  getYawRotationY:()=>yaw.rotation.y
+});
 
 // ============================================================
 //  大风车"土星环"特效：从剑轨迹往外发散的同心圆扩散环
@@ -1415,7 +1418,7 @@ function update(dt){
   if(P.state==='dodge'){
     vX=P.dodgeDir.x*DODGE_SPEED;vZ=P.dodgeDir.z*DODGE_SPEED;
     P.dodgeT-=dt;P.roll=Math.min(1,(DODGE_DUR-P.dodgeT)/DODGE_DUR);
-    ghostTimer-=dt; if(ghostTimer<=0){ spawnGhost(); ghostTimer=0.04; }
+    ghostAfterimages.tickDodge(dt);
     if(P.dodgeT<=0){
       P.state='idle';P.roll=0;
       // 闪避动作播完：有预输入立即触发，否则给一段宽限期(闪避刚结束按出也能接)
@@ -1562,9 +1565,7 @@ function updateFx(dt){
     if(k>=1){ heavyFill._dur=0; heavyFill.visible=false; heavyRing.visible=false; heavyRing._burst=false; }
   }
   // 闪避残影淡出
-  for(const g of ghosts){
-    if(g.visible){ g.life-=dt; g.material.opacity=Math.max(0,g.life*1.8); if(g.life<=0)g.visible=false; }
-  }
+  ghostAfterimages.update(dt);
   // 柱子受击：红光闪烁 + 微微颤抖
   for(const o of hittables){
     if(o.flashT>0){
@@ -1608,13 +1609,6 @@ function updateFx(dt){
     }
   }
 }
-// 生成一个残影快照
-function spawnGhost(){
-  const g=ghosts[ghostIdx]; ghostIdx=(ghostIdx+1)%ghosts.length;
-  g.position.set(P.x, P.y+1.1, P.z); g.rotation.y=yaw.rotation.y;   // 跟随跳跃高度，残影在人背后
-  g.visible=true; g.life=0.32; g.material.opacity=0.5;
-}
-
 // ============================================================
 //  姿态
 // ============================================================
