@@ -406,7 +406,27 @@ async function smokePage(cdp, origin, pathname, {
               dock?.click();
               window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
               result.escapeClosed = !(overlay?.classList.contains('open') || false);
-              resolve(result);
+              const beforeCamera = globalThis.__IAMOK_TEST_PROBE__?.camera?.();
+              window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ', key: 'q' }));
+              requestAnimationFrame(() => requestAnimationFrame(() => {
+                const afterCamera = globalThis.__IAMOK_TEST_PROBE__?.camera?.();
+                window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ', key: 'q' }));
+                result.cameraProbeExists = !!beforeCamera && !!afterCamera;
+                result.cameraBefore = beforeCamera || null;
+                result.cameraAfter = afterCamera || null;
+                result.cameraFinite = !!afterCamera && [
+                  afterCamera.x, afterCamera.y, afterCamera.z,
+                  afterCamera.yaw, afterCamera.pitch,
+                  afterCamera.targetYaw, afterCamera.targetPitch,
+                  afterCamera.playerTargetX, afterCamera.playerTargetY, afterCamera.playerTargetZ
+                ].every(Number.isFinite);
+                result.cameraPitchInRange = !!afterCamera && afterCamera.pitch >= afterCamera.minPitch - 1e-6 && afterCamera.pitch <= afterCamera.maxPitch + 1e-6;
+                result.cameraYawChanged = !!beforeCamera && !!afterCamera && (
+                  Math.abs(afterCamera.targetYaw - beforeCamera.targetYaw) > 1e-5 ||
+                  Math.abs(afterCamera.yaw - beforeCamera.yaw) > 1e-5
+                );
+                resolve(result);
+              }));
             });
           }));
         }))()`,
@@ -430,6 +450,10 @@ async function smokePage(cdp, origin, pathname, {
       if (!probe.escapeClosed) failures.push('Escape did not close overlay');
       if (!probe.stateText.startsWith('状态: ')) failures.push(`state text not populated: ${probe.stateText}`);
       if (!probe.stamWidth.endsWith('%')) failures.push(`stamina width not populated: ${probe.stamWidth}`);
+      if (!probe.cameraProbeExists) failures.push('camera test probe missing');
+      if (!probe.cameraFinite) failures.push(`camera probe contains non-finite values: ${JSON.stringify(probe.cameraAfter)}`);
+      if (!probe.cameraPitchInRange) failures.push(`camera pitch outside range: ${JSON.stringify(probe.cameraAfter)}`);
+      if (!probe.cameraYawChanged) failures.push(`camera yaw did not respond to KeyQ: before ${JSON.stringify(probe.cameraBefore)}, after ${JSON.stringify(probe.cameraAfter)}`);
       if (failures.length) throw new Error(`${pathname} HUD/map probe failed:\n${failures.map(item => `- ${item}`).join('\n')}\nProbe: ${JSON.stringify(probe)}`);
     }
     console.log(`Browser smoke passed: ${pathname}`);

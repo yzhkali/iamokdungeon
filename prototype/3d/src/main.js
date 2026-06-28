@@ -4,6 +4,7 @@ import { createModelLoader } from "./core/modelLoader.js";
 import { buildGrass, updateGrass } from "./world/grass.js";
 import { buildSky, updateSky } from "./world/sky.js";
 import { makeWolf } from "./wolf.js";
+import { createCameraController } from "./camera.js";
 import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
 import { createInputController } from "./ui/input.js";
@@ -67,15 +68,14 @@ const cameraRig={
   stickX:0,
   stickY:0
 };
-function cameraOffset(distance=cameraRig.currentDistance){
-  const cp=Math.cos(cameraRig.pitch);
-  return new THREE.Vector3(
-    Math.sin(cameraRig.yaw)*cp*distance,
-    Math.sin(cameraRig.pitch)*distance,
-    Math.cos(cameraRig.yaw)*cp*distance
-  );
-}
-camera.position.copy(cameraOffset(cameraRig.distance)); camera.lookAt(0,1.7,0);
+const cameraController = createCameraController({
+  THREE,
+  camera,
+  cameraRig,
+  getPlayer: () => P,
+  getShake: () => shake
+});
+cameraController.setInitialView();
 
 scene.add(new THREE.HemisphereLight(0xb9c6d6,0x4a3f36,0.75));
 const sun=new THREE.DirectionalLight(0xfff2d8,1.15);
@@ -275,13 +275,6 @@ const ROOM=130;
 const mapRoot=new THREE.Group(); scene.add(mapRoot);
 const mapFeatures=[];
 function registerMapFeature(feature){ mapFeatures.push(feature); return feature; }
-const interiors=[];
-function pointInRotRect(px,pz,area,pad=0){
-  const dx=px-area.x, dz=pz-area.z;
-  const s=Math.sin(area.rot||0), c=Math.cos(area.rot||0);
-  const lx=dx*c-dz*s, lz=dx*s+dz*c;
-  return Math.abs(lx)<=area.w/2+pad && Math.abs(lz)<=area.d/2+pad;
-}
 
 const propMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
 const platforms=[];   // 可站立顶面: {minx,maxx,minz,maxz,top}
@@ -414,7 +407,6 @@ function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   const roof=makeGableRoof(w+1.1,d+1.0,1.55,0x6c4738);
   roof.position.y=wallH; roof.castShadow=true; roof.receiveShadow=true;
   root.add(roof);
-  interiors.push({name:'player-home',x,z,w:w-wallT*2,d:d-wallT*2,rot,roof,inside:false});
   const porch=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.2,1.4),mat(0x80684f,0.88));
   porch.position.set(0,0.1,d/2+0.72); porch.castShadow=true; porch.receiveShadow=true; root.add(porch);
   const doorFrameMat=mat(0x4d2f1d,0.78);
@@ -1948,6 +1940,24 @@ const mapHud = createMapHud({
   documentRef: document,
   windowRef: window
 });
+if(globalThis.__IAMOK_ENABLE_TEST_PROBE__){
+  globalThis.__IAMOK_TEST_PROBE__ = {
+    camera: () => ({
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z,
+      yaw: cameraRig.yaw,
+      pitch: cameraRig.pitch,
+      targetYaw: cameraRig.targetYaw,
+      targetPitch: cameraRig.targetPitch,
+      minPitch: cameraRig.minPitch,
+      maxPitch: cameraRig.maxPitch,
+      playerTargetX: P.x,
+      playerTargetY: P.y + 1.7,
+      playerTargetZ: P.z
+    })
+  };
+}
 function updateFx(dt){
   // 刀光横扫（_from→_to 由招式指定方向）
   if(slashMesh.visible){
@@ -2216,64 +2226,12 @@ function poseCharacter(dt){
   weapon.visible=true;   // 木棍一直握在手里
 }
 
-// 相机/HUD/渲染
-const _camTarget=new THREE.Vector3(), _camIdeal=new THREE.Vector3(), _camDir=new THREE.Vector3(), _camPos=new THREE.Vector3();
-let currentInterior=null;
-function updateInteriorState(){
-  let active=null;
-  for(const area of interiors){
-    const inside=pointInRotRect(P.x,P.z,area,-0.35);
-    area.inside=inside;
-    if(area.roof) area.roof.visible=!inside;
-    if(inside) active=area;
-  }
-  currentInterior=active;
-}
-function isCameraBlockedAt(pos){
-  const pad=0.18;
-  for(const c of colliders){
-    const top=c.top??4.2, bottom=c.bottom??0;
-    if(pos.y<bottom || pos.y>top) continue;
-    if(pos.x>=c.minx-pad && pos.x<=c.maxx+pad && pos.z>=c.minz-pad && pos.z<=c.maxz+pad) return true;
-  }
-  return false;
-}
-function cameraClearDistance(target, idealDistance, minDistance=cameraRig.minDistance){ return idealDistance;
-  _camDir.copy(cameraOffset(1)).normalize();
-  const start=currentInterior?0.8:2.2, steps=currentInterior?36:28;
-  let clear=idealDistance;
-  for(let i=0;i<=steps;i++){
-    const d=start+(idealDistance-start)*(i/steps);
-    _camPos.copy(target).addScaledVector(_camDir,d);
-    if(_camPos.y<0.55) _camPos.y=0.55;
-    if(isCameraBlockedAt(_camPos)){ clear=Math.max(minDistance,d-1.6); break; }
-  }
-  return clear;
-}
-function updateCamera(dt){
-  cameraRig.targetYaw += cameraRig.stickX*cameraRig.yawSpeed*dt;
-  cameraRig.targetPitch = Math.max(cameraRig.minPitch, Math.min(cameraRig.maxPitch,
-    cameraRig.targetPitch + cameraRig.stickY*cameraRig.pitchSpeed*dt));
-  cameraRig.yaw   += angleDelta(cameraRig.yaw,   cameraRig.targetYaw)  * Math.min(1,dt*10);
-  cameraRig.pitch  = THREE.MathUtils.lerp(cameraRig.pitch, cameraRig.targetPitch, Math.min(1,dt*10));
-  const dist = cameraRig.outdoorDistance;
-  const cp = Math.cos(cameraRig.pitch), sp = Math.sin(cameraRig.pitch);
-  const cy = Math.cos(cameraRig.yaw),   sy = Math.sin(cameraRig.yaw);
-  const tgt = new THREE.Vector3(P.x, P.y + 1.7, P.z);
-  const ideal = new THREE.Vector3(
-    tgt.x + sy * cp * dist,
-    tgt.y + sp * dist,
-    tgt.z + cy * cp * dist);
-  ideal.y = Math.max(ideal.y, 1.0);
-  camera.position.copy(ideal);
-  if(shake>0){camera.position.x+=(Math.random()-0.5)*shake;camera.position.y+=(Math.random()-0.5)*shake;}
-  camera.lookAt(tgt);
-}
+// HUD/渲染
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener("resize",resize);resize();padStatus();
 document.getElementById("loading").style.display="none";
 function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);try{updateWolf(dt);}catch(e){console.error("wolf err:",e);}
-if(skyData) updateSky({ skyData, camera, dt });updateWater(clock.getElapsedTime());updateCamera(dt);
+if(skyData) updateSky({ skyData, camera, dt });updateWater(clock.getElapsedTime());cameraController.updateCamera(dt);
 mapHud.updateHUD();
 const _t=clock.getElapsedTime();updateGrass({ grassMats: grassSystem.grassMats, time: _t });
 // ── 水面反射 pass ──────────────────────────────────────────

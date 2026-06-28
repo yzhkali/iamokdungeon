@@ -172,7 +172,7 @@ Codex 应承担：
 1. 先跑 `npm run prepush`，确认当前 3D 原型和工具页仍然通过验证。
 2. 用 `npm run serve` 打开 `prototype/3d/index.html`，确认主入口可玩。
 3. 继续读 `HANDOFF.md`、`docs/project_status_v0.md` 和 `docs/cleanup_validation_report_2026-06-28.md`。
-4. 后续只做小步、行为保持式改动：优先拆 `main.js` 中的相机和主循环。
+4. 后续只做小步、行为保持式改动：优先拆 `main.js` 中的主循环/渲染编排。
 5. 每个切片都跑 `npm run validate` 或 `npm run prepush`，不要重新引入完整 vendor 源包或旧 2D 原型资产。
 
 ## 重要提醒

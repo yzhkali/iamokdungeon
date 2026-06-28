@@ -39,6 +39,7 @@ Retained tool pages:
 - `prototype/3d/src/core/sfx.js` owns SFX loading and fixes the `swosh-03.ogg` path.
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
+- `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
 - `prototype/3d/src/player/clips.js` owns animation clip data.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
@@ -60,6 +61,7 @@ Root scripts:
 - `npm run check:player-data`
 - `npm run check:input`
 - `npm run check:map-hud`
+- `npm run check:camera`
 - `npm run check:syntax`
 - `npm run check:server`
 - `npm run check:browser`
@@ -74,9 +76,10 @@ Coverage:
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
+- Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
 - Syntax check covers runtime source files, validation scripts, and inline scripts in all top-level `prototype/3d/*.html` pages.
 - Static server check verifies normal runtime routes, rejects path traversal, rejects directory listing, and rejects unsupported methods.
-- Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, requires the primary runtime canvas to render nonblank pixels, and probes mini-map/world-map canvas drawing plus map UI interactions on `/index.html`.
+- Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, requires the primary runtime canvas to render nonblank pixels, and probes mini-map/world-map canvas drawing, map UI interactions, and camera wiring on `/index.html`.
 
 ## Current Verification Evidence
 
@@ -86,12 +89,13 @@ Latest known passing gate before this report:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (64 runtime assets, 20 source files).`
+- `Asset check passed (65 runtime assets, 21 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Input controller check passed.`
 - `Map HUD check passed.`
-- `Syntax check passed (20 files plus 9 inline scripts).`
+- `Camera controller check passed.`
+- `Syntax check passed (22 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -112,7 +116,6 @@ The large `.git` size is expected while local history still contains removed ven
 ## Remaining Non-Blocking Work
 
 - Continue modularizing `prototype/3d/src/main.js` in small behavior-preserving slices:
-  - camera behavior
   - main loop orchestration
 - Keep each slice covered by `npm run validate` or `npm run prepush`.
 - Do not retune movement, combat, dodge, camera, wolf AI, hitstop, shake, or SFX timing unless fixing a confirmed bug.
