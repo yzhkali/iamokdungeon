@@ -169,7 +169,7 @@ function createFixture({ player = { x: 4, z: -2 }, spinRadius = 2.8 } = {}) {
 assert(mainJs.includes('import { createSpinRings } from "./combat/spinRings.js";'), 'main.js must import spin rings module');
 assert(/\bconst\s+spinRings\s*=\s*createSpinRings\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*,\s*getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS\s*\}\s*\)/.test(mainJs), 'main.js must create spin ring controller with live player and spin radius dependencies');
 assert(/case\s+['"]spinSlash['"]\s*:\s*hitstop\s*=\s*0\.08\s*;\s*shake\s*=\s*0\.22\s*;\s*break/.test(mainJs), 'spinSlash should preserve dormant ring behavior and only set hitstop/shake');
-assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep spin rings between sword beams and space slash');
+assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep spin rings between sword beams and space slash');
 assert(!mainJs.includes('const spinRings=[]'), 'main.js should not retain inline spin ring state');
 assert(!mainJs.includes('const SPIN_RING_Y=2.0'), 'main.js should not retain inline spin ring height constant');
 assert(!mainJs.includes('function spawnSpinRing'), 'main.js should not retain inline spawnSpinRing');

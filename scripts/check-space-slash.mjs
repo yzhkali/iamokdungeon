@@ -146,7 +146,7 @@ assert(/\bconst\s+spaceSlash\s*=\s*createSpaceSlash\s*\(\s*\{\s*THREE\s*,\s*scen
 assert(/spaceSlash\.consumeHit\s*\(\s*ox\s*,\s*oy\s*,\s*oz\s*\)/.test(mainJs), 'onHitTarget must consume space slash on target hit');
 assert(/hitstop\s*=\s*Math\.max\s*\(\s*hitstop\s*,\s*0\.06\s*\)\s*;\s*shake\s*=\s*Math\.max\s*\(\s*shake\s*,\s*0\.2\s*\)/.test(mainJs), 'onHitTarget must keep existing space slash hitstop and shake boosts');
 assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)\s*\)\s*\{\s*spaceSlash\.markReady\(\)/.test(mainJs), 'dodge cancel must mark the next hit for space slash');
-assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;\s*stompEffects\.updateStomps\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep space slash after rings and before stomps');
+assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;\s*stompEffects\.updateStomps\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep space slash after rings and before stomps');
 assert(!mainJs.includes('let spaceSlashReady=false'), 'main.js should not retain inline spaceSlashReady');
 assert(!mainJs.includes('function spawnSpaceSlash'), 'main.js should not retain inline spawnSpaceSlash');
 assert(!mainJs.includes('function updateSpaceSlash'), 'main.js should not retain inline updateSpaceSlash');

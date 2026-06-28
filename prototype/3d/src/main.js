@@ -23,6 +23,7 @@ import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
 import { createSpinRings } from "./combat/spinRings.js";
 import { createAttackBursts } from "./combat/attackBursts.js";
 import { createTargetFeedback } from "./combat/targetFeedback.js";
+import { createHitResolution, SPIN_RADIUS } from "./combat/hitResolution.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -806,6 +807,17 @@ function onHitTarget(ox,oy,oz){
   else if(nearDummy) SFX.hitWood();
   else SFX.hitFlesh();
 }
+const hitResolution=createHitResolution({
+  getPlayer:()=>P,
+  getHittables:()=>hittables,
+  getDummies:()=>dummies,
+  getMonsters:()=>monsters,
+  getMoves:()=>MOVES,
+  onHitTarget:onHitTarget,
+  boostImpact:(nextHitstop,nextShake)=>{ hitstop=Math.max(hitstop,nextHitstop); shake=Math.max(shake,nextShake); },
+  isInThrustBox:isInThrustBox,
+  isInSpinSweepArc:isInSpinSweepArc
+});
 
 // ============================================================
 //  攻击特效（朝向 yaw 局部 +Z = 正前方）
@@ -849,7 +861,6 @@ const swordTrail = createSwordTrail({ THREE, scene, weapon, weaponTip });
 // ============================================================
 //  剑气弹幕（薄而立体的鲨鱼鳍，贴地飞 + 弹道追踪式裂缝）
 // ============================================================
-const GRID=2;                              // 地面每格=2单位
 const swordBeam = createSwordBeamController({ THREE, scene, getPlayer: () => P });
 
 
@@ -998,133 +1009,6 @@ function resolveCollision(){
     }
   }
 }
-// 攻击命中：柱子(红闪+颤抖) / 木人桩(红闪+后仰)
-// hitR = 攻击判定的额外半径(挥砍覆盖范围)。轻击=最初的2倍
-function tryHitObjects(hitR){
-  hitR = hitR||0;
-  const reach=1.7, fx=Math.sin(P.facing), fz=Math.cos(P.facing);
-  const hx=P.x+fx*reach, hz=P.z+fz*reach;
-  for(const o of hittables){
-    const dx=hx-o.x, dz=hz-o.z;
-    if(dx*dx+dz*dz < (o.r+hitR)*(o.r+hitR)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); if(o.onHit) o.onHit(); }
-  }
-  for(const d of dummies){
-    const dx=hx-d.x, dz=hz-d.z;
-    if(dx*dx+dz*dz < (d.r+hitR)*(d.r+hitR)){
-      d.flashT=0.2;
-      d.tiltVel += 7.5;
-      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
-      onHitTarget(d.x,1.6,d.z);
-    }
-  }
-  for(const m of monsters){
-    const dx=hx-m.x, dz=hz-m.z;
-    if(dx*dx+dz*dz < (m.r+hitR)*(m.r+hitR)){
-      m.flashT=0.22; m.tiltVel+=6.5;
-      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
-      onHitTarget(m.x,1.6,m.z);
-    }
-  }
-}
-// 剑气命中：跟随弹道移动判定，宽度1格，每个目标对同一道剑气只命中一次
-function beamHitByBeam(b){
-  const bx=b.grp.position.x, bz=b.grp.position.z;
-  const halfW=GRID*0.5;                        // 剑气半宽0.5格
-  // 木人桩：圆形距离判定(剑气当前位置 vs 目标)，宽度容差=半宽+目标半径
-  for(const d of dummies){
-    if(b.hitSet.has(d)) continue;
-    const dx=d.x-bx, dz=d.z-bz;
-    if(dx*dx+dz*dz < (halfW+d.r)*(halfW+d.r)){
-      b.hitSet.add(d); d.flashT=0.25; d.tiltVel+=9;
-      hitstop=Math.max(hitstop,0.03); shake=Math.max(shake,0.12);
-    }
-  }
-  for(const m of monsters){
-    if(b.hitSet.has(m)) continue;
-    const dx=m.x-bx, dz=m.z-bz;
-    if(dx*dx+dz*dz < (halfW+m.r)*(halfW+m.r)){
-      b.hitSet.add(m); m.flashT=0.25; m.tiltVel+=8;
-      hitstop=Math.max(hitstop,0.03); shake=Math.max(shake,0.12);
-    }
-  }
-  // 柱子
-  for(const o of hittables){
-    if(b.hitSet.has(o)) continue;
-    const dx=o.x-bx, dz=o.z-bz;
-    if(dx*dx+dz*dz < (halfW+o.r)*(halfW+o.r)){
-      b.hitSet.add(o); o.flashT=0.18; o.shakeT=0.18;
-    }
-  }
-}
-// 突刺判定：玩家正前方 宽1格×长3格 的矩形
-const GRID_=2;
-function inThrustBox(ox,oz,or){
-  return isInThrustBox({ playerX:P.x, playerZ:P.z, facing:P.facing, targetX:ox, targetZ:oz, targetRadius:or||0, grid:GRID_ });
-}
-function tryThrustHit(){
-  for(const o of hittables){ if(inThrustBox(o.x,o.z,o.r)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); if(o.onHit) o.onHit(); } }
-  for(const d of dummies){
-    if(inThrustBox(d.x,d.z,d.r)){
-      if(d._thrustCd>0) continue;
-      d._thrustCd=0.25; d.flashT=0.22; d.tiltVel+=8;
-      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
-      onHitTarget(d.x,1.6,d.z);
-    }
-  }
-  for(const m of monsters){
-    if(inThrustBox(m.x,m.z,m.r)){
-      if(m._thrustCd>0) continue;
-      m._thrustCd=0.25; m.flashT=0.22; m.tiltVel+=8;
-      hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.14);
-      onHitTarget(m.x,1.6,m.z);
-    }
-  }
-}
-// 大风车判定：跟随剑旋转角度的扫掠命中
-const SPIN_RADIUS=2.8;
-function tryRingHit(){
-  for(const o of hittables){
-    const dx=o.x-P.x, dz=o.z-P.z;
-    if(Math.hypot(dx,dz) < SPIN_RADIUS+o.r){ o.flashT=0.2; o.shakeT=0.2; if(o.onHit) o.onHit(); }
-  }
-  for(const d of dummies){
-    const dx=d.x-P.x, dz=d.z-P.z;
-    if(Math.hypot(dx,dz) < SPIN_RADIUS+d.r){
-      d.flashT=0.25; d.tiltVel+=9;
-      hitstop=Math.max(hitstop,0.05); shake=Math.max(shake,0.18);
-    }
-  }
-  for(const m of monsters){
-    const dx=m.x-P.x, dz=m.z-P.z;
-    if(Math.hypot(dx,dz) < SPIN_RADIUS+m.r){
-      m.flashT=0.25; m.tiltVel+=8;
-      hitstop=Math.max(hitstop,0.05); shake=Math.max(shake,0.18);
-    }
-  }
-}
-// 大风车扫掠判定：只命中"剑当前扫到的角度扇区"内的目标，每个目标一次
-// aJupiter 多段命中：每转一整圈触发一次
-function tryJupiterHit(){
-  const hr=MOVES['aJupiter'].hitR||1.8;
-  for(const d of dummies){ if(Math.hypot(d.x-P.x,d.z-P.z)<hr+d.r){ d.flashT=0.22;d.tiltVel+=8;hitstop=Math.max(hitstop,0.04);shake=Math.max(shake,0.15);onHitTarget(d.x,1.5,d.z); } }
-  for(const m of monsters){ if(Math.hypot(m.x-P.x,m.z-P.z)<hr+m.r){ m.flashT=0.22;m.tiltVel+=7;hitstop=Math.max(hitstop,0.04);shake=Math.max(shake,0.15);onHitTarget(m.x,1.5,m.z); } }
-}
-function trySweepHit(){
-  // 剑当前世界朝向角度：身体绕Y顺时针转(body.rotation.y=-spin*2π)，剑在右侧(facing基础上+90°起转)
-  const _turns=MOVES[P.move]?.spinTurns||1;
-  const ARC=0.6;   // 扇区半角(弧度)~34°
-  if(!P._spinHit) P._spinHit=new Set();
-  const checkList=[...hittables,...dummies,...monsters];
-  for(const o of checkList){
-    if(P._spinHit.has(o)) continue;
-    if(isInSpinSweepArc({ playerX:P.x, playerZ:P.z, playerFacing:P.facing, spin:P.spin, spinTurns:_turns, targetX:o.x, targetZ:o.z, targetRadius:o.r, spinRadius:SPIN_RADIUS, arc:ARC })){
-      P._spinHit.add(o);
-      if(o.tiltVel!==undefined){ o.flashT=0.12; o.tiltVel=Math.max(o.tiltVel,8); hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.16); onHitTarget(o.x,1.6,o.z); }
-      else { o.flashT=0.2; o.shakeT=0.2; onHitTarget(o.x,1.4,o.z); }
-    }
-  }
-}
-
 const clock=new THREE.Clock();
 function update(dt){
   if(mapHud.isWorldMapOpen()){updateFx(dt);poseCharacter(dt);return;}
@@ -1252,24 +1136,24 @@ function update(dt){
     if(mv.trail && !P._trailStarted && P.moveT>=mv.strike-0.10){ P._trailStarted=true; swordTrail.startTrail(mv.trailSegs||(mv.spinY?26:4)); }
     // 命中瞬间：触发特效 + 顿帧 + 检测打到的物体
     if(!P.struck && P.moveT>=mv.strike){ P.struck=true; if(mv.fx) fireFx(mv.fx);
-      if(mv.thrustHit) tryThrustHit();
-      else if(mv.ringHit && !mv.spinY) tryRingHit();
-      else if(!mv.ringHit && !mv.spinY && !mv.landHit && !mv.plunge) tryHitObjects(mv.hitR||0); }
+      if(mv.thrustHit) hitResolution.tryThrustHit();
+      else if(mv.ringHit && !mv.spinY) hitResolution.tryRingHit();
+      else if(!mv.ringHit && !mv.spinY && !mv.landHit && !mv.plunge) hitResolution.tryHitObjects(mv.hitR||0); }
     // 大风车：判定跟随剑的旋转角度(扫到哪个角度,那个角度才命中)
     if(mv.spinY && P.spin>0 && P.spin<1){
       // 每完成一圈就重置命中记录,让转几圈打几次
       const turns=mv.spinTurns||1;
       const curRot=Math.floor(P.spin*turns);
       if(P._lastSpinRot===undefined||curRot!==P._lastSpinRot){ P._spinHit&&P._spinHit.clear(); P._lastSpinRot=curRot; }
-      trySweepHit();
+      hitResolution.trySweepHit();
     }
     // aJupiter 多段：每转一整圈再打一次
     if(P.move==='aJupiter' && P.struck && !P._plungeDone){
       const curRev=Math.floor(_jSpin/(Math.PI*2));
-      if(P._jupRev!==curRev){ P._jupRev=curRev; if(curRev>0) tryJupiterHit(); }
+      if(P._jupRev!==curRev){ P._jupRev=curRev; if(curRev>0) hitResolution.tryJupiterHit(); }
     }
     // 突刺判定：滑行全程持续命中(长矩形)
-    if(mv.thrustHit && P.struck && P.moveT<mv.cancel){ tryThrustHit(); }
+    if(mv.thrustHit && P.struck && P.moveT<mv.cancel){ hitResolution.tryThrustHit(); }
     // 挥砍结束后让拖尾淡出(大风车记录到招式末尾以画满整圈，其余到cancel)
     const trailStop = mv.spinY ? mv.total : mv.cancel;
     if(mv.trail && swordTrail.isActive() && P.moveT>=trailStop){ swordTrail.stopTrail(); }
@@ -1283,7 +1167,7 @@ function update(dt){
       P.chargeLock=true;   // 落地后短暂锁定重击,防止连按重击意外触发地面大风车
       if(jupiterActive){jupiterActive=false;jupiterBall.visible=false;}
       if(mv.landFx) fireFx(mv.landFx);              // 落地冲击特效(aChop=slam / aStomp=stomp)
-      if(mv.landHit) tryHitObjects(mv.hitR||0);     // 落地正前判定(仅 aChop；aStomp 的判定在 doStomp 周身AoE)
+      if(mv.landHit) hitResolution.tryHitObjects(mv.hitR||0);     // 落地正前判定(仅 aChop；aStomp 的判定在 doStomp 周身AoE)
       P.clip=mv.plunge; P.clipDur=CLIPS[mv.plunge].dur; P.clipT=0;
       P.moveT=mv.total; P._customRecover=CLIPS[mv.plunge].dur;
     }
@@ -1398,7 +1282,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); spinRings.updateSpinRings(dt); spaceSlash.update(dt); stompEffects.updateStomps(dt);
+  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, hitResolution.beamHitByBeam); spinRings.updateSpinRings(dt); spaceSlash.update(dt); stompEffects.updateStomps(dt);
 }
 
 // ============================================================

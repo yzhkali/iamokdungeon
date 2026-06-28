@@ -40,10 +40,11 @@ Retained tool pages:
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
 - `prototype/3d/src/combat/attackBursts.js` owns slash/heavy burst visual meshes, dormant `startSlash` effective behavior, `doSlash`, `burstCircle`, and attack burst fade updates.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
+- `prototype/3d/src/combat/hitResolution.js` owns slash, beam, thrust, ring, jupiter, and spin-sweep hit resolution while main keeps move timing.
 - `prototype/3d/src/combat/targetFeedback.js` owns hittable/dummy/monster hit flash, shake, tilt spring, and per-target hit cooldown decay.
 - `prototype/3d/src/combat/spaceSlash.js` owns dodge-cancel space-slash readiness, radial line spawning, fadeout, and cleanup.
 - `prototype/3d/src/combat/spinRings.js` owns big-spin ring geometry, delayed expansion, opacity fade, and cleanup while preserving the current dormant spawn behavior.
-- `prototype/3d/src/combat/swordBeam.js` owns sword beam spawning, projectile/crack movement, beam lifecycle, and crack fadeout cleanup while main keeps hit target side effects.
+- `prototype/3d/src/combat/swordBeam.js` owns sword beam spawning, projectile/crack movement, beam lifecycle, and crack fadeout cleanup while hit resolution owns beam hit side effects.
 - `prototype/3d/src/combat/swordTrail.js` owns sword trail geometry, sword root/tip sampling, segment capping, and stopped-trail fadeout.
 - `prototype/3d/src/combat/stompEffects.js` owns stomp crater/debris spawning, debris physics, AoE feedback, SFX/impact callbacks, and mark fadeout cleanup.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
@@ -79,6 +80,7 @@ Root scripts:
 - `npm run check:attack-bursts`
 - `npm run check:target-feedback`
 - `npm run check:hit-math`
+- `npm run check:hit-resolution`
 - `npm run check:space-slash`
 - `npm run check:spin-rings`
 - `npm run check:stomp-effects`
