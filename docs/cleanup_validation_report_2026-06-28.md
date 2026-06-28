@@ -49,6 +49,7 @@ Retained tool pages:
 - `prototype/3d/src/combat/stompEffects.js` owns stomp crater/debris spawning, debris physics, AoE feedback, SFX/impact callbacks, and mark fadeout cleanup.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
 - `prototype/3d/src/world/collision.js` owns collider/platform/terrain-area state, terrain/platform height queries, and player horizontal collision resolution.
+- `prototype/3d/src/world/village.js` owns the static village/blockout helpers, map feature registration, ground patches, buildings, player home, tree/prop placement wrappers, and the dormant `buildNewVillage()` builder.
 - `prototype/3d/src/world/trainingDummy.js` owns training dummy geometry construction, map feature registration, collider registration, and shared dummy-array writes.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
@@ -90,6 +91,7 @@ Root scripts:
 - `npm run check:spin-rings`
 - `npm run check:stomp-effects`
 - `npm run check:training-dummy`
+- `npm run check:village`
 - `npm run check:world-collision`
 - `npm run check:sword-beam`
 - `npm run check:sword-trail`
@@ -121,6 +123,7 @@ Coverage:
 - Spin rings check verifies ring geometry/material setup, delayed visibility, ease-out radius scaling, opacity fade, removal, five-ring saturn burst parameters, live player/radius dependency, dormant `spinSlash` behavior, and main-module integration.
 - Stomp effects check verifies crater material/geometry setup, exact debris count/materials, SFX-before-impact callback order, in-range and out-of-range AoE feedback, deterministic debris bounce/settle behavior, fadeout/removal, and main-module integration.
 - Training dummy check verifies dummy geometry/material/shadow values, scene registration, map feature payload, collider payload, shared dummy-array writes, feedback material collection, and main-module integration.
+- Village blockout check verifies factory initialization side effects, live map feature registration, terrain/platform/collider callbacks, building/player-home geometry registration, model placement wrappers, dormant `buildNewVillage()` side effects when explicitly called, random consumption boundaries, and main-module integration.
 - World collision check verifies collider/platform/terrain-area AABB registration, terrain and platform height separation, platform collider skip tolerance, normal and zero-distance player pushout, live player mutation, preserved vertical-height ignorance, and main-module integration.
 - Sword beam check verifies beam material/geometry setup, one-grid spawn offset, direction snapshot, movement before hit callback, crack growth/index stitching, beam removal, crack fadeout/removal, and main-module integration while preserving main-owned hit behavior.
 - Sword trail check verifies mesh/material/geometry setup, default and explicit segment caps, root/tip sampling order, hidden-update no-op behavior, stopped-trail fadeout, history reset, and main-module integration.
@@ -139,11 +142,11 @@ Coverage:
 
 Latest passing gate for the current cleanup/modularization slice:
 
-- `npm run prepush`
+- `npm run validate`
 
 Important passing lines from the latest run:
 
-- `Asset check passed (77 runtime assets, 33 source files).`
+- `Asset check passed (84 runtime assets, 41 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
@@ -153,6 +156,9 @@ Important passing lines from the latest run:
 - `Space slash check passed.`
 - `Spin rings check passed.`
 - `Stomp effects check passed.`
+- `Training dummy check passed.`
+- `Village blockout check passed.`
+- `World collision check passed.`
 - `Sword beam check passed.`
 - `Sword trail check passed.`
 - `Input controller check passed.`
@@ -161,7 +167,7 @@ Important passing lines from the latest run:
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (46 files plus 9 inline scripts).`
+- `Syntax check passed (62 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -169,6 +175,10 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 
 ## Multi-Agent Review Notes
 
+- Village blockout requirement/boundary review: no behavior blocker. The reviewer identified the static village/blockout helpers, live `mapFeatures`, collision/platform callback ordering, map feature schema, dormant `buildNewVillage()` state, and unchanged `ROOM`/hittables/dummies/collision ownership as required preservation points.
+- Village blockout testing-plan review: no blocker. The reviewer requested fake-Three coverage for factory no-op initialization, explicit `buildNewVillage()` baseline counts, helper callbacks, player-home platform bounds, tree/prop placement wrappers, and dormant main-module wiring; `scripts/check-village.mjs` implements those checks and is included in `validate`.
+- Village blockout implementation review: no blocker. The reviewer confirmed the extraction preserves `main.js` integration, random initialization behavior, resource path semantics, and browser smoke behavior; the only non-blocking suggestion was to include `/src/world/village.js` in static server route coverage, which was added.
+- Village blockout final strict review: PASS. The reviewer reran `git diff --check`, `check:village`, `check:world-collision`, `check:training-dummy`, `check:map-hud`, and `check:syntax` with no blocker findings.
 - Implementation/behavior review: no blocker. The reviewer confirmed the wolf AI extraction preserves the previous state machine shape and noted only that `prototype/3d/src/enemies/wolfAi.js` must be included in the commit.
 - Validation/docs/repository-hygiene review: no blocker and no non-blocker findings. The reviewer confirmed `check:wolf-ai`, server route coverage, docs, and temporary-file state are consistent.
 - Game loop implementation review: no blocker and no non-blocker findings. The reviewer confirmed the extracted loop preserves the frame order and keeps wolf error isolation.

@@ -4,6 +4,7 @@ import { createWorldCollision } from '../prototype/3d/src/world/collision.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const villageJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/world/village.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -135,9 +136,9 @@ assert(typeof createWorldCollision === 'function', 'collision.js must export cre
 assert(mainJs.includes('import { createWorldCollision } from "./world/collision.js";'), 'main.js must import createWorldCollision');
 assert(/createWorldCollision\s*\(\s*\{\s*terrainHeightAt\s*:\s*terrainH\s*\}\s*\)/.test(mainJs), 'main.js must create collision module with terrainH injection');
 assert(/const\s+\{[\s\S]*colliders[\s\S]*platforms[\s\S]*terrainAreas[\s\S]*addCollider[\s\S]*addTerrainArea[\s\S]*addPlatform[\s\S]*addPlatformBounds[\s\S]*terrainYAt[\s\S]*groundHeightAt[\s\S]*resolveCollision[\s\S]*\}\s*=\s*createWorldCollision/.test(mainJs), 'main.js should destructure the collision surface');
-assert(/addTerrainArea\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)\s*;\s*if\s*\(\s*top\s*>\s*0\.03\s*\)\s*addPlatform\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)/.test(mainJs), 'addGroundPatch should preserve terrain/platform registration and threshold');
-assert(/addPlatform\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)/.test(mainJs), 'addStep should register platforms through collision module');
-assert(/addPlatformBounds\s*\(\s*x-w\/2\+wallT\s*,\s*x\+w\/2-wallT\s*,\s*z-d\/2\+wallT\s*,\s*z\+d\/2-wallT\s*,\s*floorTop\s*\)/.test(mainJs), 'player home should preserve exact indoor platform bounds');
+assert(/addTerrainArea\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)\s*;[\s\S]*if\s*\(\s*top\s*>\s*0\.03\s*\)\s*addPlatform\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)/.test(villageJs), 'addGroundPatch should preserve terrain/platform registration and threshold');
+assert(/function\s+addStep[\s\S]*addPlatform\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)/.test(villageJs), 'addStep should register platforms through collision module');
+assert(/addPlatformBounds\s*\(\s*x\s*-\s*w\s*\/\s*2\s*\+\s*wallT\s*,\s*x\s*\+\s*w\s*\/\s*2\s*-\s*wallT\s*,\s*z\s*-\s*d\s*\/\s*2\s*\+\s*wallT\s*,\s*z\s*\+\s*d\s*\/\s*2\s*-\s*wallT\s*,\s*floorTop\s*\)/.test(villageJs), 'player home should preserve exact indoor platform bounds');
 assert(/makeTrainingDummy\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*registerMapFeature\s*,\s*addCollider\s*,\s*terrainYAt\s*,\s*dummies\s*\}/.test(mainJs), 'training dummy should keep using shared addCollider and terrainYAt');
 assert(mainJs.includes('resolveCollision(P, PLAYER_R);'), 'main.js should call resolveCollision after boundary clamp with player and radius');
 

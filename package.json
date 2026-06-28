@@ -19,6 +19,7 @@
     "check:spin-rings": "node scripts/check-spin-rings.mjs",
     "check:stomp-effects": "node scripts/check-stomp-effects.mjs",
     "check:training-dummy": "node scripts/check-training-dummy.mjs",
+    "check:village": "node scripts/check-village.mjs",
     "check:world-collision": "node scripts/check-world-collision.mjs",
     "check:sword-beam": "node scripts/check-sword-beam.mjs",
     "check:sword-trail": "node scripts/check-sword-trail.mjs",
@@ -32,7 +33,7 @@
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:server": "node scripts/check-server.mjs",
     "check:browser": "node scripts/check-browser.mjs",
-    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:player-rig && npm run check:pose-clip-controller && npm run check:ghost-afterimages && npm run check:attack-bursts && npm run check:target-feedback && npm run check:hit-math && npm run check:hit-resolution && npm run check:space-slash && npm run check:spin-rings && npm run check:stomp-effects && npm run check:training-dummy && npm run check:world-collision && npm run check:sword-beam && npm run check:sword-trail && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:cube-wolf-adapter && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
+    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:player-rig && npm run check:pose-clip-controller && npm run check:ghost-afterimages && npm run check:attack-bursts && npm run check:target-feedback && npm run check:hit-math && npm run check:hit-resolution && npm run check:space-slash && npm run check:spin-rings && npm run check:stomp-effects && npm run check:training-dummy && npm run check:village && npm run check:world-collision && npm run check:sword-beam && npm run check:sword-trail && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:cube-wolf-adapter && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
     "serve": "node scripts/static-server.mjs prototype/3d",
     "prepush": "git diff --check && npm run validate"
   }
