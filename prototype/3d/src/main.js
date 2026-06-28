@@ -16,6 +16,7 @@ import { createPlayerRig } from "./player/rig.js";
 import { createPlayerState, clonePlayerTuning } from "./player/state.js";
 import { createGhostAfterimages } from "./player/ghostAfterimages.js";
 import { createPoseClipController } from "./player/poseClipController.js";
+import { createMoveTriggers } from "./player/moveTriggers.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
@@ -349,68 +350,28 @@ const {
 // HEAVY_R_MIN/HEAVY_R_MAX 是重击圆圈半径(空蓄~满蓄)
 let shake=0,hitstop=0;
 
-function playClip(name){ P.clip=name; P.clipT=0; P.clipDur=CLIPS[name].dur; }
-
-// 触发某招特效
-function fireFx(fx){
-  switch(fx){
-    case 'slashR': hitstop=0.07; shake=0.14; SFX.swing(); break;
-    case 'slashL': hitstop=0.07; shake=0.14; SFX.swing(); break;
-    case 'chop':   hitstop=0.10; shake=0.22; SFX.chop(); swordBeam.spawnSwordBeam(); break;
-    case 'slam':   hitstop=0.14; shake=0.32; break;   // 落地砸地：顿帧+震屏(更重)，不发剑气
-    case 'stomp':  stompEffects.doStomp(); break;
-    case 'drill':  hitstop=0.14; shake=0.6; stompEffects.doStomp(); P._drillBounce=4.5; break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
-    case 'kick':   hitstop=0.10; shake=0.20; SFX.kick(); break;   // 飞踹：顿帧+震屏(暂不击飞)
-    case 'rise':   hitstop=0.09; shake=0.18; SFX.rise(); break;   // 升龙剑上挑：顿帧+震屏
-    case 'thrust': SFX.thrust(); doThrust(); break;
-    case 'spinSlash': hitstop=0.08; shake=0.22; break;
-    case 'heavyCircle':    attackBursts.burstCircle(1.7); break;
-    case 'heavyCircleBig': attackBursts.burstCircle(2.6); break;
-  }
-}
-function doSlash(from,to,heavy){
-  attackBursts.doSlash(from,to,heavy);
-}
-function doThrust(){
-  // 去掉黄色刀光区域，只保留顿帧/震屏(剑的拖尾已表现突刺)
-  hitstop=0.04; shake=0.12;
-}
-// 开始一招
-function startMove(name){
-  const mv=MOVES[name]; if(!mv)return;
-  const prevMove=P.move;
-  const prevState=P.state;
-  P.state='attack'; P.move=name; P.moveT=0;
-  P.phase='startup'; P.struck=false; P._plungeDone=false; P._customRecover=null;
-  P.nextBuffer=null;
-  P._ignoreHeavyRelease=false;   // 默认不忽略重击松手(升龙剑从"按住"触发时才置true)
-  P.lunge=mv.lunge||0;
-  P.spin = (mv.spin||mv.spinY)?0:P.spin;
-  if(mv.spinY && P._spinHit) P._spinHit.clear();   // 重置大风车命中记录
-  P._spinSnd=false; SFX.spinStop();
-  P._slideV=undefined; P._slideStarted=null;   // 重置滑行
-  // 拍下当前姿势快照，用于切招过渡补间(消除"弹一下"的卡顿)
-  poseClipController.capturePoseSnapshot();
-  P.blendT=0;
-  P.blendDur=(name==='dRise'&&prevState==='dodge')?0.22:0.13;
-  playClip(mv.clip);
-  P._trailStarted=false;   // 拖尾在挥砍主体段才开启(见招式推进)
-  P._launched=false;       // 升龙剑(dRise)地面蓄力后再起跳的一次性标志
-  // 升龙剑顶点接践踏：先在最高点滞空停顿一下再俯冲(其它来源的践踏不停顿)
-  P._stompHang = (name==='aStomp' && prevMove==='dRise') ? 0.28 : 0;
-  if(name==='aDrill') _drillSpin=0;   // 旋风坠每次从0开始转，不累积
-  if(name==='aJupiter') P._jupRev=-1;
-  // 特效在 strike 时刻才触发(见招式推进)，不在起手触发
-}
-// 闪避连招触发：轻=李小龙腾空飞踢(立即起跳) / 重=升龙剑(先地面蓄力，起跳由推进段处理)
-function startDodgeCombo(kind){
-  if(kind==='light'){ P.jumping=true; P.vy=JUMP_V*0.95; startMove('dKick'); }
-  else { P.chargeLock=true; startMove('dRise'); P._ignoreHeavyRelease=true; }
-}
-
-function startSlash(type,ratio=0){
-  attackBursts.startSlash(type,ratio);
-}
+const {
+  playClip,
+  fireFx,
+  doSlash,
+  doThrust,
+  startMove,
+  startDodgeCombo,
+  startSlash
+} = createMoveTriggers({
+  player: P,
+  clips: CLIPS,
+  moves: MOVES,
+  jumpVelocity: JUMP_V,
+  sfx: SFX,
+  attackBursts,
+  swordBeam,
+  stompEffects,
+  poseClipController,
+  setHitstop: value => { hitstop = value; },
+  setShake: value => { shake = value; },
+  resetDrillSpin: () => { _drillSpin = 0; }
+});
 const clock=new THREE.Clock();
 function update(dt){
   if(mapHud.isWorldMapOpen()){updateFx(dt);poseCharacter(dt);return;}

@@ -4,6 +4,7 @@ import { createStompEffects, STOMP_RADIUS } from '../prototype/3d/src/combat/sto
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -223,8 +224,8 @@ function createFixture({
 assert(mainJs.includes('import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";'), 'main.js must import stomp effects module');
 assert(/\bconst\s+STOMP_R\s*=\s*STOMP_RADIUS\s*;/.test(mainJs), 'main.js must keep named stomp radius alias for AoE comments and checks');
 assert(/\bconst\s+stompEffects\s*=\s*createStompEffects\s*\(\s*\{[\s\S]*\bTHREE\b[\s\S]*\bscene\b[\s\S]*getPlayer\s*:\s*\(\s*\)\s*=>\s*P[\s\S]*getHittables\s*:\s*\(\s*\)\s*=>\s*hittables[\s\S]*getDummies\s*:\s*\(\s*\)\s*=>\s*dummies[\s\S]*playStomp\s*:\s*\(\s*\)\s*=>\s*SFX\.stomp\(\)[\s\S]*boostImpact\s*:\s*\(\s*\)\s*=>\s*\{\s*hitstop\s*=\s*Math\.max\s*\(\s*hitstop\s*,\s*0\.12\s*\)\s*;\s*shake\s*=\s*Math\.max\s*\(\s*shake\s*,\s*0\.45\s*\)\s*;?\s*\}[\s\S]*\}\s*\)/.test(mainJs), 'main.js must create stompEffects with live scene/player/target/SFX dependencies');
-assert(/case\s+['"]stomp['"]\s*:\s*stompEffects\.doStomp\s*\(\s*\)\s*;\s*break/.test(mainJs), 'stomp fireFx must delegate to stomp effects');
-assert(/case\s+['"]drill['"]\s*:\s*hitstop\s*=\s*0\.14\s*;\s*shake\s*=\s*0\.6\s*;\s*stompEffects\.doStomp\s*\(\s*\)\s*;\s*P\._drillBounce\s*=\s*4\.5\s*;\s*break/.test(mainJs), 'drill fireFx must preserve impact, stomp, bounce order');
+assert(/case\s+['"]stomp['"]\s*:\s*stompEffects\.doStomp\s*\(\s*\)\s*;\s*break/.test(moveTriggersJs), 'stomp fireFx must delegate to stomp effects');
+assert(/case\s+['"]drill['"]\s*:\s*setImpact\s*\(\s*0\.14\s*,\s*0\.6\s*\)\s*;\s*stompEffects\.doStomp\s*\(\s*\)\s*;\s*P\._drillBounce\s*=\s*4\.5\s*;\s*break/.test(moveTriggersJs), 'drill fireFx must preserve impact, stomp, bounce order');
 assert(/spaceSlash\.update\s*\(\s*dt\s*\)\s*;\s*stompEffects\.updateStomps\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep stomp effects after space slash');
 assert(!mainJs.includes('const stompMarks=[]'), 'main.js should not retain inline stomp mark state');
 assert(!mainJs.includes('function irregularShape'), 'main.js should not retain inline crater shape helper');

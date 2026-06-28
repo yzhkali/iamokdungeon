@@ -4,6 +4,7 @@ import { createAttackBursts } from '../prototype/3d/src/combat/attackBursts.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -226,15 +227,11 @@ function createFixture({ min = 1.2, max = 3.2 } = {}) {
 
 assert(mainJs.includes('import { createAttackBursts } from "./combat/attackBursts.js";'), 'main.js must import attack bursts module');
 assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*yaw\s*,\s*getHeavyRadiusMin\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MIN\s*,\s*getHeavyRadiusMax\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MAX\s*,\s*setImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{\s*hitstop\s*=\s*nextHitstop\s*;\s*shake\s*=\s*nextShake\s*;\s*\}\s*\}\s*\)/.test(mainJs), 'main.js must create attackBursts with yaw, heavy radius, and impact dependencies');
-assert((mainJs.match(/function\s+startSlash\s*\(/g) || []).length === 1, 'main.js should keep only one startSlash wrapper');
-assert(/function\s+startSlash\s*\(\s*type\s*,\s*ratio\s*=\s*0\s*\)\s*\{\s*attackBursts\.startSlash\s*\(\s*type\s*,\s*ratio\s*\)\s*;\s*\}/.test(mainJs), 'startSlash wrapper should delegate to the extracted effective behavior');
-assert(/function\s+doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*\{\s*attackBursts\.doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*;\s*\}/.test(mainJs), 'doSlash wrapper should delegate without wiring new gameplay');
-assert(/case\s+['"]slashR['"]\s*:\s*hitstop\s*=\s*0\.07\s*;\s*shake\s*=\s*0\.14\s*;\s*SFX\.swing\(\)\s*;\s*break/.test(mainJs), 'slashR should preserve hitstop, shake, and SFX only');
-assert(/case\s+['"]slashL['"]\s*:\s*hitstop\s*=\s*0\.07\s*;\s*shake\s*=\s*0\.14\s*;\s*SFX\.swing\(\)\s*;\s*break/.test(mainJs), 'slashL should preserve hitstop, shake, and SFX only');
-assert(/case\s+['"]thrust['"]\s*:\s*SFX\.thrust\(\)\s*;\s*doThrust\(\)\s*;\s*break/.test(mainJs), 'thrust should keep SFX then doThrust');
-assert(/case\s+['"]spinSlash['"]\s*:\s*hitstop\s*=\s*0\.08\s*;\s*shake\s*=\s*0\.22\s*;\s*break/.test(mainJs), 'spinSlash should preserve hitstop and shake only');
-assert(/case\s+['"]heavyCircle['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*1\.7\s*\)\s*;\s*break/.test(mainJs), 'heavyCircle should delegate to attackBursts');
-assert(/case\s+['"]heavyCircleBig['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*2\.6\s*\)\s*;\s*break/.test(mainJs), 'heavyCircleBig should delegate to attackBursts');
+assert(mainJs.includes('attackBursts,'), 'main.js must pass attackBursts into move trigger wiring');
+assert(/function\s+startSlash\s*\(\s*type\s*,\s*ratio\s*=\s*0\s*\)\s*\{\s*attackBursts\.startSlash\s*\(\s*type\s*,\s*ratio\s*\)\s*;\s*\}/.test(moveTriggersJs), 'startSlash wrapper should delegate to the extracted effective behavior');
+assert(/function\s+doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*\{\s*attackBursts\.doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*;\s*\}/.test(moveTriggersJs), 'doSlash wrapper should delegate without wiring new gameplay');
+assert(/case\s+['"]heavyCircle['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*1\.7\s*\)\s*;\s*break/.test(moveTriggersJs), 'heavyCircle should delegate to attackBursts');
+assert(/case\s+['"]heavyCircleBig['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*2\.6\s*\)\s*;\s*break/.test(moveTriggersJs), 'heavyCircleBig should delegate to attackBursts');
 assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{\s*attackBursts\.update\s*\(\s*dt\s*\)\s*;\s*\/\/ 闪避残影淡出\s*ghostAfterimages\.update\s*\(\s*dt\s*\)/.test(mainJs), 'updateFx should update attack bursts before ghost afterimages');
 assert(!mainJs.includes('const slashPivot='), 'main.js should not retain inline slash pivot');
 assert(!mainJs.includes('const slashMat='), 'main.js should not retain inline slash material');

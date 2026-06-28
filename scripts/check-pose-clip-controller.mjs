@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
 const modulePath = path.join(repoRoot, 'prototype/3d/src/player/poseClipController.js');
 
 function assert(condition, message) {
@@ -206,7 +207,7 @@ assert(typeof createPoseClipController === 'function', 'poseClipController.js mu
 
 assert(mainJs.includes('import { createPoseClipController } from "./player/poseClipController.js";'), 'main.js must import createPoseClipController');
 assert(mainJs.includes('createPoseClipController({'), 'main.js must construct the pose clip controller');
-assert(/function\s+startMove\s*\([\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)/.test(mainJs), 'startMove should capture pose snapshots through the controller');
+assert(/function\s+startMove\s*\([\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)/.test(moveTriggersJs), 'startMove should capture pose snapshots through the controller');
 assert(/mv\.recoverClip[\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)\s*;\s*P\.blendT\s*=\s*0\s*;\s*P\.blendDur\s*=\s*0\.12/.test(mainJs), 'recover clip transition should preserve snapshot timing and blend duration');
 assert(/mv\.landClip[\s\S]*poseClipController\.capturePoseSnapshot\s*\(\s*\)\s*;\s*P\.blendT\s*=\s*0\s*;\s*P\.blendDur\s*=\s*0\.10/.test(mainJs), 'land clip transition should preserve snapshot timing and blend duration');
 assert(/function\s+poseCharacter\s*\(\s*dt\s*\)\s*\{[\s\S]*poseClipController\.resetJoints\s*\(\s*\)[\s\S]*poseClipController\.resetDrivenState\s*\(\s*\)[\s\S]*poseClipController\.applyClip\s*\(\s*P\.clip\s*,\s*P\.clipT\s*,\s*blend\s*\)[\s\S]*const\s+drivenPose\s*=\s*poseClipController\.getDrivenState\s*\(\s*\)/.test(mainJs), 'poseCharacter should reset, apply clips, then consume driven pose through the controller');
