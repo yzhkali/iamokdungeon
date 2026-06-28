@@ -22,7 +22,7 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空和草模块。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/world/`：天空和草。
 - `prototype/3d/src/wolf.js`：程序化狼。
@@ -47,12 +47,12 @@ Windows 本地双击入口仍保留：
 
 ## Known Issues
 
-- 工具页还需要最终本地化复查和 smoke 覆盖。
+- 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
 - `main.js` 仍偏大，后续应继续拆 `CLIPS`、`MOVES`、输入、HUD、相机、循环。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks
 
-1. 修保留工具页的 CDN/缺失资源引用，并纳入验证。
-2. 继续行为保持式模块化。
+1. 继续行为保持式模块化。
+2. 每个切片都跑 `npm run validate` 或 `npm run prepush`。
 3. 最终多子代理严格复查后再推送。
