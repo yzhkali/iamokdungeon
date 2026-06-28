@@ -17,10 +17,12 @@
 ## 当前结构
 
 - `prototype/3d/index.html`：主入口、UI/CSS、importmap、本地 BGM。
-- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块、相机控制器、UI 控制器、狼 AI 控制器、GLTF 狼适配器、主循环调度器、世界碰撞/高度状态、静态村庄/blockout、训练木人桩构建器、玩家状态/调参数据、玩家程序化 rig、战斗/姿态纯数学辅助函数、攻击视觉爆发控制器、目标受击反馈控制器、命中判定控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器、大风车同心环控制器、闪避残影控制器和动作关键帧控制器。
+- `prototype/3d/src/main.js`：主编排入口，当前约 411 行；负责装配场景、世界、玩家、输入、运行服务和主循环，不再内联玩家每帧 update 或战斗 runtime 装配。
 - `prototype/3d/src/core/threeLoader.js`：本地 Three.js / GLTFLoader 加载。没有 CDN 回退。
 - `prototype/3d/src/core/sfx.js`：SFX 封装。
 - `prototype/3d/src/core/modelLoader.js`：GLTF 缓存、预处理和放置。
+- `prototype/3d/src/core/runtimeServices.js`：HUD/map、水面反射 pass、测试探针、resize/loading 和主循环启动装配。
+- `prototype/3d/src/combat/runtimeCombat.js`：战斗 runtime 装配，集中创建空间斩、命中反馈、命中判定、攻击爆发、残影、目标反馈、同心环、剑拖尾、剑气、践踏和 `updateFx`。
 - `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
 - `prototype/3d/src/combat/hitResolution.js`：普通挥砍、剑气、突刺、大风车、木星球和扫掠命中的目标判定与命中副作用调度。
 - `prototype/3d/src/combat/attackBursts.js`：轻击刀光/重击圆圈视觉对象、休眠 `startSlash` 语义、`doSlash`、`burstCircle` 和淡出更新。
@@ -39,6 +41,7 @@
 - `prototype/3d/src/player/state.js`：玩家初始状态和移动/跳跃/闪避/蓄力调参常量。
 - `prototype/3d/src/player/ghostAfterimages.js`：闪避残影池、快照、计时和淡出。
 - `prototype/3d/src/player/poseClipController.js`：动作关键帧关节重置、切招快照、clip 采样补间和身体驱动值 staging。
+- `prototype/3d/src/player/updateController.js`：玩家每帧 update 主流程，保持原移动、闪避、连招、hitstop、pose 和战斗特效更新顺序。
 - `prototype/3d/src/combat/spaceSlash.js`：闪避打断后的空间斩 ready 标记、辐射线生成、淡出和清理。
 - `prototype/3d/src/combat/swordBeam.js`：剑气弹幕、弹道裂缝生长、剑气生命周期和裂缝淡出清理。
 - `prototype/3d/src/combat/swordTrail.js`：剑刃挥砍拖尾几何、采样、段数上限和停止后淡出。
@@ -70,12 +73,12 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 当前已知风险
 
-- `main.js` 已拆出低风险模块、水面反射 pass、玩家纯数据表、输入控制器、HUD/map 控制器、相机控制器、狼 AI 控制器、GLTF 狼适配器、主循环调度器、世界碰撞/高度状态、静态村庄/blockout、训练木人桩构建器、玩家状态/调参数据、玩家程序化 rig、闪避残影控制器、动作关键帧控制器、战斗/姿态纯数学辅助函数、命中判定控制器、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器，但特殊姿态执行和玩家 update 主流程仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
+- `main.js` 已降到主装配职责。为缩短收尾时间，后续暂不继续深拆；除非有明确 bug，不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量。
 - 部分保留工具页仍是历史工具，但已经纳入资产检查、语法检查和浏览器 smoke；后续迁移或清理仍需保持这些验证通过。
 - 不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量，除非是在修明确 bug。
 
 ## 下一步建议
 
-1. 继续小步模块化：战斗副作用或姿态执行边界整理。
-2. 每个模块化切片都跑 `npm run validate` 或 `npm run prepush`，再提交。
-3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证并完成只读复查。
+1. 优先保持干净可运行：跑 `npm run validate` 或 `npm run prepush`，再提交。
+2. 短期不要继续大拆；只处理明确 bug、文档过期或低风险废弃文件。
+3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证。
