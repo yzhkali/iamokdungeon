@@ -1,12 +1,24 @@
 # Recovery Execution Plan - 2026-06-28
 
-## Current Verified State
+## Execution Result
+
+This file records the recovery plan that was written before the cleanup work was reconstructed. It is now a historical baseline, not the current branch state.
+
+Current result summary:
+
+- Cleanup and validation results are recorded in `docs/cleanup_validation_report_2026-06-28.md`.
+- The branch now has root validation scripts and a passing `npm run prepush` gate.
+- Complete source packs under `assets/packs/vendor/**` have been removed from the working tree.
+- The runtime vendor subset remains under `prototype/3d/assets/vendor/`.
+- Retained 3D tool pages are covered by asset, syntax, and browser smoke checks.
+
+## Original Verified State
 
 - Active branch: `codex/yard-map-asset-test`.
 - Remote HEAD: `1a121d3` (`草地简化：只保留5种连片草`).
 - The previous local worktree at `/tmp/iamokdungeon-review` was deleted before it was pushed. The previously reported local HEAD `07d7aac` and 21 ahead commits are not present in any currently visible local git object store.
 - This worktree was recloned from `origin/codex/yard-map-asset-test` on 2026-06-28.
-- Current remote state still has the original large runtime file and duplicate vendor source packs:
+- The original remote state still had the large runtime file and duplicate vendor source packs:
   - `prototype/3d/src/main.js`: 3174 lines, about 183 KB.
   - `assets/packs/vendor/`: about 907 MB.
   - `prototype/3d/assets/vendor/`: about 115 MB retained runtime subset.
