@@ -8,8 +8,7 @@ import { buildTerrainWater } from "./world/terrainWater.js";
 import { createWorldCollision } from "./world/collision.js";
 import { createVillageBlockout } from "./world/village.js";
 import { makeTrainingDummy } from "./world/trainingDummy.js";
-import { makeWolf } from "./wolf.js";
-import { createWolfAiController } from "./enemies/wolfAi.js";
+import { createWolfRuntime } from "./enemies/wolfRuntime.js";
 import { createCameraController } from "./camera.js";
 import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
@@ -155,13 +154,10 @@ function makeDummy(dx,dz,face){
 //makeDummy(0,5,Math.PI);
 const monsters=[];
 
-// ─── WOLF ──────────────────────────────────────────────
-let wolf=null;
-
 // ── WOLF AI ─────────────────────────────────────────
-wolf=makeWolf(THREE, scene, 0, 0.72, -40);
-const wolfController = createWolfAiController({
-  wolf,
+const { updateWolf } = createWolfRuntime({
+  THREE,
+  scene,
   hittables,
   getPlayer: () => P,
   setHitstop: value => { hitstop = value; },
@@ -169,8 +165,6 @@ const wolfController = createWolfAiController({
   setTimeoutRef: setTimeout,
   random: Math.random
 });
-const wolfAI = wolfController.wolfAI;
-function updateWolf(dt){ wolfController.updateWolf(dt); }
 
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”

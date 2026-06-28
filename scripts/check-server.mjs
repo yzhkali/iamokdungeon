@@ -36,6 +36,7 @@ try {
   await expectStatus(origin, '/src/core/renderScene.js', 200);
   await expectStatus(origin, '/src/debug/testProbe.js', 200);
   await expectStatus(origin, '/src/loop.js', 200);
+  await expectStatus(origin, '/src/enemies/wolfRuntime.js', 200);
   await expectStatus(origin, '/src/rendering/waterReflection.js', 200);
   await expectStatus(origin, '/src/player/clips.js', 200);
   await expectStatus(origin, '/src/player/characterPose.js', 200);
