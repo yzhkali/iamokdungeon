@@ -4,6 +4,7 @@ import { createSpaceSlash } from '../prototype/3d/src/combat/spaceSlash.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const hitTargetFeedbackJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/hitTargetFeedback.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -143,8 +144,8 @@ function createFixture(randomValues) {
 
 assert(mainJs.includes('import { createSpaceSlash } from "./combat/spaceSlash.js";'), 'main.js must import space slash module');
 assert(/\bconst\s+spaceSlash\s*=\s*createSpaceSlash\s*\(\s*\{\s*THREE\s*,\s*scene\s*\}\s*\)/.test(mainJs), 'main.js must create spaceSlash controller');
-assert(/spaceSlash\.consumeHit\s*\(\s*ox\s*,\s*oy\s*,\s*oz\s*\)/.test(mainJs), 'onHitTarget must consume space slash on target hit');
-assert(/hitstop\s*=\s*Math\.max\s*\(\s*hitstop\s*,\s*0\.06\s*\)\s*;\s*shake\s*=\s*Math\.max\s*\(\s*shake\s*,\s*0\.2\s*\)/.test(mainJs), 'onHitTarget must keep existing space slash hitstop and shake boosts');
+assert(/spaceSlash\.consumeHit\s*\(\s*ox\s*,\s*oy\s*,\s*oz\s*\)/.test(hitTargetFeedbackJs), 'onHitTarget must consume space slash on target hit');
+assert(/boostImpact\s*\(\s*0\.06\s*,\s*0\.2\s*\)/.test(hitTargetFeedbackJs), 'onHitTarget must keep existing space slash hitstop and shake boosts');
 assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)\s*\)\s*\{\s*spaceSlash\.markReady\(\)/.test(mainJs), 'dodge cancel must mark the next hit for space slash');
 assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;\s*stompEffects\.updateStomps\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep space slash after rings and before stomps');
 assert(!mainJs.includes('let spaceSlashReady=false'), 'main.js should not retain inline spaceSlashReady');

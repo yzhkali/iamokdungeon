@@ -24,6 +24,7 @@ import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 import { createGameLoop } from "./loop.js";
 import { installTestProbe } from "./debug/testProbe.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
+import { createHitTargetFeedback } from "./combat/hitTargetFeedback.js";
 import { createSwordTrail } from "./combat/swordTrail.js";
 import { createSpaceSlash } from "./combat/spaceSlash.js";
 import { createSwordBeamController } from "./combat/swordBeam.js";
@@ -194,16 +195,16 @@ scene.add(jupiterBall);
 let jupiterActive=false,_jSpin=0,_drillSpin=0;
 
 const spaceSlash = createSpaceSlash({ THREE, scene });
-// 命中钩子：带空间斩标记时，在命中点放空间斩并清除标记
-function onHitTarget(ox,oy,oz){
-  if(spaceSlash.consumeHit(ox,oy,oz)){ hitstop=Math.max(hitstop,0.06); shake=Math.max(shake,0.2); }
-  // 命中音效:骷髅→骨头脆响, 木桩→撞木声, 怪物(肉)→闷击声
-  const nearDummy=dummies.some(d=>Math.hypot(d.x-ox,d.z-oz)<1.8);
-  const nearMonster=monsters.some(m=>Math.hypot(m.x-ox,m.z-oz)<1.8);
-  if(nearMonster) SFX.hitBone();
-  else if(nearDummy) SFX.hitWood();
-  else SFX.hitFlesh();
-}
+const { onHitTarget } = createHitTargetFeedback({
+  spaceSlash,
+  getDummies: () => dummies,
+  getMonsters: () => monsters,
+  sfx: SFX,
+  boostImpact: (nextHitstop, nextShake) => {
+    hitstop = Math.max(hitstop, nextHitstop);
+    shake = Math.max(shake, nextShake);
+  }
+});
 const hitResolution=createHitResolution({
   getPlayer:()=>P,
   getHittables:()=>hittables,
