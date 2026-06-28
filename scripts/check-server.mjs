@@ -44,6 +44,7 @@ try {
   await expectStatus(origin, '/src/ui/input.js', 200);
   await expectStatus(origin, '/src/ui/mapHud.js', 200);
   await expectStatus(origin, '/src/enemies/wolfAi.js', 200);
+  await expectStatus(origin, '/src/world/terrainWater.js', 200);
   await expectStatus(origin, '/src/world/village.js', 200);
   await expectStatus(origin, '/maps/map15.json', 200);
   await expectStatus(origin, '/', 200);
