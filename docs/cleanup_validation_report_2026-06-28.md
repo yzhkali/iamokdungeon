@@ -45,6 +45,7 @@ Retained tool pages:
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
 - `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
+- `prototype/3d/src/enemies/wolfAi.js` owns wolf patrol/look/chase/border/return/death state, wolf hittable callbacks, and wolf-to-player damage.
 - `prototype/3d/src/main.js` is reduced from the original giant file and remains the startup/gameplay coordinator.
 - Map loading uses local `./maps/map15.json` and validates the HTTP response.
 - Wolf runtime state is active instead of leaving a hittable null wolf.
@@ -64,6 +65,7 @@ Root scripts:
 - `npm run check:map-hud`
 - `npm run check:camera`
 - `npm run check:render-loop`
+- `npm run check:wolf-ai`
 - `npm run check:syntax`
 - `npm run check:server`
 - `npm run check:browser`
@@ -80,30 +82,37 @@ Coverage:
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
 - Render loop check verifies water reflection RT sizing, `uRes` sync, reflection camera/clip setup, water mesh hide/restore, render-target/clipping reset order, and cleanup on reflection render errors with lightweight fakes.
+- Wolf AI check verifies patrol timing, vision/look/chase transitions, attack cooldown and damage/iframe/death handling, territory border/return behavior, hittable removal, finite knockback, and final hittable position sync with lightweight fakes.
 - Syntax check covers runtime source files, validation scripts, and inline scripts in all top-level `prototype/3d/*.html` pages.
 - Static server check verifies normal runtime routes, rejects path traversal, rejects directory listing, and rejects unsupported methods.
 - Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, requires the primary runtime canvas to render nonblank pixels, and probes mini-map/world-map canvas drawing, map UI interactions, camera wiring, and render-state restoration on `/index.html`.
 
 ## Current Verification Evidence
 
-Latest known passing gate before this report:
+Latest passing gate for the current cleanup/modularization slice:
 
 - `npm run prepush`
 
 Important passing lines from the latest run:
 
-- `Asset check passed (66 runtime assets, 22 source files).`
+- `Asset check passed (67 runtime assets, 23 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Input controller check passed.`
 - `Map HUD check passed.`
 - `Camera controller check passed.`
 - `Render loop check passed.`
-- `Syntax check passed (24 files plus 9 inline scripts).`
+- `Wolf AI check passed.`
+- `Syntax check passed (26 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
 The final handoff should rerun `npm run prepush` after any document or code changes.
+
+## Multi-Agent Review Notes
+
+- Implementation/behavior review: no blocker. The reviewer confirmed the wolf AI extraction preserves the previous state machine shape and noted only that `prototype/3d/src/enemies/wolfAi.js` must be included in the commit.
+- Validation/docs/repository-hygiene review: no blocker and no non-blocker findings. The reviewer confirmed `check:wolf-ai`, server route coverage, docs, and temporary-file state are consistent.
 
 ## Repository Size Notes
 
