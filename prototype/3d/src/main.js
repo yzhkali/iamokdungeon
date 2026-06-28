@@ -3,6 +3,7 @@ import { createSfx } from "./core/sfx.js";
 import { createModelLoader } from "./core/modelLoader.js";
 import { buildGrass, updateGrass } from "./world/grass.js";
 import { buildSky, updateSky } from "./world/sky.js";
+import { createWorldCollision } from "./world/collision.js";
 import { makeTrainingDummy } from "./world/trainingDummy.js";
 import { makeWolf } from "./wolf.js";
 import { createWolfAiController } from "./enemies/wolfAi.js";
@@ -283,8 +284,18 @@ const { placeModel } = createModelLoader({ THREE, GLTFLoader, scene });
 // ============================================================
 //  Village blockout v1: player village + training yard + monster pen
 // ============================================================
-const colliders=[]; // AABB: {minx,maxx,minz,maxz,bottom,top}
-function addCollider(x,z,w,d,bottom=0,top=3.2){ colliders.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,bottom,top}); }
+const {
+  colliders,
+  platforms,
+  terrainAreas,
+  addCollider,
+  addTerrainArea,
+  addPlatform,
+  addPlatformBounds,
+  terrainYAt,
+  groundHeightAt,
+  resolveCollision
+} = createWorldCollision({ terrainHeightAt: terrainH });
 
 const wallMat=new THREE.MeshStandardMaterial({color:0x6b5a4a,roughness:0.9});
 function wall(x,z,w,d,h=2.6){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,h/2,z);m.castShadow=true;m.receiveShadow=true;scene.add(m); addCollider(x,z,w,d,0,h);}
@@ -294,9 +305,7 @@ const mapFeatures=[];
 function registerMapFeature(feature){ mapFeatures.push(feature); return feature; }
 
 const propMat=new THREE.MeshStandardMaterial({color:0x7a6450,roughness:0.85});
-const platforms=[];   // 可站立顶面: {minx,maxx,minz,maxz,top}
 const hittables=[];   // 可被攻击的物体
-const terrainAreas=[];
 const VILLAGE_TOPS = { ground:0, church:0.22, elder:0.48 };
 const groundMats=new Map();
 function mat(color,roughness=0.9){
@@ -308,17 +317,10 @@ function addGroundPatch(x,z,w,d,top=0,color=0x5a5241){
   const h=0.14;
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.94));
   m.position.set(x,top-h/2,z); m.receiveShadow=true; mapRoot.add(m);
-  terrainAreas.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
-  if(top>0.03) platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  addTerrainArea(x,z,w,d,top);
+  if(top>0.03) addPlatform(x,z,w,d,top);
   registerMapFeature({type:color===0x6d6049||color===0x766a58?'road':'terrain',x,z,w,d,rot:0,top,color});
   return m;
-}
-function terrainYAt(x,z){
-  let top=terrainH(x,z);
-  for(const a of terrainAreas){
-    if(x>=a.minx && x<=a.maxx && z>=a.minz && z<=a.maxz) top=Math.max(top,a.top);
-  }
-  return top;
 }
 function addLowWall(x,z,w,d,h=1.25,color=0x6b5a4a,top=terrainYAt(x,z)){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,0.86));
@@ -329,7 +331,7 @@ function addLowWall(x,z,w,d,h=1.25,color=0x6b5a4a,top=terrainYAt(x,z)){
 function addStep(x,z,w,d,top,color=0x756354){
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,top,d),mat(color,0.88));
   m.position.set(x,top/2,z); m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
-  platforms.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,top});
+  addPlatform(x,z,w,d,top);
   registerMapFeature({type:'road',x,z,w,d,rot:0,top,color});
   return m;
 }
@@ -409,7 +411,7 @@ function addPlayerHome({x,z,top=terrainYAt(x,z),rot=0}){
   registerMapFeature({type:'building',name:'player-home',sign:'HOME',x,z,w,d,rot,top,roofColor:0x6c4738,enterable:true});
   const floor=new THREE.Mesh(new THREE.BoxGeometry(w,0.18,d),mat(0x7b6a52,0.92));
   floor.position.y=0.04; floor.receiveShadow=true; root.add(floor);
-  platforms.push({minx:x-w/2+wallT,maxx:x+w/2-wallT,minz:z-d/2+wallT,maxz:z+d/2-wallT,top:floorTop});
+  addPlatformBounds(x-w/2+wallT,x+w/2-wallT,z-d/2+wallT,z+d/2-wallT,floorTop);
   const wallMaterial=mat(0xc8b07f,0.88);
   function wallSeg(lx,ly,lz,sw,sh,sd){
     const m=new THREE.Mesh(new THREE.BoxGeometry(sw,sh,sd),wallMaterial);
@@ -825,36 +827,6 @@ function startDodgeCombo(kind){
 function startSlash(type,ratio=0){
   attackBursts.startSlash(type,ratio);
 }
-// 当前 (x,z) 处的支撑高度（地面0 或 站在某个平台顶）
-function groundHeightAt(x,z){
-  let g=terrainH(x,z);
-  for(const p of platforms){
-    if(x>=p.minx && x<=p.maxx && z>=p.minz && z<=p.maxz){ if(p.top>g) g=p.top; }
-  }
-  return g;
-}
-// 水平碰撞：当玩家高于某柱顶时，不把它当墙(可落脚)
-function resolveCollision(){
-  for(let i=0;i<colliders.length;i++){
-    const c=colliders[i];
-    // 柱子(有对应platform)且玩家已高于其顶面 → 跳过水平碰撞，让玩家能站上去
-    const plat=platforms.find(p=>Math.abs((p.minx+p.maxx)/2-(c.minx+c.maxx)/2)<0.01 && Math.abs((p.minz+p.maxz)/2-(c.minz+c.maxz)/2)<0.01);
-    if(plat && P.y>=plat.top-0.05) continue;
-    const cx=Math.max(c.minx,Math.min(P.x,c.maxx));
-    const cz=Math.max(c.minz,Math.min(P.z,c.maxz));
-    const dx=P.x-cx, dz=P.z-cz; const d2=dx*dx+dz*dz;
-    if(d2<PLAYER_R*PLAYER_R){
-      const d=Math.sqrt(d2);
-      if(d>0.0001){ const push=(PLAYER_R-d)/d; P.x+=dx*push; P.z+=dz*push; }
-      else {
-        const toL=P.x-c.minx, toR=c.maxx-P.x, toD=P.z-c.minz, toU=c.maxz-P.z;
-        const m=Math.min(toL,toR,toD,toU);
-        if(m===toL)P.x=c.minx-PLAYER_R; else if(m===toR)P.x=c.maxx+PLAYER_R;
-        else if(m===toD)P.z=c.minz-PLAYER_R; else P.z=c.maxz+PLAYER_R;
-      }
-    }
-  }
-}
 const clock=new THREE.Clock();
 function update(dt){
   if(mapHud.isWorldMapOpen()){updateFx(dt);poseCharacter(dt);return;}
@@ -1121,7 +1093,7 @@ function update(dt){
   P.x+=vX*dt;P.z+=vZ*dt;P.speed=Math.hypot(vX,vZ);
   // 边界 + 碰撞
   const B=ROOM-1;P.x=Math.max(-B,Math.min(B,P.x));P.z=Math.max(-B,Math.min(B,P.z));
-  resolveCollision();
+  resolveCollision(P, PLAYER_R);
 
   if(P.moving)P.runPhase+=dt*Math.min(P.speed,MOVE_SPEED)*1.9;else P.runPhase*=0.85;
   if(P.stamina<P.staminaMax)P.stamina=Math.min(P.staminaMax,P.stamina+STAM_REGEN*dt);

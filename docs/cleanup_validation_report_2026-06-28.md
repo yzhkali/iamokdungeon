@@ -48,6 +48,7 @@ Retained tool pages:
 - `prototype/3d/src/combat/swordTrail.js` owns sword trail geometry, sword root/tip sampling, segment capping, and stopped-trail fadeout.
 - `prototype/3d/src/combat/stompEffects.js` owns stomp crater/debris spawning, debris physics, AoE feedback, SFX/impact callbacks, and mark fadeout cleanup.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
+- `prototype/3d/src/world/collision.js` owns collider/platform/terrain-area state, terrain/platform height queries, and player horizontal collision resolution.
 - `prototype/3d/src/world/trainingDummy.js` owns training dummy geometry construction, map feature registration, collider registration, and shared dummy-array writes.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
@@ -89,6 +90,7 @@ Root scripts:
 - `npm run check:spin-rings`
 - `npm run check:stomp-effects`
 - `npm run check:training-dummy`
+- `npm run check:world-collision`
 - `npm run check:sword-beam`
 - `npm run check:sword-trail`
 - `npm run check:input`
@@ -119,6 +121,7 @@ Coverage:
 - Spin rings check verifies ring geometry/material setup, delayed visibility, ease-out radius scaling, opacity fade, removal, five-ring saturn burst parameters, live player/radius dependency, dormant `spinSlash` behavior, and main-module integration.
 - Stomp effects check verifies crater material/geometry setup, exact debris count/materials, SFX-before-impact callback order, in-range and out-of-range AoE feedback, deterministic debris bounce/settle behavior, fadeout/removal, and main-module integration.
 - Training dummy check verifies dummy geometry/material/shadow values, scene registration, map feature payload, collider payload, shared dummy-array writes, feedback material collection, and main-module integration.
+- World collision check verifies collider/platform/terrain-area AABB registration, terrain and platform height separation, platform collider skip tolerance, normal and zero-distance player pushout, live player mutation, preserved vertical-height ignorance, and main-module integration.
 - Sword beam check verifies beam material/geometry setup, one-grid spawn offset, direction snapshot, movement before hit callback, crack growth/index stitching, beam removal, crack fadeout/removal, and main-module integration while preserving main-owned hit behavior.
 - Sword trail check verifies mesh/material/geometry setup, default and explicit segment caps, root/tip sampling order, hidden-update no-op behavior, stopped-trail fadeout, history reset, and main-module integration.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
