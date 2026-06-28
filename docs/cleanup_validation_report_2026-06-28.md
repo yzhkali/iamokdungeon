@@ -38,6 +38,7 @@ Retained tool pages:
 - `prototype/3d/src/core/threeLoader.js` now loads only local Three.js and GLTFLoader.
 - `prototype/3d/src/core/sfx.js` owns SFX loading and fixes the `swosh-03.ogg` path.
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
+- `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
@@ -64,6 +65,7 @@ Root scripts:
 - `npm run check:vendor-subset`
 - `npm run check:player-data`
 - `npm run check:player-state`
+- `npm run check:hit-math`
 - `npm run check:input`
 - `npm run check:map-hud`
 - `npm run check:camera`
@@ -83,6 +85,7 @@ Coverage:
 - Vendor subset check parses retained `.gltf` files and verifies `.bin` and texture dependency closure.
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
+- Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
@@ -101,17 +104,18 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (69 runtime assets, 25 source files).`
+- `Asset check passed (70 runtime assets, 26 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
+- `Hit math check passed.`
 - `Input controller check passed.`
 - `Map HUD check passed.`
 - `Camera controller check passed.`
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (30 files plus 9 inline scripts).`
+- `Syntax check passed (32 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -125,6 +129,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Game loop validation review: one commit-hygiene blocker was raised because `prototype/3d/src/loop.js` and `scripts/check-game-loop.mjs` were still untracked during review; this slice stages both files. The reviewer also requested tighter unit coverage, which was added for sky/camera clamped dt, exact event count, repeated RAF rescheduling, and second-frame elapsed-time use.
 - Player state implementation review: no blocker and no non-blocker findings. The reviewer confirmed the extracted player defaults and tuning constants match the old inline values and that `state.js` does not depend on Three.js.
 - Player state validation review: one commit-hygiene blocker was raised because `prototype/3d/src/player/state.js` and `scripts/check-player-state.mjs` were still untracked during review; this slice stages both files. The reviewer noted the integration assertions are string-based but acceptable for this lightweight guard.
+- Hit math implementation review: no blocker. The reviewer confirmed `sampleTrack`, `angleDelta`, thrust-box math, and spin-sweep arc math preserve the old calculations; the only note was to ensure `prototype/3d/src/combat/hitMath.js` is staged with the slice.
+- Hit math validation/repository review: one commit-hygiene blocker was raised because `prototype/3d/src/combat/hitMath.js` and `scripts/check-hit-math.mjs` were still untracked during review; this slice stages both files. Coverage, script order, server route coverage, docs, and repo hygiene had no blocker findings.
 
 ## Repository Size Notes
 
@@ -141,7 +147,7 @@ The large `.git` size is expected while local history still contains removed ven
 ## Remaining Non-Blocking Work
 
 - Continue modularizing `prototype/3d/src/main.js` in small behavior-preserving slices:
-  - combat state and hit detection boundaries
+  - combat side-effect boundaries
   - pose execution boundaries
 - Keep each slice covered by `npm run validate` or `npm run prepush`.
 - Do not retune movement, combat, dodge, camera, wolf AI, hitstop, shake, or SFX timing unless fixing a confirmed bug.

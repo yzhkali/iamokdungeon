@@ -17,10 +17,11 @@
 ## 当前结构
 
 - `prototype/3d/index.html`：主入口、UI/CSS、importmap、本地 BGM。
-- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块、相机控制器、UI 控制器、狼 AI 控制器、主循环调度器和玩家状态/调参数据。
+- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块、相机控制器、UI 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据和战斗/姿态纯数学辅助函数。
 - `prototype/3d/src/core/threeLoader.js`：本地 Three.js / GLTFLoader 加载。没有 CDN 回退。
 - `prototype/3d/src/core/sfx.js`：SFX 封装。
 - `prototype/3d/src/core/modelLoader.js`：GLTF 缓存、预处理和放置。
+- `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
 - `prototype/3d/src/world/sky.js`：天空 dome、云层和更新。
 - `prototype/3d/src/world/grass.js`：草卡实例化和风动更新。
 - `prototype/3d/src/rendering/waterReflection.js`：水面反射 pass，负责反射 RT 尺寸同步、clippingPlanes、水面隐藏/恢复和状态清理。
@@ -54,12 +55,12 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 当前已知风险
 
-- `main.js` 已拆出低风险模块、水面反射 pass、玩家纯数据表、输入控制器、HUD/map 控制器、相机控制器、狼 AI 控制器、主循环调度器和玩家状态/调参数据，但战斗判定和姿态执行仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
+- `main.js` 已拆出低风险模块、水面反射 pass、玩家纯数据表、输入控制器、HUD/map 控制器、相机控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据和战斗/姿态纯数学辅助函数，但战斗副作用和姿态执行仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
 - 部分保留工具页仍是历史工具，但已经纳入资产检查、语法检查和浏览器 smoke；后续迁移或清理仍需保持这些验证通过。
 - 不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量，除非是在修明确 bug。
 
 ## 下一步建议
 
-1. 继续小步模块化：战斗判定或姿态执行边界整理。
+1. 继续小步模块化：战斗副作用或姿态执行边界整理。
 2. 每个模块化切片都跑 `npm run validate` 或 `npm run prepush`，再提交。
 3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证并完成只读复查。

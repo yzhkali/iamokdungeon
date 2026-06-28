@@ -8,6 +8,7 @@
     "check:vendor-subset": "node scripts/check-vendor-subset.mjs",
     "check:player-data": "node scripts/check-player-data.mjs",
     "check:player-state": "node scripts/check-player-state.mjs",
+    "check:hit-math": "node scripts/check-hit-math.mjs",
     "check:input": "node scripts/check-input-controller.mjs",
     "check:map-hud": "node scripts/check-map-hud.mjs",
     "check:camera": "node scripts/check-camera.mjs",
@@ -17,7 +18,7 @@
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:server": "node scripts/check-server.mjs",
     "check:browser": "node scripts/check-browser.mjs",
-    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
+    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:hit-math && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
     "serve": "node scripts/static-server.mjs prototype/3d",
     "prepush": "git diff --check && npm run validate"
   }

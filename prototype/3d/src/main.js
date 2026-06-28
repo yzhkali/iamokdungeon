@@ -13,6 +13,7 @@ import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 import { createGameLoop } from "./loop.js";
+import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -1143,23 +1144,6 @@ function updateStomps(dt){
 const JOINTS={ shoR:RArm.root, elbR:RArm.j2, shoL:LArm.root, elbL:LArm.j2,
   hipR:RLeg.root, kneeR:RLeg.j2, hipL:LLeg.root, kneeL:LLeg.j2, chest:chest, head:headGrp, wristR:rWrist };
 function resetJoints(){ for(const k in JOINTS){ JOINTS[k].rotation.set(0,0,0); } }
-function ease(k,mode){
-  if(mode==='out') return 1-(1-k)*(1-k);          // 减速逼近(慢出)
-  if(mode==='in')  return k*k;                      // 加速离开(慢入)
-  if(mode==='inout') return k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
-  return k;                                         // 线性
-}
-function sampleTrack(track,t){
-  if(t<=track[0].t)return track[0];
-  if(t>=track[track.length-1].t)return track[track.length-1];
-  for(let i=0;i<track.length-1;i++){const a=track[i],b=track[i+1];
-    if(t>=a.t&&t<=b.t){let k=(t-a.t)/(b.t-a.t);
-      k=ease(k, b.e);                               // 目标关键帧可声明缓动 e:'out'/'in'/'inout'
-      const o={};
-      for(const key of ['x','y','z','v'])if(a[key]!==undefined||b[key]!==undefined)o[key]=THREE.MathUtils.lerp(a[key]||0,b[key]||0,k);
-      return o;}}
-  return track[track.length-1];
-}
 // 切招过渡：记录切招瞬间每个关节的实际旋转，作为补间起点
 const POSE_SNAP={};
 let clipBodyY=null, clipBodyLean=null, clipBodyYaw=null, clipBodySide=null, clipGripMode=null;   // 动作驱动的身体下沉/前倾/握剑姿态(null=不覆盖)
@@ -1179,7 +1163,7 @@ function applyClip(name,time,blend){
   // blend: 0→1，从切招快照过渡到新动作；>=1 或未传则直接套用
   const b = (blend===undefined)?1:Math.min(1,blend);
   for(const jn in clip.tracks){
-    const val=sampleTrack(clip.tracks[jn],time);
+    const val=sampleTrack(clip.tracks[jn],time,THREE.MathUtils.lerp);
     // 身体下沉 / 整体前倾（驱动下半身核心发力感）
     if(jn==='bodyY'){
       const tgt=val.v||0; const s=(POSE_SNAP._bodyY??0);
@@ -1451,12 +1435,7 @@ function beamHitDummies(bx,bz){
 // 突刺判定：玩家正前方 宽1格×长3格 的矩形
 const GRID_=2;
 function inThrustBox(ox,oz,or){
-  const fx=Math.sin(P.facing), fz=Math.cos(P.facing);
-  const px=-fz, pz=fx;                       // 垂直方向
-  const dx=ox-P.x, dz=oz-P.z;
-  const along=dx*fx+dz*fz;                   // 沿前方距离
-  const side=Math.abs(dx*px+dz*pz);          // 横向偏移
-  return along>-0.3 && along<GRID_*3 && side<GRID_*0.5+(or||0);
+  return isInThrustBox({ playerX:P.x, playerZ:P.z, facing:P.facing, targetX:ox, targetZ:oz, targetRadius:or||0, grid:GRID_ });
 }
 function tryThrustHit(){
   for(const o of hittables){ if(inThrustBox(o.x,o.z,o.r)){ o.flashT=0.18; o.shakeT=0.18; onHitTarget(o.x,1.4,o.z); if(o.onHit) o.onHit(); } }
@@ -1509,18 +1488,12 @@ function tryJupiterHit(){
 function trySweepHit(){
   // 剑当前世界朝向角度：身体绕Y顺时针转(body.rotation.y=-spin*2π)，剑在右侧(facing基础上+90°起转)
   const _turns=MOVES[P.move]?.spinTurns||1;
-  const swordAng = P.facing + Math.PI/2 - P.spin*Math.PI*2*_turns;   // 当前剑角度(乘以转圈数)
   const ARC=0.6;   // 扇区半角(弧度)~34°
   if(!P._spinHit) P._spinHit=new Set();
   const checkList=[...hittables,...dummies,...monsters];
   for(const o of checkList){
     if(P._spinHit.has(o)) continue;
-    const dx=o.x-P.x, dz=o.z-P.z;
-    const dist=Math.hypot(dx,dz);
-    if(dist > SPIN_RADIUS+o.r) continue;
-    let ang=Math.atan2(dx,dz);                 // 目标方向角(与facing同基准)
-    let diff=((ang-swordAng)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI;
-    if(Math.abs(diff)<ARC){
+    if(isInSpinSweepArc({ playerX:P.x, playerZ:P.z, playerFacing:P.facing, spin:P.spin, spinTurns:_turns, targetX:o.x, targetZ:o.z, targetRadius:o.r, spinRadius:SPIN_RADIUS, arc:ARC })){
       P._spinHit.add(o);
       if(o.tiltVel!==undefined){ o.flashT=0.12; o.tiltVel=Math.max(o.tiltVel,8); hitstop=Math.max(hitstop,0.04); shake=Math.max(shake,0.16); onHitTarget(o.x,1.6,o.z); }
       else { o.flashT=0.2; o.shakeT=0.2; onHitTarget(o.x,1.4,o.z); }
@@ -1803,7 +1776,6 @@ function update(dt){
   updateFx(dt); poseCharacter(dt);
   updateTrail(dt); updateBeams(dt); updateSpinRings(dt); updateSpaceSlash(dt); updateStomps(dt);
 }
-function angleDelta(a,b){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d;}
 
 // ============================================================
 //  自动地图：同一份场景登记数据生成小地图和展开地图
