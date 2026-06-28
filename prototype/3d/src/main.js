@@ -9,6 +9,7 @@ import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
+import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -1940,6 +1941,18 @@ const mapHud = createMapHud({
   documentRef: document,
   windowRef: window
 });
+const waterReflectionPass = createWaterReflectionPass({
+  renderer,
+  scene,
+  camera,
+  reflRT,
+  sceneRT,
+  reflCam,
+  reflClip: _reflClip,
+  reflMatrix: _reflM,
+  waterReflectionMeshes,
+  getWaterSurfaceMaterial: () => (typeof wSurfMat !== 'undefined' ? wSurfMat : null)
+});
 if(globalThis.__IAMOK_ENABLE_TEST_PROBE__){
   globalThis.__IAMOK_TEST_PROBE__ = {
     camera: () => ({
@@ -1955,6 +1968,17 @@ if(globalThis.__IAMOK_ENABLE_TEST_PROBE__){
       playerTargetX: P.x,
       playerTargetY: P.y + 1.7,
       playerTargetZ: P.z
+    }),
+    render: () => ({
+      renderTargetIsNull: renderer.getRenderTarget ? renderer.getRenderTarget() === null : true,
+      clippingPlanes: renderer.clippingPlanes.length,
+      waterReflectionMeshesVisible: waterReflectionMeshes.every(mesh => mesh.visible !== false),
+      rendererWidth: renderer.domElement.width,
+      rendererHeight: renderer.domElement.height,
+      reflWidth: reflRT.width,
+      reflHeight: reflRT.height,
+      sceneRTWidth: sceneRT.width,
+      sceneRTHeight: sceneRT.height
     })
   };
 }
@@ -2235,18 +2259,7 @@ if(skyData) updateSky({ skyData, camera, dt });updateWater(clock.getElapsedTime(
 mapHud.updateHUD();
 const _t=clock.getElapsedTime();updateGrass({ grassMats: grassSystem.grassMats, time: _t });
 // ── 水面反射 pass ──────────────────────────────────────────
-const _rW=renderer.domElement.width,_rH=renderer.domElement.height;
-if(reflRT.width!==_rW||reflRT.height!==_rH){reflRT.setSize(_rW,_rH);sceneRT.setSize(_rW,_rH);if(typeof wSurfMat!=='undefined')wSurfMat.uniforms.uRes.value.set(_rW,_rH);}
-const _wY=-2;
-_reflM.set(1,0,0,0, 0,-1,0,2*_wY, 0,0,1,0, 0,0,0,1);
-reflCam.projectionMatrix.copy(camera.projectionMatrix);
-reflCam.matrixWorld.copy(_reflM).multiply(camera.matrixWorld);
-reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();
-_reflClip.constant=-_wY;
-for(const m of waterReflectionMeshes)m.visible=false;
-renderer.setRenderTarget(reflRT);renderer.clippingPlanes=[_reflClip];renderer.render(scene,reflCam);
-for(const m of waterReflectionMeshes)m.visible=true;
-renderer.setRenderTarget(null);renderer.clippingPlanes=[];
+waterReflectionPass.render();
 // ── 最终渲染 ────────────────────────────────────
 renderer.render(scene,camera);requestAnimationFrame(loop);}
 loop();

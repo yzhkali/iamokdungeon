@@ -410,10 +410,13 @@ async function smokePage(cdp, origin, pathname, {
               window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ', key: 'q' }));
               requestAnimationFrame(() => requestAnimationFrame(() => {
                 const afterCamera = globalThis.__IAMOK_TEST_PROBE__?.camera?.();
+                const renderState = globalThis.__IAMOK_TEST_PROBE__?.render?.();
                 window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ', key: 'q' }));
                 result.cameraProbeExists = !!beforeCamera && !!afterCamera;
                 result.cameraBefore = beforeCamera || null;
                 result.cameraAfter = afterCamera || null;
+                result.renderProbeExists = !!renderState;
+                result.renderState = renderState || null;
                 result.cameraFinite = !!afterCamera && [
                   afterCamera.x, afterCamera.y, afterCamera.z,
                   afterCamera.yaw, afterCamera.pitch,
@@ -425,6 +428,14 @@ async function smokePage(cdp, origin, pathname, {
                   Math.abs(afterCamera.targetYaw - beforeCamera.targetYaw) > 1e-5 ||
                   Math.abs(afterCamera.yaw - beforeCamera.yaw) > 1e-5
                 );
+                result.renderStateClean = !!renderState &&
+                  renderState.renderTargetIsNull === true &&
+                  renderState.clippingPlanes === 0 &&
+                  renderState.waterReflectionMeshesVisible === true &&
+                  renderState.reflWidth === renderState.rendererWidth &&
+                  renderState.reflHeight === renderState.rendererHeight &&
+                  renderState.sceneRTWidth === renderState.reflWidth &&
+                  renderState.sceneRTHeight === renderState.reflHeight;
                 resolve(result);
               }));
             });
@@ -454,6 +465,8 @@ async function smokePage(cdp, origin, pathname, {
       if (!probe.cameraFinite) failures.push(`camera probe contains non-finite values: ${JSON.stringify(probe.cameraAfter)}`);
       if (!probe.cameraPitchInRange) failures.push(`camera pitch outside range: ${JSON.stringify(probe.cameraAfter)}`);
       if (!probe.cameraYawChanged) failures.push(`camera yaw did not respond to KeyQ: before ${JSON.stringify(probe.cameraBefore)}, after ${JSON.stringify(probe.cameraAfter)}`);
+      if (!probe.renderProbeExists) failures.push('render state probe missing');
+      if (!probe.renderStateClean) failures.push(`render state not restored after reflection pass: ${JSON.stringify(probe.renderState)}`);
       if (failures.length) throw new Error(`${pathname} HUD/map probe failed:\n${failures.map(item => `- ${item}`).join('\n')}\nProbe: ${JSON.stringify(probe)}`);
     }
     console.log(`Browser smoke passed: ${pathname}`);
