@@ -17,6 +17,7 @@ Retained tool pages:
 - `prototype/3d/bones.html`
 - `prototype/3d/skeleton-demo.html`
 - `prototype/3d/quat-demo.html`
+- `prototype/3d/角色展示厅.html`
 
 ## Completed Cleanup
 
@@ -63,7 +64,7 @@ Coverage:
 - Asset check scans all `prototype/3d/*.html` files and all `prototype/3d/src/**/*.js` files.
 - Asset check rejects external runtime references and missing referenced local files.
 - Vendor subset check parses retained `.gltf` files and verifies `.bin` and texture dependency closure.
-- Syntax check covers runtime source files and inline scripts in retained HTML pages.
+- Syntax check covers runtime source files, validation scripts, and inline scripts in all top-level `prototype/3d/*.html` pages.
 - Static server check verifies normal runtime routes, rejects path traversal, rejects directory listing, and rejects unsupported methods.
 - Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, and requires the primary runtime canvas to render nonblank pixels.
 
@@ -77,9 +78,9 @@ Important passing lines from the latest run:
 
 - `Asset check passed (60 runtime assets, 16 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
-- `Syntax check passed (13 files plus 8 inline scripts).`
+- `Syntax check passed (13 files plus 9 inline scripts).`
 - `Static server check passed.`
-- Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, and `/quat-demo.html`.
+- Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
 The final handoff should rerun `npm run prepush` after any document or code changes.
 

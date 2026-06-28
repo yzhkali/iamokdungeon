@@ -15,6 +15,7 @@ const smokeTargets = [
   { path: '/bones.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
   { path: '/skeleton-demo.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
   { path: '/quat-demo.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
+  { path: '/%E8%A7%92%E8%89%B2%E5%B1%95%E7%A4%BA%E5%8E%85.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
 ];
 const chromeCandidates = [
   process.env.CHROME_BIN,

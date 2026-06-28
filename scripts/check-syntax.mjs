@@ -7,16 +7,10 @@ const files = [
   ...walk(path.join(repoRoot, 'prototype/3d/src')).filter(file => file.endsWith('.js')),
   ...walk(path.join(repoRoot, 'scripts')).filter(file => file.endsWith('.mjs')),
 ];
-const htmlFiles = [
-  'prototype/3d/index.html',
-  'prototype/3d/editor3d.html',
-  'prototype/3d/gallery.html',
-  'prototype/3d/pose-editor.html',
-  'prototype/3d/sfx-editor.html',
-  'prototype/3d/bones.html',
-  'prototype/3d/skeleton-demo.html',
-  'prototype/3d/quat-demo.html',
-].map(file => path.join(repoRoot, file)).filter(fs.existsSync);
+const htmlRoot = path.join(repoRoot, 'prototype/3d');
+const htmlFiles = fs.readdirSync(htmlRoot, { withFileTypes: true })
+  .filter(entry => entry.isFile() && entry.name.endsWith('.html'))
+  .map(entry => path.join(htmlRoot, entry.name));
 
 function walk(dir) {
   if (!fs.existsSync(dir)) return [];
