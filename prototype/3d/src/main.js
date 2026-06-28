@@ -14,6 +14,7 @@ import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 import { createGameLoop } from "./loop.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
+import { createSwordTrail } from "./combat/swordTrail.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -893,57 +894,7 @@ function spawnSaturnRings(){
   }
 }
 
-// ============================================================
-//  剑刃挥砍拖尾（每段独立年龄：先出现的先消失，彗星尾式渐隐）
-// ============================================================
-const TRAIL_MAX=26;                       // 拖尾缓冲上限
-const TRAIL_LIFE=0.30;                    // 每段残影寿命(秒)
-let TRAIL_SEG=4;                          // 当前拖尾采样段数(轻击=4, 大风车=长)
-const trailMat=new THREE.MeshBasicMaterial({color:0xbfe6ff,transparent:true,opacity:1,vertexColors:true,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
-const trailGeo=new THREE.BufferGeometry();
-const trailPos=new Float32Array(TRAIL_MAX*2*3);  // 每段2个顶点(剑根/剑尖)
-const trailCol=new Float32Array(TRAIL_MAX*2*4);  // 每顶点RGBA(用alpha做逐段渐隐)
-trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
-trailGeo.setAttribute('color',new THREE.BufferAttribute(trailCol,4));
-const trailIdx=[];
-for(let i=0;i<TRAIL_MAX-1;i++){ const a=i*2,b=i*2+1,c=(i+1)*2,d=(i+1)*2+1; trailIdx.push(a,b,c, b,d,c); }
-trailGeo.setIndex(trailIdx);
-const trailMesh=new THREE.Mesh(trailGeo,trailMat); trailMesh.frustumCulled=false; trailMesh.visible=false; scene.add(trailMesh);
-let trailActive=false;
-const trailRootPts=[], trailTipPts=[], trailAges=[];   // 世界坐标历史 + 每段年龄
-function startTrail(segs){ TRAIL_SEG=segs||4; trailActive=true; trailRootPts.length=0; trailTipPts.length=0; trailAges.length=0; trailMesh.visible=true; }
-function stopTrail(){ trailActive=false; }   // 停止记录，已有段继续按各自年龄消失
-const _tmpTip=new THREE.Vector3(), _tmpRoot=new THREE.Vector3();
-function updateTrail(dt){
-  if(!trailMesh.visible) return;
-  // 所有已存在段各自变老
-  for(let i=0;i<trailAges.length;i++) trailAges[i]+=dt;
-  if(trailActive){
-    // 采样当前剑尖 + 剑根(护手处)世界坐标，作为最新段(年龄0)
-    weaponTip.getWorldPosition(_tmpTip);
-    weapon.localToWorld(_tmpRoot.set(0,0.3,0));
-    trailTipPts.unshift(_tmpTip.clone()); trailRootPts.unshift(_tmpRoot.clone()); trailAges.unshift(0);
-    if(trailTipPts.length>TRAIL_SEG){ trailTipPts.pop(); trailRootPts.pop(); trailAges.pop(); }
-  }
-  const n=trailTipPts.length;
-  let anyVisible=false;
-  for(let i=0;i<TRAIL_MAX;i++){
-    const ti=Math.min(i,n-1);
-    const tip=trailTipPts[ti]||_tmpTip, root=trailRootPts[ti]||_tmpRoot;
-    trailPos[i*6+0]=root.x; trailPos[i*6+1]=root.y; trailPos[i*6+2]=root.z;
-    trailPos[i*6+3]=tip.x;  trailPos[i*6+4]=tip.y;  trailPos[i*6+5]=tip.z;
-    // 逐段透明度：按各段年龄(越老越透明)，超出实际段数的=0
-    const age=(i<n && trailAges[ti]!==undefined)?trailAges[ti]:999;
-    let a=Math.max(0, 1-age/TRAIL_LIFE)*0.7;
-    if(a>0.001) anyVisible=true;
-    for(const v of [i*2, i*2+1]){
-      trailCol[v*4+0]=0.78; trailCol[v*4+1]=0.92; trailCol[v*4+2]=1.0; trailCol[v*4+3]=a;
-    }
-  }
-  trailGeo.attributes.position.needsUpdate=true;
-  trailGeo.attributes.color.needsUpdate=true;
-  if(!trailActive && !anyVisible) trailMesh.visible=false;
-}
+const swordTrail = createSwordTrail({ THREE, scene, weapon, weaponTip });
 
 
 // ============================================================
@@ -1517,7 +1468,7 @@ function update(dt){
     let dx=inX,dz=inZ; if(inLen<0.01){dx=Math.sin(P.facing);dz=Math.cos(P.facing);}
     const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
     // 剑攻击中(挥砍主体段/剑影还在)用闪避打断 → 标记下次剑攻击触发空间斩
-    if(P.move && trailMesh.visible && trailActive){ spaceSlashReady=true; }
+    if(P.move && swordTrail.mesh.visible && swordTrail.isActive()){ spaceSlashReady=true; }
     P.state='dodge';P.dodgeT=DODGE_DUR;P.dodgeDir.set(dx,0,dz);P.roll=0;
     SFX.dodge();
     P.iframe=DODGE_IFRAME;P.stamina-=DODGE_COST;P.facing=Math.atan2(dx,dz);
@@ -1625,7 +1576,7 @@ function update(dt){
     if(P.clip===mv.recoverClip) P.clipT+=dt;
 
     // 挥砍主体段开启拖尾(strike前一点开始，cancel停止)
-    if(mv.trail && !P._trailStarted && P.moveT>=mv.strike-0.10){ P._trailStarted=true; startTrail(mv.trailSegs||(mv.spinY?26:4)); }
+    if(mv.trail && !P._trailStarted && P.moveT>=mv.strike-0.10){ P._trailStarted=true; swordTrail.startTrail(mv.trailSegs||(mv.spinY?26:4)); }
     // 命中瞬间：触发特效 + 顿帧 + 检测打到的物体
     if(!P.struck && P.moveT>=mv.strike){ P.struck=true; if(mv.fx) fireFx(mv.fx);
       if(mv.thrustHit) tryThrustHit();
@@ -1648,7 +1599,7 @@ function update(dt){
     if(mv.thrustHit && P.struck && P.moveT<mv.cancel){ tryThrustHit(); }
     // 挥砍结束后让拖尾淡出(大风车记录到招式末尾以画满整圈，其余到cancel)
     const trailStop = mv.spinY ? mv.total : mv.cancel;
-    if(mv.trail && trailActive && P.moveT>=trailStop){ stopTrail(); }
+    if(mv.trail && swordTrail.isActive() && P.moveT>=trailStop){ swordTrail.stopTrail(); }
 
     // 空中俯冲砸：落地瞬间转入插地僵直动画
     if(mv.plunge && onGround && P.moveT>0.05 && !P._plungeDone){
@@ -1774,7 +1725,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  updateTrail(dt); updateBeams(dt); updateSpinRings(dt); updateSpaceSlash(dt); updateStomps(dt);
+  swordTrail.updateTrail(dt); updateBeams(dt); updateSpinRings(dt); updateSpaceSlash(dt); updateStomps(dt);
 }
 
 // ============================================================

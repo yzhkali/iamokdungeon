@@ -39,6 +39,7 @@ Retained tool pages:
 - `prototype/3d/src/core/sfx.js` owns SFX loading and fixes the `swosh-03.ogg` path.
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
+- `prototype/3d/src/combat/swordTrail.js` owns sword trail geometry, sword root/tip sampling, segment capping, and stopped-trail fadeout.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
@@ -66,6 +67,7 @@ Root scripts:
 - `npm run check:player-data`
 - `npm run check:player-state`
 - `npm run check:hit-math`
+- `npm run check:sword-trail`
 - `npm run check:input`
 - `npm run check:map-hud`
 - `npm run check:camera`
@@ -86,6 +88,7 @@ Coverage:
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
+- Sword trail check verifies mesh/material/geometry setup, default and explicit segment caps, root/tip sampling order, hidden-update no-op behavior, stopped-trail fadeout, history reset, and main-module integration.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
@@ -104,18 +107,19 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (70 runtime assets, 26 source files).`
+- `Asset check passed (71 runtime assets, 27 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
 - `Hit math check passed.`
+- `Sword trail check passed.`
 - `Input controller check passed.`
 - `Map HUD check passed.`
 - `Camera controller check passed.`
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (32 files plus 9 inline scripts).`
+- `Syntax check passed (34 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -131,6 +135,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Player state validation review: one commit-hygiene blocker was raised because `prototype/3d/src/player/state.js` and `scripts/check-player-state.mjs` were still untracked during review; this slice stages both files. The reviewer noted the integration assertions are string-based but acceptable for this lightweight guard.
 - Hit math implementation review: no blocker. The reviewer confirmed `sampleTrack`, `angleDelta`, thrust-box math, and spin-sweep arc math preserve the old calculations; the only note was to ensure `prototype/3d/src/combat/hitMath.js` is staged with the slice.
 - Hit math validation/repository review: one commit-hygiene blocker was raised because `prototype/3d/src/combat/hitMath.js` and `scripts/check-hit-math.mjs` were still untracked during review; this slice stages both files. Coverage, script order, server route coverage, docs, and repo hygiene had no blocker findings.
+- Sword trail implementation review: no behavior blocker. The reviewer confirmed start/stop/update semantics, sampling order, fadeout, `spaceSlashReady` gating, update order after `poseCharacter`, and map/dead/hitstop early-return behavior are preserved.
+- Sword trail validation/repository review: two hygiene blockers were raised because `prototype/3d/src/combat/swordTrail.js` and `scripts/check-sword-trail.mjs` were not yet staged and the verification evidence counts were stale. This slice stages both files and updates the evidence to `71 runtime assets, 27 source files` and `34 files plus 9 inline scripts`; the brittle main integration assertions were relaxed to regex checks.
 
 ## Repository Size Notes
 

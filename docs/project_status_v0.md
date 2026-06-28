@@ -22,9 +22,10 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块和战斗/姿态纯数学辅助函数。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、战斗/姿态纯数学辅助函数和剑拖尾控制器。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
+- `prototype/3d/src/combat/swordTrail.js`：剑刃挥砍拖尾几何、采样、段数上限和停止后淡出。
 - `prototype/3d/src/world/`：天空和草。
 - `prototype/3d/src/rendering/waterReflection.js`：水面反射渲染 pass。
 - `prototype/3d/src/camera.js`：相机控制器。
@@ -56,7 +57,7 @@ Windows 本地双击入口仍保留：
 ## Known Issues
 
 - 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
-- `main.js` 仍偏大，后续应继续整理战斗副作用和姿态执行边界。
+- `main.js` 仍偏大，剑拖尾已拆出；后续应继续整理空间斩/剑气/践踏等战斗副作用和姿态执行边界。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks
