@@ -38,7 +38,9 @@ Retained tool pages:
 - `prototype/3d/src/core/threeLoader.js` now loads only local Three.js and GLTFLoader.
 - `prototype/3d/src/core/sfx.js` owns SFX loading and fixes the `swosh-03.ogg` path.
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
+- `prototype/3d/src/core/runtimeServices.js` owns map HUD setup, water reflection pass setup, test probe install, resize/loading startup, and game loop startup.
 - `prototype/3d/src/combat/attackBursts.js` owns slash/heavy burst visual meshes, dormant `startSlash` effective behavior, `doSlash`, `burstCircle`, and attack burst fade updates.
+- `prototype/3d/src/combat/runtimeCombat.js` owns combat runtime setup for space slash, hit target feedback, hit resolution, attack bursts, ghost afterimages, target feedback, spin rings, sword trail, sword beam, stomp effects, and `updateFx`.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
 - `prototype/3d/src/combat/hitResolution.js` owns slash, beam, thrust, ring, jupiter, and spin-sweep hit resolution while main keeps move timing.
 - `prototype/3d/src/combat/targetFeedback.js` owns hittable/dummy/monster hit flash, shake, tilt spring, and per-target hit cooldown decay.
@@ -60,6 +62,7 @@ Retained tool pages:
 - `prototype/3d/src/player/poseClipController.js` owns keyframe pose joint reset, transition snapshots, clip sampling/blending, and driven body pose state.
 - `prototype/3d/src/player/rig.js` owns the procedural player skeleton, physical left/right aliases, weapon socket, sword tip reference, charge aura, and static Jupiter-ball meshes.
 - `prototype/3d/src/player/state.js` owns player initial state and movement/jump/dodge/charge tuning constants.
+- `prototype/3d/src/player/updateController.js` owns the player per-frame update flow while preserving the old movement, dodge, combo, hitstop, pose, and combat-effect order.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
 - `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
 - `prototype/3d/src/enemies/wolfAi.js` owns wolf patrol/look/chase/border/return/death state, wolf hittable callbacks, and wolf-to-player damage.
@@ -82,26 +85,36 @@ Root scripts:
 - `npm run check:player-state`
 - `npm run check:player-rig`
 - `npm run check:pose-clip-controller`
+- `npm run check:move-triggers`
+- `npm run check:character-pose`
+- `npm run check:player-update`
 - `npm run check:ghost-afterimages`
 - `npm run check:attack-bursts`
 - `npm run check:target-feedback`
 - `npm run check:hit-math`
+- `npm run check:hit-target-feedback`
 - `npm run check:hit-resolution`
+- `npm run check:runtime-combat`
 - `npm run check:space-slash`
 - `npm run check:spin-rings`
 - `npm run check:stomp-effects`
 - `npm run check:training-dummy`
 - `npm run check:village`
 - `npm run check:world-collision`
+- `npm run check:terrain-water`
 - `npm run check:sword-beam`
 - `npm run check:sword-trail`
 - `npm run check:input`
 - `npm run check:map-hud`
 - `npm run check:camera`
+- `npm run check:test-probe`
 - `npm run check:render-loop`
 - `npm run check:game-loop`
 - `npm run check:cube-wolf-adapter`
 - `npm run check:wolf-ai`
+- `npm run check:wolf-runtime`
+- `npm run check:render-scene`
+- `npm run check:runtime-services`
 - `npm run check:syntax`
 - `npm run check:server`
 - `npm run check:browser`
@@ -116,6 +129,9 @@ Coverage:
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
 - Player rig check verifies the procedural hierarchy, physical side aliases, limb dimensions, right-wrist socket, sword tip reference, Jupiter-ball meshes, charge aura material, grip constants, and main-module integration.
+- Player update check verifies the world-map/dead/hitstop early-return paths, shared runtime state, main-module wiring, and updater ownership of the old frame update loop.
+- Runtime combat check verifies combat runtime imports, setup order, live getters, hit math injection, impact-state writes, `updateFx` ordering, and removal of direct combat setup from `main.js`.
+- Runtime services check verifies HUD/reflection/test-probe setup order, startup view order, game-loop startup, and main-module wiring.
 - Ghost afterimages check verifies pool size, capsule geometry/material setup, direct scene registration, live player/yaw snapshotting, pool wraparound, first-frame and 0.04s dodge cadence, fade math, hidden no-op behavior, and main-module integration.
 - Attack bursts check verifies yaw-local slash/heavy visual construction, geometry/material values, preserved dormant `startSlash` heavy-only semantics, `doSlash`, `burstCircle`, exact hitstop/shake writes, slash/heavy fade math, active `fireFx` behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
@@ -142,36 +158,51 @@ Coverage:
 
 Latest passing gate for the current cleanup/modularization slice:
 
-- `npm run validate`
+- `npm run prepush` after refreshing this report and `docs/project_status_v0.md`.
 
 Important passing lines from the latest run:
 
-- `Asset check passed (84 runtime assets, 41 source files).`
+- `Asset check passed (94 runtime assets, 51 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
+- `Player rig check passed.`
+- `Pose clip controller check passed.`
+- `Player move triggers check passed.`
+- `Character pose check passed.`
+- `Player update check passed.`
 - `Ghost afterimages check passed.`
 - `Attack bursts check passed.`
+- `Target feedback extracted-module check passed.`
 - `Hit math check passed.`
+- `Hit target feedback check passed.`
+- `Hit resolution extracted-module check passed.`
+- `Runtime combat check passed.`
 - `Space slash check passed.`
 - `Spin rings check passed.`
 - `Stomp effects check passed.`
 - `Training dummy check passed.`
 - `Village blockout check passed.`
 - `World collision check passed.`
+- `Terrain water check passed.`
 - `Sword beam check passed.`
 - `Sword trail check passed.`
 - `Input controller check passed.`
 - `Map HUD check passed.`
 - `Camera controller check passed.`
+- `Test probe check passed.`
 - `Render loop check passed.`
 - `Game loop check passed.`
+- `Cube wolf adapter check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (62 files plus 9 inline scripts).`
+- `Wolf runtime check passed.`
+- `Render scene check passed.`
+- `Runtime services check passed.`
+- `Syntax check passed (82 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
-The final handoff should rerun `npm run prepush` after any document or code changes.
+The final handoff reran `npm run prepush` after the documentation refresh and before committing.
 
 ## Multi-Agent Review Notes
 
@@ -203,6 +234,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Ghost afterimages testing-plan review: no blocker. The reviewer requested fake-Three coverage for pool construction, spawn snapshot/wraparound, dodge timer cadence, fade behavior, main-module integration, and static server route coverage; `scripts/check-ghost-afterimages.mjs` implements those checks and is included in `validate`.
 - Attack bursts requirement/boundary review: no behavior blocker. The reviewer identified yaw-local mesh ownership, exact slash/heavy geometry/material values, duplicate `startSlash` effective semantics, `fireFx` active behavior, `doSlash`, `burstCircle`, fade math, and hitstop/shake overwrite semantics as required preservation points.
 - Attack bursts testing-plan review: no blocker. The reviewer requested fake-Three coverage for construction, dormant `startSlash` behavior, `doSlash`, `burstCircle`, update fade behavior, `fireFx` wiring, static server coverage, and old inline removal; `scripts/check-attack-bursts.mjs` implements those checks and is included in `validate`.
+- Requirements coverage review after the 1-hour narrowed scope: blockers were stale cleanup/project-status docs and missing fresh `prepush` evidence after documentation changes. This report and `docs/project_status_v0.md` are refreshed, and `npm run prepush` passed before committing the refresh.
+- Implementation review after the runtime modules: no blocker. The reviewer confirmed `runtimeServices`, `updateController`, and `runtimeCombat` preserve setup order, live getters, map/dead/hitstop early returns, `updateFx` order, and combat effect order. Non-blocking risk: several getters intentionally close over `P` or heavy radius constants before declaration, matching the pre-existing delayed-read pattern.
 
 ## Repository Size Notes
 
@@ -218,10 +251,9 @@ The large `.git` size is expected while local history still contains removed ven
 
 ## Remaining Non-Blocking Work
 
-- Continue modularizing `prototype/3d/src/main.js` in small behavior-preserving slices:
-  - combat side-effect boundaries
-  - pose execution boundaries
-- Keep each slice covered by `npm run validate` or `npm run prepush`.
+- Short-term scope is narrowed to clean, runnable, validated handoff.
+- Do not continue large refactors unless explicitly requested.
+- Keep any future slice covered by `npm run validate` or `npm run prepush`.
 - Do not retune movement, combat, dodge, camera, wolf AI, hitstop, shake, or SFX timing unless fixing a confirmed bug.
 
 ## Push Policy
