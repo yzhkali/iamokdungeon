@@ -224,7 +224,7 @@ assert(mainJs.includes('import { createSwordBeamController } from "./combat/swor
 assert(/\bconst\s+GRID\s*=\s*2\s*;/.test(mainJs), 'main.js must keep GRID=2 for beam hit width');
 assert(/\bconst\s+swordBeam\s*=\s*createSwordBeamController\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*\}\s*\)/.test(mainJs), 'main.js must create swordBeam controller');
 assert(/case\s+['"]chop['"]\s*:\s*hitstop\s*=\s*0\.10\s*;\s*shake\s*=\s*0\.22\s*;\s*SFX\.chop\(\)\s*;\s*swordBeam\.spawnSwordBeam\(\)\s*;\s*break/.test(mainJs), 'chop effect must preserve hitstop, shake, SFX, and spawn order');
-assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*beamHitByBeam\s*\)\s*;\s*updateSpinRings\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'main loop must update sword beams in the original effect slot');
+assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'main loop must update sword beams in the original effect slot');
 assert(mainJs.includes('function beamHitByBeam(b){'), 'main.js must keep live beam hit behavior in place');
 assert(!mainJs.includes('function beamHitDummies(bx,bz)'), 'legacy beamHitDummies should be removed instead of reintroduced');
 assert(!mainJs.includes('function makeFinShape'), 'main.js should not retain inline beam shape builder');

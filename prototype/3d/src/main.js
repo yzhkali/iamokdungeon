@@ -18,6 +18,7 @@ import { createSwordTrail } from "./combat/swordTrail.js";
 import { createSpaceSlash } from "./combat/spaceSlash.js";
 import { createSwordBeamController } from "./combat/swordBeam.js";
 import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
+import { createSpinRings } from "./combat/spinRings.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -833,33 +834,12 @@ let ghostTimer=0, ghostIdx=0;
 // ============================================================
 //  大风车"土星环"特效：从剑轨迹往外发散的同心圆扩散环
 // ============================================================
-const spinRings=[];   // {mesh,mat,t,dur,fromR,toR}
-const SPIN_RING_Y=2.0;   // 土星环高度(大风车展开时手的高度)
-function spawnSpinRing(centerX, centerZ, fromR, toR, delay){
-  const geo=new THREE.RingGeometry(0.92,1.0,40);   // 细环，靠缩放当半径
-  const mat=new THREE.MeshBasicMaterial({color:0xbfeaff,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
-  const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(centerX,SPIN_RING_Y,centerZ); m.visible=false; scene.add(m);
-  spinRings.push({mesh:m,mat,t:-(delay||0),dur:0.32,fromR,toR});
-}
-function updateSpinRings(dt){
-  for(let i=spinRings.length-1;i>=0;i--){
-    const r=spinRings[i]; r.t+=dt;
-    if(r.t<0) continue;
-    r.mesh.visible=true;
-    const k=Math.min(1,r.t/r.dur);
-    const rad=r.fromR+(r.toR-r.fromR)*(1-(1-k)*(1-k));   // ease-out扩散
-    r.mesh.scale.set(rad,rad,1);
-    r.mat.opacity=0.7*(1-k);
-    if(k>=1){ scene.remove(r.mesh); spinRings.splice(i,1); }
-  }
-}
-// 一次大风车：发射一串往外扩散的同心环(土星环)
-function spawnSaturnRings(){
-  const inner=1.0, outer=SPIN_RADIUS+0.4;
-  for(let n=0;n<5;n++){
-    spawnSpinRing(P.x,P.z, inner+n*0.3, outer+n*0.25, n*0.035);
-  }
-}
+const spinRings=createSpinRings({
+  THREE,
+  scene,
+  getPlayer:()=>P,
+  getSpinRadius:()=>SPIN_RADIUS
+});
 
 const swordTrail = createSwordTrail({ THREE, scene, weapon, weaponTip });
 
@@ -1508,7 +1488,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); updateSpinRings(dt); spaceSlash.update(dt); stompEffects.updateStomps(dt);
+  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); spinRings.updateSpinRings(dt); spaceSlash.update(dt); stompEffects.updateStomps(dt);
 }
 
 // ============================================================
