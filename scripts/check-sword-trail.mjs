@@ -4,6 +4,7 @@ import { createSwordTrail } from '../prototype/3d/src/combat/swordTrail.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -230,10 +231,10 @@ function createFixture() {
 
 assert(mainJs.includes('import { createSwordTrail } from "./combat/swordTrail.js";'), 'main.js must import sword trail module');
 assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(mainJs), 'main.js must create swordTrail after weapon setup');
-assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)/.test(mainJs), 'space slash dodge gate must use swordTrail state');
-assert(/swordTrail\.startTrail\s*\(\s*mv\.trailSegs\s*\|\|\s*\(\s*mv\.spinY\s*\?\s*26\s*:\s*4\s*\)\s*\)/.test(mainJs), 'move update must start sword trail with existing segment expression');
-assert(mainJs.includes('swordTrail.stopTrail()'), 'move update must stop sword trail through the module');
-assert(/updateFx\s*\(\s*dt\s*\)\s*;\s*poseCharacter\s*\(\s*dt\s*\)\s*;\s*swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'effect update order must keep sword trail immediately after pose');
+assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)/.test(updateControllerJs), 'space slash dodge gate must use swordTrail state');
+assert(/swordTrail\.startTrail\s*\(\s*mv\.trailSegs\s*\|\|\s*\(\s*mv\.spinY\s*\?\s*26\s*:\s*4\s*\)\s*\)/.test(updateControllerJs), 'move update must start sword trail with existing segment expression');
+assert(updateControllerJs.includes('swordTrail.stopTrail()'), 'move update must stop sword trail through the module');
+assert(/updateFx\s*\(\s*dt\s*\)\s*;\s*poseCharacter\s*\(\s*dt\s*\)\s*;\s*swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;/.test(updateControllerJs), 'effect update order must keep sword trail immediately after pose');
 assert(!mainJs.includes('function updateTrail(dt){'), 'main.js should not retain inline updateTrail');
 assert(!mainJs.includes('const TRAIL_MAX=26'), 'main.js should not retain inline trail constants');
 

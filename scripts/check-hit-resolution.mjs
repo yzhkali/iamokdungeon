@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const modulePath = path.join(repoRoot, 'prototype/3d/src/combat/hitResolution.js');
 const mainPath = path.join(repoRoot, 'prototype/3d/src/main.js');
 const mainJs = fs.readFileSync(mainPath, 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -309,9 +310,9 @@ function runMainIntegrationGuards() {
     assert(new RegExp(`\\b${required}\\s*:`).test(mainJs), `main.js hitResolution setup must provide ${required}`);
   }
   assert(/getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS/.test(mainJs), 'spin rings should continue to read the extracted SPIN_RADIUS');
-  assert(/swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)/.test(mainJs), 'main loop must pass extracted beamHitByBeam to sword beams');
+  assert(/swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)/.test(updateControllerJs), 'player updater must pass extracted beamHitByBeam to sword beams');
   for (const name of ['tryThrustHit', 'tryRingHit', 'tryHitObjects', 'trySweepHit', 'tryJupiterHit']) {
-    assert(new RegExp(`hitResolution\\.${name}\\s*\\(`).test(mainJs), `main.js must call hitResolution.${name} after extraction`);
+    assert(new RegExp(`hitResolution\\.${name}\\s*\\(`).test(updateControllerJs), `player updater must call hitResolution.${name} after extraction`);
     assert(!new RegExp(`function\\s+${name}\\s*\\(`).test(mainJs), `main.js should not retain inline ${name} after extraction`);
   }
   assert(!/function\s+beamHitByBeam\s*\(/.test(mainJs), 'main.js should not retain inline beamHitByBeam after extraction');

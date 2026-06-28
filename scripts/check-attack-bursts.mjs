@@ -226,7 +226,7 @@ function createFixture({ min = 1.2, max = 3.2 } = {}) {
 }
 
 assert(mainJs.includes('import { createAttackBursts } from "./combat/attackBursts.js";'), 'main.js must import attack bursts module');
-assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*yaw\s*,\s*getHeavyRadiusMin\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MIN\s*,\s*getHeavyRadiusMax\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MAX\s*,\s*setImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{\s*hitstop\s*=\s*nextHitstop\s*;\s*shake\s*=\s*nextShake\s*;\s*\}\s*\}\s*\)/.test(mainJs), 'main.js must create attackBursts with yaw, heavy radius, and impact dependencies');
+assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*yaw\s*,\s*getHeavyRadiusMin\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MIN\s*,\s*getHeavyRadiusMax\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MAX\s*,\s*setImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{\s*runtimeState\.hitstop\s*=\s*nextHitstop\s*;\s*runtimeState\.shake\s*=\s*nextShake\s*;\s*\}\s*\}\s*\)/.test(mainJs), 'main.js must create attackBursts with yaw, heavy radius, and impact dependencies');
 assert(mainJs.includes('attackBursts,'), 'main.js must pass attackBursts into move trigger wiring');
 assert(/function\s+startSlash\s*\(\s*type\s*,\s*ratio\s*=\s*0\s*\)\s*\{\s*attackBursts\.startSlash\s*\(\s*type\s*,\s*ratio\s*\)\s*;\s*\}/.test(moveTriggersJs), 'startSlash wrapper should delegate to the extracted effective behavior');
 assert(/function\s+doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*\{\s*attackBursts\.doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*;\s*\}/.test(moveTriggersJs), 'doSlash wrapper should delegate without wiring new gameplay');

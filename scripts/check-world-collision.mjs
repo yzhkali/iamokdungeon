@@ -5,6 +5,7 @@ import { createWorldCollision } from '../prototype/3d/src/world/collision.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const villageJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/world/village.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -140,7 +141,7 @@ assert(/addTerrainArea\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)\s*;[\s\S]
 assert(/function\s+addStep[\s\S]*addPlatform\s*\(\s*x\s*,\s*z\s*,\s*w\s*,\s*d\s*,\s*top\s*\)/.test(villageJs), 'addStep should register platforms through collision module');
 assert(/addPlatformBounds\s*\(\s*x\s*-\s*w\s*\/\s*2\s*\+\s*wallT\s*,\s*x\s*\+\s*w\s*\/\s*2\s*-\s*wallT\s*,\s*z\s*-\s*d\s*\/\s*2\s*\+\s*wallT\s*,\s*z\s*\+\s*d\s*\/\s*2\s*-\s*wallT\s*,\s*floorTop\s*\)/.test(villageJs), 'player home should preserve exact indoor platform bounds');
 assert(/makeTrainingDummy\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*registerMapFeature\s*,\s*addCollider\s*,\s*terrainYAt\s*,\s*dummies\s*\}/.test(mainJs), 'training dummy should keep using shared addCollider and terrainYAt');
-assert(mainJs.includes('resolveCollision(P, PLAYER_R);'), 'main.js should call resolveCollision after boundary clamp with player and radius');
+assert(updateControllerJs.includes('resolveCollision(P, PLAYER_R);'), 'player updater should call resolveCollision after boundary clamp with player and radius');
 
 assert(!mainJs.includes('const colliders=[]'), 'main.js should not retain inline colliders array');
 assert(!mainJs.includes('const platforms=[]'), 'main.js should not retain inline platforms array');

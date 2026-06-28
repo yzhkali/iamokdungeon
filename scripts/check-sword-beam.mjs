@@ -5,6 +5,7 @@ import { createSwordBeamController } from '../prototype/3d/src/combat/swordBeam.
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -225,7 +226,7 @@ assert(mainJs.includes('import { createSwordBeamController } from "./combat/swor
 assert(mainJs.includes('import { createHitResolution, SPIN_RADIUS } from "./combat/hitResolution.js";'), 'main.js must import hit resolution for beam hit behavior');
 assert(/\bconst\s+swordBeam\s*=\s*createSwordBeamController\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*\}\s*\)/.test(mainJs), 'main.js must create swordBeam controller');
 assert(/case\s+['"]chop['"]\s*:\s*setImpact\s*\(\s*0\.10\s*,\s*0\.22\s*\)\s*;\s*SFX\.chop\(\)\s*;\s*swordBeam\.spawnSwordBeam\(\)\s*;\s*break/.test(moveTriggersJs), 'chop effect must preserve hitstop, shake, SFX, and spawn order');
-assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;/.test(mainJs), 'main loop must update sword beams in the original effect slot');
+assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;/.test(updateControllerJs), 'player updater must update sword beams in the original effect slot');
 assert(!mainJs.includes('function beamHitByBeam(b){'), 'main.js should not retain inline beam hit behavior after hit resolution extraction');
 assert(!mainJs.includes('function beamHitDummies(bx,bz)'), 'legacy beamHitDummies should be removed instead of reintroduced');
 assert(!mainJs.includes('function makeFinShape'), 'main.js should not retain inline beam shape builder');

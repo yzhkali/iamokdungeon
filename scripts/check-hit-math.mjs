@@ -13,6 +13,7 @@ const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const poseClipJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/poseClipController.js'), 'utf8');
 const hitResolutionJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/hitResolution.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -79,7 +80,8 @@ nearly(angleDelta(-Math.PI + 0.1, Math.PI - 0.1), -0.2, 'angleDelta should wrap 
   assert(isInSpinSweepArc({ ...base, spin: 0.25, spinTurns: 2, targetX: -2, targetZ: 0, targetRadius: 0.2 }), 'spinTurns should multiply sweep rotation');
 }
 
-assert(mainJs.includes('import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";'), 'main.js must import hit math helpers');
+assert(mainJs.includes('import { isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";'), 'main.js must import hit math helpers used during setup');
+assert(updateControllerJs.includes('import { angleDelta } from "../combat/hitMath.js";'), 'player updater must import angleDelta for facing interpolation');
 assert(/createPoseClipController\s*\(\s*\{[\s\S]*sampleTrack[\s\S]*lerp\s*:\s*THREE\.MathUtils\.lerp/.test(mainJs), 'main.js must inject hitMath sampleTrack with Three lerp into pose clips');
 assert(poseClipJs.includes('sampleTrack(clip.tracks[jointName], time, lerp)'), 'pose clip controller must use injected hitMath sampleTrack');
 assert(/createHitResolution\s*\(\s*\{[\s\S]*isInThrustBox\s*:\s*isInThrustBox[\s\S]*isInSpinSweepArc\s*:\s*isInSpinSweepArc/.test(mainJs), 'main.js must inject hitMath thrust and sweep helpers into hit resolution');

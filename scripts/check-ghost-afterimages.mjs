@@ -4,6 +4,7 @@ import { createGhostAfterimages } from '../prototype/3d/src/player/ghostAfterima
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -146,7 +147,7 @@ function createFixture({ player = { x: 4, y: 0, z: -2 }, yaw = { value: 0.7 } } 
 
 assert(mainJs.includes('import { createGhostAfterimages } from "./player/ghostAfterimages.js";'), 'main.js must import ghost afterimages module');
 assert(/\bconst\s+ghostAfterimages\s*=\s*createGhostAfterimages\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*,\s*getYawRotationY\s*:\s*\(\s*\)\s*=>\s*yaw\.rotation\.y\s*\}\s*\)/.test(mainJs), 'main.js must create ghostAfterimages with live player and yaw dependencies');
-assert(/if\s*\(\s*P\.state\s*===\s*['"]dodge['"]\s*\)\s*\{[\s\S]*ghostAfterimages\.tickDodge\s*\(\s*dt\s*\)/.test(mainJs), 'dodge movement branch must tick ghost afterimages');
+assert(/if\s*\(\s*P\.state\s*===\s*["']dodge["']\s*\)\s*\{[\s\S]*ghostAfterimages\.tickDodge\s*\(\s*dt\s*\)/.test(updateControllerJs), 'dodge movement branch must tick ghost afterimages');
 assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{[\s\S]*ghostAfterimages\.update\s*\(\s*dt\s*\)/.test(mainJs), 'updateFx must fade ghost afterimages');
 assert(!mainJs.includes('const ghostMat='), 'main.js should not retain inline ghost material factory');
 assert(!mainJs.includes('const ghosts=[]'), 'main.js should not retain inline ghost pool state');

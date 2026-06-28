@@ -5,6 +5,7 @@ import { createMoveTriggers } from '../prototype/3d/src/player/moveTriggers.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
+const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -294,11 +295,11 @@ for (const name of ['playClip', 'fireFx', 'doSlash', 'doThrust', 'startMove', 's
 for (const fx of ['slashR', 'slashL', 'chop', 'slam', 'stomp', 'drill', 'kick', 'rise', 'thrust', 'spinSlash', 'heavyCircle', 'heavyCircleBig']) {
   assert(!mainJs.includes(`case '${fx}'`), `main.js should not keep fireFx case ${fx}`);
 }
-assert(mainJs.includes("playClip('pushGlasses')"), 'main.js should keep taunt clip call site');
-assert(mainJs.includes('fireFx(mv.fx)'), 'main.js should keep strike effect call site');
-assert(mainJs.includes('fireFx(mv.landFx)'), 'main.js should keep landing effect call site');
-assert(mainJs.includes('startDodgeCombo(P.dodgeBuffer)'), 'main.js should keep dodge combo call site');
-assert(mainJs.includes("startMove(onGround ? 'gL1' : 'aL1')"), 'main.js should keep primary attack start call site');
+assert(updateControllerJs.includes('playClip("pushGlasses")'), 'player updater should keep taunt clip call site');
+assert(updateControllerJs.includes('fireFx(mv.fx)'), 'player updater should keep strike effect call site');
+assert(updateControllerJs.includes('fireFx(mv.landFx)'), 'player updater should keep landing effect call site');
+assert(updateControllerJs.includes('startDodgeCombo(P.dodgeBuffer)'), 'player updater should keep dodge combo call site');
+assert(updateControllerJs.includes('startMove(onGround ? "gL1" : "aL1")'), 'player updater should keep primary attack start call site');
 assert(moveTriggersJs.includes("case 'thrust':") && /SFX\.thrust\s*\(\s*\)\s*;\s*doThrust\s*\(\s*\)/.test(moveTriggersJs), 'move trigger module should preserve thrust SFX then impact order');
 
 console.log('Player move triggers check passed.');
