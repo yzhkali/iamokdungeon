@@ -1,6 +1,7 @@
 import { loadThreeRuntime } from "./core/threeLoader.js";
 import { createSfx } from "./core/sfx.js";
 import { createModelLoader } from "./core/modelLoader.js";
+import { createRenderScene } from "./core/renderScene.js";
 import { buildGrass, updateGrass } from "./world/grass.js";
 import { buildSky, updateSky } from "./world/sky.js";
 import { buildTerrainWater } from "./world/terrainWater.js";
@@ -50,47 +51,22 @@ function main(THREE, GLTFLoader){
 //        魔兽式跳跃 / 翻滚不入地 / 柱子墙体碰撞
 // ============================================================
 const canvas=document.getElementById('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-let sceneRT=new THREE.WebGLRenderTarget(1,1);
-let reflRT=new THREE.WebGLRenderTarget(1,1);
-const reflCam=new THREE.PerspectiveCamera();
-const _reflClip=new THREE.Plane(new THREE.Vector3(0,1,0),0);
-reflCam.matrixAutoUpdate=false;
-const _reflM=new THREE.Matrix4();
-renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const {
+  renderer,
+  sceneRT,
+  reflRT,
+  reflCam,
+  reflClip: _reflClip,
+  reflMatrix: _reflM,
+  scene,
+  camera,
+  cameraRig
+} = createRenderScene({ THREE, canvas, pixelRatio: devicePixelRatio });
 
 // ===== 音效系统 (真实CC0音效文件) =====
 const SFX=createSfx();
 document.addEventListener('keydown',()=>SFX.resume(),{once:true});
 document.addEventListener('mousedown',()=>SFX.resume(),{once:true});
-
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0xbbd0df);
-// scene.fog=new THREE.Fog(0xbbd0df,60,220); // 已关闭远景雾
-
-const camera=new THREE.PerspectiveCamera(45,1,0.1,2000);
-const cameraRig={
-  yaw:0,
-  pitch:THREE.MathUtils.degToRad(43),
-  targetYaw:0,
-  targetPitch:THREE.MathUtils.degToRad(43),
-  distance:43,
-  outdoorDistance:43,
-  indoorDistance:11,
-  currentDistance:43,
-  minDistance:12,
-  indoorMinDistance:2.4,
-  maxDistance:90,
-  minPitch:THREE.MathUtils.degToRad(8),
-  maxPitch:THREE.MathUtils.degToRad(78),
-  indoorMinPitch:THREE.MathUtils.degToRad(16),
-  indoorMaxPitch:THREE.MathUtils.degToRad(48),
-  yawSpeed:1.55,
-  pitchSpeed:1.05,
-  stickX:0,
-  stickY:0
-};
 const cameraController = createCameraController({
   THREE,
   camera,
@@ -99,13 +75,6 @@ const cameraController = createCameraController({
   getShake: () => shake
 });
 cameraController.setInitialView();
-
-scene.add(new THREE.HemisphereLight(0xb9c6d6,0x4a3f36,0.75));
-const sun=new THREE.DirectionalLight(0xfff2d8,1.15);
-sun.position.set(12,26,10); sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.near=1; sun.shadow.camera.far=140;
-const sc=60; sun.shadow.camera.left=-sc; sun.shadow.camera.right=sc; sun.shadow.camera.top=sc; sun.shadow.camera.bottom=-sc;
-sun.shadow.bias=-0.0005; scene.add(sun);
 
 const terrainWater = buildTerrainWater({
   THREE,
