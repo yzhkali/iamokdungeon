@@ -143,7 +143,7 @@ sun.shadow.bias=-0.0005; scene.add(sun);
 
 // ── 地形系统 ──────────────────────────────────────────────────
 function terrainH(x,z){const ix=Math.max(0,Math.min(_SEG,Math.round((x+_SZ/2)/_SZ*_SEG)));const iz=Math.max(0,Math.min(_SEG,Math.round((z+_SZ/2)/_SZ*_SEG)));return _mapH[iz*(_SEG+1)+ix]??0;}
-let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tNorm,tCaust;
+let fallCurtainMat=null,waterMats=[],waterReflectionMeshes=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tNorm,tCaust;
 {
   const SZ=260, SEG=130;
   const tg=new THREE.PlaneGeometry(SZ,SZ,SEG,SEG);
@@ -251,7 +251,7 @@ let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tN
   wSurfMat.uniforms.tReflect={value:reflRT.texture};
   wSurfMat.uniforms.uRes={value:new THREE.Vector2(innerWidth,innerHeight)};
   var _wMain=new THREE.Mesh(new THREE.PlaneGeometry(260,260,60,60),wSurfMat);
-  _wMain.rotation.x=-Math.PI/2;_wMain.position.y=-2;scene.add(_wMain);
+  _wMain.rotation.x=-Math.PI/2;_wMain.position.y=-2;scene.add(_wMain);waterReflectionMeshes.push(_wMain);
   // waterfall + river from map15
   const _tWfall3=new THREE.TextureLoader().load('./textures/texture_waterfall.png');
   _tWfall3.wrapS=_tWfall3.wrapT=THREE.RepeatWrapping;
@@ -278,7 +278,7 @@ let fallCurtainMat=null,waterMats=[],mistPS=null,tWater,tFoam,tWfall,tMistTex,tN
     g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
     g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uvs),2));
     g.setIndex(ix);g.computeVertexNormals();
-    const m=new THREE.Mesh(g,wSurfMat);m.renderOrder=2;scene.add(m);return m;
+    const m=new THREE.Mesh(g,wSurfMat);m.renderOrder=2;scene.add(m);waterReflectionMeshes.push(m);return m;
   }
   function makeWaterfallPath(pts,fh){
     const SEGS=12,zFwd=fh*0.55,v=[],ix=[],uvs=[];
@@ -3170,7 +3170,9 @@ reflCam.projectionMatrix.copy(camera.projectionMatrix);
 reflCam.matrixWorld.copy(_reflM).multiply(camera.matrixWorld);
 reflCam.matrixWorldInverse.copy(reflCam.matrixWorld).invert();
 _reflClip.constant=-_wY;
+for(const m of waterReflectionMeshes)m.visible=false;
 renderer.setRenderTarget(reflRT);renderer.clippingPlanes=[_reflClip];renderer.render(scene,reflCam);
+for(const m of waterReflectionMeshes)m.visible=true;
 renderer.setRenderTarget(null);renderer.clippingPlanes=[];
 // ── 最终渲染 ────────────────────────────────────
 renderer.render(scene,camera);requestAnimationFrame(loop);}
