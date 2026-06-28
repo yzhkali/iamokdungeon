@@ -25,6 +25,7 @@ try {
   await expectStatus(origin, '/src/main.js', 200);
   await expectStatus(origin, '/src/combat/hitMath.js', 200);
   await expectStatus(origin, '/src/combat/spaceSlash.js', 200);
+  await expectStatus(origin, '/src/combat/swordBeam.js', 200);
   await expectStatus(origin, '/src/combat/swordTrail.js', 200);
   await expectStatus(origin, '/src/camera.js', 200);
   await expectStatus(origin, '/src/loop.js', 200);

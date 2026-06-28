@@ -17,7 +17,7 @@
 ## 当前结构
 
 - `prototype/3d/index.html`：主入口、UI/CSS、importmap、本地 BGM。
-- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块、相机控制器、UI 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据、战斗/姿态纯数学辅助函数、剑拖尾控制器和空间斩控制器。
+- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块、相机控制器、UI 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据、战斗/姿态纯数学辅助函数、剑拖尾控制器、空间斩控制器和剑气/裂缝控制器。
 - `prototype/3d/src/core/threeLoader.js`：本地 Three.js / GLTFLoader 加载。没有 CDN 回退。
 - `prototype/3d/src/core/sfx.js`：SFX 封装。
 - `prototype/3d/src/core/modelLoader.js`：GLTF 缓存、预处理和放置。
@@ -31,6 +31,7 @@
 - `prototype/3d/src/player/moves.js`：连招树和招式时序数据。
 - `prototype/3d/src/player/state.js`：玩家初始状态和移动/跳跃/闪避/蓄力调参常量。
 - `prototype/3d/src/combat/spaceSlash.js`：闪避打断后的空间斩 ready 标记、辐射线生成、淡出和清理。
+- `prototype/3d/src/combat/swordBeam.js`：剑气弹幕、弹道裂缝生长、剑气生命周期和裂缝淡出清理。
 - `prototype/3d/src/combat/swordTrail.js`：剑刃挥砍拖尾几何、采样、段数上限和停止后淡出。
 - `prototype/3d/src/ui/input.js`：键鼠/手柄输入状态、模式切换、相机输入和输入清空。
 - `prototype/3d/src/ui/mapHud.js`：体力/状态 HUD、小地图、展开地图绘制和地图开关。
@@ -57,7 +58,7 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 当前已知风险
 
-- `main.js` 已拆出低风险模块、水面反射 pass、玩家纯数据表、输入控制器、HUD/map 控制器、相机控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据、战斗/姿态纯数学辅助函数、剑拖尾控制器和空间斩控制器，但剑气/践踏等战斗副作用和姿态执行仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
+- `main.js` 已拆出低风险模块、水面反射 pass、玩家纯数据表、输入控制器、HUD/map 控制器、相机控制器、狼 AI 控制器、主循环调度器、玩家状态/调参数据、战斗/姿态纯数学辅助函数、剑拖尾控制器、空间斩控制器和剑气/裂缝控制器，但践踏等战斗副作用和姿态执行仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
 - 部分保留工具页仍是历史工具，但已经纳入资产检查、语法检查和浏览器 smoke；后续迁移或清理仍需保持这些验证通过。
 - 不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量，除非是在修明确 bug。
 

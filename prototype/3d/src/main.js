@@ -16,6 +16,7 @@ import { createGameLoop } from "./loop.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
 import { createSwordTrail } from "./combat/swordTrail.js";
 import { createSpaceSlash } from "./combat/spaceSlash.js";
+import { createSwordBeamController } from "./combat/swordBeam.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -866,93 +867,7 @@ const swordTrail = createSwordTrail({ THREE, scene, weapon, weaponTip });
 //  剑气弹幕（薄而立体的鲨鱼鳍，贴地飞 + 弹道追踪式裂缝）
 // ============================================================
 const GRID=2;                              // 地面每格=2单位
-// 鲨鱼鳍轮廓(XY平面: X=飞行方向, Y=高度)；底边贴地，后缘高耸、尖端前扫
-function makeFinShape(){
-  const s=new THREE.Shape();
-  s.moveTo(-0.55,0.0);                       // 尾根(后下)
-  s.lineTo(-0.35,0.95);                      // 后缘陡升到鳍背最高
-  s.quadraticCurveTo(0.1,0.85, 1.25,0.06);   // 鳍背前扫 → 前尖(贴地)
-  s.lineTo(1.25,0.0);                        // 前尖底
-  s.closePath();
-  return s;
-}
-const beamMat=new THREE.MeshBasicMaterial({color:0xaff0ff,transparent:true,opacity:0.92,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
-const finExtrudeGeo=new THREE.ExtrudeGeometry(makeFinShape(),{depth:0.1,bevelEnabled:false});
-finExtrudeGeo.translate(0,0,-0.05);
-const beams=[];
-const cracks=[];
-function spawnSwordBeam(){
-  const grp=new THREE.Group();
-  const fin=new THREE.Mesh(finExtrudeGeo, beamMat);
-  fin.rotation.y=-Math.PI/2;                 // shape尖端+X → local +Z(飞行方向)
-  grp.add(fin);
-  const fx=Math.sin(P.facing), fz=Math.cos(P.facing);
-  // 贴地飞：从玩家前方1格起步(脚下那格不算)
-  const startX=P.x+fx*GRID, startZ=P.z+fz*GRID;
-  grp.position.set(startX, 0.06, startZ);    // 紧贴地面
-  grp.rotation.y=P.facing;
-  scene.add(grp);
-  // 弹道追踪式裂缝：先建空几何，随剑气推进逐段填充，总长3格
-  const crack=newCrack();
-  beams.push({grp,fin,vz:26,life:1.2, fx,fz, startX,startZ, dist:0, crack, lastCrackD:0, hitSet:new Set()});
-}
-// 新建一条空裂缝(逐段生长)
-const CRACK_SEGS=22;                         // 3格的裂缝分段数
-function newCrack(){
-  const geo=new THREE.BufferGeometry();
-  const pos=new Float32Array((CRACK_SEGS+1)*2*3);
-  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const idx=[];                              // 动态加索引(随生长)
-  geo.setIndex(idx);
-  const mat=new THREE.MeshBasicMaterial({color:0x140f0b,transparent:true,opacity:0.92,side:THREE.DoubleSide,depthWrite:false});
-  mat.polygonOffset=true; mat.polygonOffsetFactor=-2; mat.polygonOffsetUnits=-2;
-  const m=new THREE.Mesh(geo,mat); m.frustumCulled=false; scene.add(m);
-  const c={mesh:m, geo, pos, filled:0, prevWob:0, age:0, growing:true};
-  cracks.push(c);
-  return c;
-}
-// 把裂缝延伸到位置(x,z)，沿方向(fx,fz)，写入下一段顶点
-function growCrack(c, x, z, fx, fz){
-  if(c.filled>CRACK_SEGS) return;
-  const px=-fz, pz=fx;
-  const wob=(Math.random()-0.5)*0.16 + c.prevWob*0.45; c.prevWob=wob;
-  const mx=x+px*wob, mz=z+pz*wob;
-  const w=0.045*(0.6+Math.random()*0.9);
-  const i=c.filled;
-  c.pos[i*6+0]=mx+px*w; c.pos[i*6+1]=0.03; c.pos[i*6+2]=mz+pz*w;
-  c.pos[i*6+3]=mx-px*w; c.pos[i*6+4]=0.03; c.pos[i*6+5]=mz-pz*w;
-  if(i>0){ const a=(i-1)*2,b=(i-1)*2+1,cc=i*2,d=i*2+1;
-    const arr=c.geo.index.array? Array.from(c.geo.index.array):[];
-    arr.push(a,b,cc, b,d,cc); c.geo.setIndex(arr);
-  }
-  c.geo.attributes.position.needsUpdate=true;
-  c.filled++;
-}
-function updateBeams(dt){
-  for(let i=beams.length-1;i>=0;i--){
-    const b=beams[i];
-    const step=b.vz*dt;
-    b.grp.position.x+=b.fx*step; b.grp.position.z+=b.fz*step; b.dist+=step;
-    b.life-=dt;
-    b.fin.scale.y=1+0.06*Math.sin(performance.now()/35);
-    beamHitByBeam(b);
-    // 裂缝追踪剑气：每推进一小段就把裂缝长到当前位置(最多3格)
-    const crackLen=GRID*3, segStep=crackLen/CRACK_SEGS;
-    while(b.crack.growing && b.dist - b.lastCrackD >= segStep && b.crack.filled<=CRACK_SEGS){
-      b.lastCrackD += segStep;
-      growCrack(b.crack, b.startX+b.fx*b.lastCrackD, b.startZ+b.fz*b.lastCrackD, b.fx, b.fz);
-      if(b.lastCrackD>=crackLen){ b.crack.growing=false; }
-    }
-    if(b.dist>=GRID*4 || b.life<=0){ if(b.crack) b.crack.growing=false; scene.remove(b.grp); beams.splice(i,1); }
-  }
-  // 裂缝：10秒保持，10→15秒淡出
-  for(let i=cracks.length-1;i>=0;i--){
-    const c=cracks[i]; c.age+=dt;
-    if(c.age<10) c.mesh.material.opacity=0.9;
-    else if(c.age<15) c.mesh.material.opacity=0.9*(1-(c.age-10)/5);
-    else { scene.remove(c.mesh); cracks.splice(i,1); }
-  }
-}
+const swordBeam = createSwordBeamController({ THREE, scene, getPlayer: () => P });
 
 
 
@@ -1169,7 +1084,7 @@ function fireFx(fx){
   switch(fx){
     case 'slashR': hitstop=0.07; shake=0.14; SFX.swing(); break;
     case 'slashL': hitstop=0.07; shake=0.14; SFX.swing(); break;
-    case 'chop':   hitstop=0.10; shake=0.22; SFX.chop(); spawnSwordBeam(); break;
+    case 'chop':   hitstop=0.10; shake=0.22; SFX.chop(); swordBeam.spawnSwordBeam(); break;
     case 'slam':   hitstop=0.14; shake=0.32; break;   // 落地砸地：顿帧+震屏(更重)，不发剑气
     case 'stomp':  doStomp(); break;
     case 'drill':  hitstop=0.14; shake=0.6; doStomp(); P._drillBounce=4.5; break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
@@ -1329,22 +1244,6 @@ function beamHitByBeam(b){
     const dx=o.x-bx, dz=o.z-bz;
     if(dx*dx+dz*dz < (halfW+o.r)*(halfW+o.r)){
       b.hitSet.add(o); o.flashT=0.18; o.shakeT=0.18;
-    }
-  }
-}
-function beamHitDummies(bx,bz){
-  for(const d of dummies){
-    const dx=bx-d.x, dz=bz-d.z;
-    if(dx*dx+dz*dz < (d.r+0.4)*(d.r+0.4)){
-      if(d._beamCd>0) continue;
-      d._beamCd=0.2; d.flashT=0.25; d.tiltVel+=9;
-    }
-  }
-  for(const m of monsters){
-    const dx=bx-m.x, dz=bz-m.z;
-    if(dx*dx+dz*dz < (m.r+0.4)*(m.r+0.4)){
-      if(m._beamCd>0) continue;
-      m._beamCd=0.2; m.flashT=0.25; m.tiltVel+=8;
     }
   }
 }
@@ -1690,7 +1589,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  swordTrail.updateTrail(dt); updateBeams(dt); updateSpinRings(dt); spaceSlash.update(dt); updateStomps(dt);
+  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); updateSpinRings(dt); spaceSlash.update(dt); updateStomps(dt);
 }
 
 // ============================================================

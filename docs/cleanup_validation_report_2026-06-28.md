@@ -40,6 +40,7 @@ Retained tool pages:
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
 - `prototype/3d/src/combat/spaceSlash.js` owns dodge-cancel space-slash readiness, radial line spawning, fadeout, and cleanup.
+- `prototype/3d/src/combat/swordBeam.js` owns sword beam spawning, projectile/crack movement, beam lifecycle, and crack fadeout cleanup while main keeps hit target side effects.
 - `prototype/3d/src/combat/swordTrail.js` owns sword trail geometry, sword root/tip sampling, segment capping, and stopped-trail fadeout.
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
@@ -69,6 +70,7 @@ Root scripts:
 - `npm run check:player-state`
 - `npm run check:hit-math`
 - `npm run check:space-slash`
+- `npm run check:sword-beam`
 - `npm run check:sword-trail`
 - `npm run check:input`
 - `npm run check:map-hud`
@@ -91,6 +93,7 @@ Coverage:
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
 - Space slash check verifies ready-state consumption, line mesh/material/geometry setup, deterministic radial growth, offset handling, fadeout/removal, and main-module integration.
+- Sword beam check verifies beam material/geometry setup, one-grid spawn offset, direction snapshot, movement before hit callback, crack growth/index stitching, beam removal, crack fadeout/removal, and main-module integration while preserving main-owned hit behavior.
 - Sword trail check verifies mesh/material/geometry setup, default and explicit segment caps, root/tip sampling order, hidden-update no-op behavior, stopped-trail fadeout, history reset, and main-module integration.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
@@ -110,12 +113,13 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (72 runtime assets, 28 source files).`
+- `Asset check passed (73 runtime assets, 29 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
 - `Hit math check passed.`
 - `Space slash check passed.`
+- `Sword beam check passed.`
 - `Sword trail check passed.`
 - `Input controller check passed.`
 - `Map HUD check passed.`
@@ -123,7 +127,7 @@ Important passing lines from the latest run:
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (36 files plus 9 inline scripts).`
+- `Syntax check passed (38 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -143,6 +147,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Sword trail validation/repository review: two hygiene blockers were raised because `prototype/3d/src/combat/swordTrail.js` and `scripts/check-sword-trail.mjs` were not yet staged and the verification evidence counts were stale. This slice stages both files and updates the evidence to `71 runtime assets, 27 source files` and `34 files plus 9 inline scripts`; the brittle main integration assertions were relaxed to regex checks.
 - Space slash implementation review: no behavior blocker. The reviewer confirmed ready-state consumption is one-shot, `onHitTarget` still continues to SFX, hitstop/shake still use `Math.max`, dodge cancel readiness keeps the same sword-trail gate, update order stays after spin rings and before stomps, and map/dead/hitstop early returns still skip space-slash updates.
 - Space slash validation/repository review: one hygiene blocker was raised because `prototype/3d/src/combat/spaceSlash.js` and `scripts/check-space-slash.mjs` were not yet staged. This slice stages both files; `check:space-slash` is included in `validate`, static server coverage includes `/src/combat/spaceSlash.js`, and the latest evidence is `72 runtime assets, 28 source files` and `36 files plus 9 inline scripts`.
+- Sword beam implementation review: no behavior blocker. The reviewer confirmed spawn position and facing snapshot, speed/lifetime/removal behavior, crack growth/fadeout, move-before-hit callback ordering, `fireFx('chop')` SFX/hitstop/shake order, and map/dead/hitstop early-return behavior are preserved. The unused legacy `beamHitDummies` path was confirmed safe to delete.
+- Sword beam validation/repository review: one hygiene blocker was raised because `prototype/3d/src/combat/swordBeam.js` and `scripts/check-sword-beam.mjs` were not yet staged. This slice stages both files; `check:sword-beam` is included in `validate`, static server coverage includes `/src/combat/swordBeam.js`, and the latest evidence is `73 runtime assets, 29 source files` and `38 files plus 9 inline scripts`.
 
 ## Repository Size Notes
 
