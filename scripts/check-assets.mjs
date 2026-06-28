@@ -5,9 +5,8 @@ const repoRoot = process.cwd();
 const runtimeRoot = path.join(repoRoot, 'prototype/3d');
 const sourceFiles = [
   'prototype/3d/index.html',
-  'prototype/3d/src/main.js',
-  'prototype/3d/src/wolf.js',
-].map(file => path.join(repoRoot, file)).filter(fs.existsSync);
+  ...walk(path.join(repoRoot, 'prototype/3d/src')).filter(file => file.endsWith('.js')),
+].map(file => path.isAbsolute(file) ? file : path.join(repoRoot, file)).filter(fs.existsSync);
 
 const dynamicRuntimeAssets = [
   'maps/map15.json',
@@ -41,7 +40,7 @@ function existsRuntime(rel, from = runtimeRoot) {
   if (!looksLikeAsset(clean)) return;
   const bases = clean.startsWith('/')
     ? [runtimeRoot]
-    : from.endsWith(`${path.sep}src`)
+    : (from === path.join(runtimeRoot, 'src') || from.startsWith(`${path.join(runtimeRoot, 'src')}${path.sep}`))
       ? [from, runtimeRoot]
       : [from];
   const candidates = bases

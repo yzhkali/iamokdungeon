@@ -1,33 +1,12 @@
+import { loadThreeRuntime } from "./core/threeLoader.js";
+import { createSfx } from "./core/sfx.js";
+import { createModelLoader } from "./core/modelLoader.js";
+import { buildGrass, updateGrass } from "./world/grass.js";
+import { buildSky, updateSky } from "./world/sky.js";
 import { makeWolf } from "./wolf.js";
-// ===== 本地加载 Three.js =====
-const THREE_SOURCES = [
-  "three",
-];
-const GLTF_LOADER_SOURCES = [
-  "three/addons/loaders/GLTFLoader.js",
-];
-const loadingEl = document.getElementById('loading');
-let THREE = null;
-for(let i=0;i<THREE_SOURCES.length;i++){
-  try{
-    THREE = await import(THREE_SOURCES[i]);
-    if(THREE && THREE.Scene) break;
-  }catch(e){ /* 试下一个源 */ }
-}
-if(!THREE || !THREE.Scene){
-  loadingEl.innerHTML = '⚠️ 3D 引擎加载失败<br><span style="font-size:12px">本地 Three.js 依赖加载失败，请确认 lib/three.module.js 存在。</span>';
-  throw new Error('Three.js load failed');
-}
 
-let GLTFLoader = null;
-for(let i=0;i<GLTF_LOADER_SOURCES.length;i++){
-  try{
-    const mod = await import(GLTF_LOADER_SOURCES[i]);
-    GLTFLoader = mod.GLTFLoader;
-    if(GLTFLoader) break;
-  }catch(e){ /* 试下一个源 */ }
-}
-if(!GLTFLoader) console.warn('Local GLTFLoader load failed; vendor models will be skipped.');
+const loadingEl = document.getElementById('loading');
+const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
 
 const _mapResp=await fetch(new URL('../maps/map15.json', import.meta.url));
 if(!_mapResp.ok) throw new Error(`Failed to load map15.json: ${_mapResp.status}`);
@@ -54,47 +33,7 @@ const _reflM=new THREE.Matrix4();
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 // ===== 音效系统 (真实CC0音效文件) =====
-const SFX=(()=>{
-  let ac=null; const cache={};
-  function getAC(){ if(!ac)try{ac=new AudioContext();}catch(e){}; return ac; }
-  async function load(url){
-    if(cache[url]) return cache[url];
-    const a=getAC(); if(!a) return null;
-    try{
-      const r=await fetch(url); const buf=await r.arrayBuffer();
-      const decoded=await a.decodeAudioData(buf);
-      cache[url]=decoded; return decoded;
-    }catch(e){ return null; }
-  }
-  function play(url,vol=1){
-    const a=getAC(); if(!a) return;
-    load(url).then(buf=>{
-      if(!buf) return;
-      const src=a.createBufferSource(); src.buffer=buf;
-      const g=a.createGain(); g.gain.value=vol;
-      src.connect(g); g.connect(a.destination); src.start();
-    });
-  }
-  const P='./assets/sounds/';
-  let _si=0;
-  return {
-    resume(){ getAC()?.resume(); },
-    swing(){ const ff=['swoshes/swosh-18','swoshes/swosh-20','swoshes/swosh-16']; play(P+ff[_si++%3]+'.ogg',0.55); },
-    hitBone(){ const v=['hit_bone','hit_bone2','hit_bone3'][Math.floor(Math.random()*3)]; play(P+v+'.ogg',0.75); },
-    hitWood(){ play(P+'hit_wood.ogg',0.65); },
-    hitFlesh(){ play(P+(Math.random()<.5?'hit_flesh':'hit_flesh2')+'.ogg',0.6); },
-    stomp(){   play(P+'stomp.ogg',0.85); play(P+'stomp2.ogg',0.4); },
-    kick(){    play(P+'hit_bone.ogg',0.6); },
-    thrust(){ const ff=['swoshes/swosh-18','swoshes/swosh-29']; play(P+ff[Math.floor(Math.random()*2)]+'.ogg',0.6); },
-    _spinSrc:null,_spinGain:null,
-    spinPlay(dur){ const url=P+'swoshes/swosh-23.ogg'; load(url).then(buf=>{ if(!buf)return; const a=getAC(),t0=a.currentTime,s=a.createBufferSource(),g=a.createGain(); s.buffer=buf; g.gain.setValueAtTime(0.6,t0); g.gain.setValueAtTime(0.6,t0+Math.max(0,dur-0.3)); g.gain.linearRampToValueAtTime(0,t0+dur); s.connect(g); g.connect(a.destination); this._spinSrc=s;this._spinGain=g; s.start(); s.stop(t0+dur+0.05); s.onended=()=>{this._spinSrc=null;this._spinGain=null;}; }); },
-    spinStop(){ if(this._spinSrc&&this._spinGain){const a=getAC(),g=this._spinGain.gain,t=a.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(0.6,t); g.linearRampToValueAtTime(0,t+0.15); try{this._spinSrc.stop(t+0.16);}catch(e){} this._spinSrc=null;this._spinGain=null;} },
-    dodge(){ play(P+(Math.random()<.5?'dodge':'dodge2')+'.ogg',0.4); },
-    rise(){ const ff=['swoshes/swosh-33','swoshes/swosh-26']; play(P+ff[_si++%2]+'.ogg',0.5); },
-    drill(){   play(P+'stomp.ogg',0.9); },
-    chop(){    play(P+'swoshes/swosh-03.ogg',0.7); },
-  };
-})();
+const SFX=createSfx();
 document.addEventListener('keydown',()=>SFX.resume(),{once:true});
 document.addEventListener('mousedown',()=>SFX.resume(),{once:true});
 
@@ -318,62 +257,7 @@ function updateWater(t){
   if(mistPS){const p=mistPS.geometry.attributes.position.array,N=p.length/3;for(let i=0;i<N;i++){p[i*3+1]+=.004;if(p[i*3+1]>2.5){p[i*3]=44+(Math.random()-.5)*6;p[i*3+1]=-1.5;p[i*3+2]=104+Math.random()*6;}}mistPS.geometry.attributes.position.needsUpdate=true;}
 }
 
-const gltfLoader = GLTFLoader ? new GLTFLoader() : null;
-const modelCache = new Map();
-function prepModel(root){
-  root.traverse(o=>{
-    if(o.isMesh){
-      o.castShadow=true; o.receiveShadow=true;
-      if(o.material){
-        if(Array.isArray(o.material)) o.material.forEach(m=>{ if(m) m.roughness=Math.max(m.roughness??0.8,0.75); });
-        else o.material.roughness=Math.max(o.material.roughness??0.8,0.75);
-      }
-    }
-  });
-}
-function loadModel(path){
-  if(!gltfLoader) return Promise.resolve(null);
-  if(modelCache.has(path)) return modelCache.get(path);
-  const p = new Promise(resolve=>{
-    gltfLoader.load(path, gltf=>{
-      prepModel(gltf.scene);
-      resolve(gltf.scene);
-    }, undefined, err=>{
-      console.warn('Model load failed:', path, err);
-      resolve(null);
-    });
-  });
-  modelCache.set(path,p);
-  return p;
-}
-function loadFreshModel(path){
-  if(!gltfLoader) return Promise.resolve(null);
-  return new Promise(resolve=>{
-    gltfLoader.load(path, gltf=>{
-      prepModel(gltf.scene);
-      resolve(gltf.scene);
-    }, undefined, err=>{
-      console.warn('Model load failed:', path, err);
-      resolve(null);
-    });
-  });
-}
-async function placeModel(path,x,z,{scale=1,rot=0,y=0,parent=scene,name='',groundCenter=false}={}){
-  const src=await loadModel(path);
-  if(!src) return null;
-  const obj=src.clone(true);
-  obj.rotation.y=rot; obj.scale.setScalar(scale);
-  if(groundCenter){
-    const box=new THREE.Box3().setFromObject(obj);
-    const c=box.getCenter(new THREE.Vector3());
-    obj.position.set(x-c.x,y-box.min.y,z-c.z);
-  } else {
-    obj.position.set(x,y,z);
-  }
-  if(name) obj.name=name;
-  parent.add(obj);
-  return obj;
-}
+const { placeModel } = createModelLoader({ THREE, GLTFLoader, scene });
 
 // ============================================================
 //  Village blockout v1: player village + training yard + monster pen
@@ -574,48 +458,6 @@ function addPrimitiveRock(x,z,s=1){
   m.castShadow=true; m.receiveShadow=true; mapRoot.add(m);
 }
 
-function buildSky(){
-  const _sd=new THREE.Mesh(new THREE.SphereGeometry(450000,16,8),new THREE.ShaderMaterial({
-    side:THREE.BackSide,depthWrite:false,fog:false,
-    uniforms:{uTop:{value:new THREE.Color(0.18,0.42,0.75)},uMid:{value:new THREE.Color(0.38,0.65,0.88)},uHor:{value:new THREE.Color(0.72,0.85,0.94)}},
-    vertexShader:'varying vec3 vDir;void main(){vDir=normalize((modelMatrix*vec4(position,0.)).xyz);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}',
-    fragmentShader:'uniform vec3 uTop,uMid,uHor;varying vec3 vDir;void main(){float y=clamp(normalize(vDir).y,0.,1.);vec3 c=mix(uHor,uMid,smoothstep(-0.1,0.15,y));c=mix(c,uTop,smoothstep(0.15,1.,y));gl_FragColor=vec4(c,1.);}'
-  }));
-  _sd.renderOrder=-1; scene.add(_sd);
-  scene.background=new THREE.Color(0x5ab4e8);
-  const _cTL2=new THREE.TextureLoader();
-  const _cirrTex=_cTL2.load('./textures/cloud_cirrus.png'); _cirrTex.wrapS=_cirrTex.wrapT=THREE.RepeatWrapping;
-  function _mkCDome(tex,renderOrd,sx,sz,frag){
-    const mat=new THREE.ShaderMaterial({uniforms:{uMap:{value:tex},uOff:{value:new THREE.Vector2()}},
-      vertexShader:'varying vec3 vDir;void main(){vDir=normalize((modelMatrix*vec4(position,0.)).xyz);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}',
-      fragmentShader:frag||'uniform sampler2D uMap;uniform vec2 uOff;varying vec3 vDir;void main(){vec3 d=normalize(vDir);if(d.y<-0.02){gl_FragColor=vec4(0.);return;}float fade=smoothstep(-0.02,0.15,d.y);float sc=1./(abs(d.y)+0.12);vec2 uv=d.xz*sc*0.3+uOff;vec4 c=texture2D(uMap,uv);gl_FragColor=vec4(c.rgb,c.a*fade);}',
-      transparent:true,depthWrite:false,depthTest:true,depthFunc:THREE.LessEqualDepth,side:THREE.BackSide,fog:false});
-    const mesh=new THREE.Mesh(new THREE.SphereGeometry(450000,32,16),mat);
-    mesh.renderOrder=renderOrd;scene.add(mesh);return{mesh,mat,ox:0,oz:0,sx,sz};
-  }
-  const _ct2=[1,2,3,4].map(()=>{const t=_cTL2.load('./textures/cloud_cumulus.png');t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
-  function _mkBill(tex,angle,r,h,w,bh){
-    const mat=new THREE.ShaderMaterial({uniforms:{uMap:{value:tex}},
-      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:'uniform sampler2D uMap;varying vec2 vUv;void main(){vec4 c=texture2D(uMap,vUv);if(c.a<0.08)discard;float bt=smoothstep(0.55,0.0,vUv.y)*0.35;c.rgb=mix(c.rgb,vec3(0.72,0.85,0.94),bt);gl_FragColor=vec4(c.rgb,1.);}',
-      side:THREE.DoubleSide,fog:false});
-    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,bh),mat);
-    mesh.position.set(r*Math.cos(angle),h,r*Math.sin(angle));scene.add(mesh);
-    return{mesh,angle,r,h,speed:.000008};
-  }
-  const _cloudLayers=[_mkCDome(_cirrTex,1,.000025,.00001)];
-  const _cloudBillboards=[
-    _mkBill(_ct2[0],.35,600,150,675,450),_mkBill(_ct2[2],1.80,640,150,675,450),
-    _mkBill(_ct2[1],3.30,620,150,675,450),_mkBill(_ct2[3],5.00,660,150,675,450)
-  ];
-  return{clouds:[],birds:[],_cloudLayers,_cloudBillboards};
-}
-function updateSky(dt,t){
-  for(const cl of skyData._cloudLayers)
-    cl.mat.uniforms.uOff.value.set(cl.ox+=cl.sx*dt, cl.oz+=cl.sz*dt);
-  for(const b of skyData._cloudBillboards)
-    b.mesh.quaternion.copy(camera.quaternion);
-}
 let skyData;
 function buildNewVillage(){
   function wb(px,py,pz,w,h,d,c=0xc9b487){
@@ -727,88 +569,11 @@ function buildNewVillage(){
 
 // ── village ──────────────────────────────────────────────────
 //buildNewVillage();
-skyData = buildSky();
+skyData = buildSky({ THREE, scene });
 // vegetation cleared
 ; console.log("skyData:",!!skyData,"layers:",skyData?._cloudLayers?.length,"bills:",skyData?._cloudBillboards?.length);
 
-// ── Foliage System ──────────────────────────────────────────
-function buildGrass(){
-  const _tl=new THREE.TextureLoader();
-  window._grassMats=[];
-  function bh(x,z){const fx=(x+130)/2,fz=(z+130)/2,ix=Math.max(0,Math.min(129,Math.floor(fx))),iz=Math.max(0,Math.min(129,Math.floor(fz))),tx=fx-ix,tz=fz-iz,S=131;return(_mapH[iz*S+ix]??0)*(1-tx)*(1-tz)+(_mapH[iz*S+ix+1]??0)*tx*(1-tz)+(_mapH[(iz+1)*S+ix]??0)*(1-tx)*tz+(_mapH[(iz+1)*S+ix+1]??0)*tx*tz;}
-  // GPU Gems Ch7.3.2: 3张交叉面，贴图512x512正方形→W=H
-  // [name, count, size, windStr, yMin, yMax, bottomOffset, cellSize(>0=网格排布连成片)]
-  const TYPES=[
-    ['foliage_card_02_short_turf',   8000,1.8,0.12,-5,20,0.20,1.5],
-    ['foliage_card_05_broadleaf_low',2800,2.2,0.18, 0,14,0.08,2.2],
-    ['foliage_card_06_white_wildflowers',1800,2.0,0.25,0,14,0.05,2.8],
-    ['foliage_extra_05_clover_ground',2200,2.0,0.12, 0,13,0.14,2.2],
-    ['foliage_card_03_sedge_thin',   1800,2.4,0.50,-3, 8,0.02,2.5],
-  ];
-  // 3交叉面几何体，ofs=底部留白高度→下移让草根贴地
-  function makeCross(S,ofs){
-    const vp=[],vu=[],vi=[];
-    for(let i=0;i<3;i++){
-      const a=i*Math.PI/3,ca=Math.cos(a),sa=Math.sin(a),b=vp.length/3;
-      vp.push(-ca*S/2,-ofs,-sa*S/2, ca*S/2,-ofs,sa*S/2, -ca*S/2,S-ofs,-sa*S/2, ca*S/2,S-ofs,sa*S/2);
-      vu.push(0,0,1,0,0,1,1,1);
-      vi.push(b,b+1,b+2, b+1,b+3,b+2);
-    }
-    const g=new THREE.BufferGeometry();
-    g.setAttribute('position',new THREE.Float32BufferAttribute(vp,3));
-    g.setAttribute('uv',new THREE.Float32BufferAttribute(vu,2));
-    g.setIndex(vi);return g;
-  }
-  const VS=`#include <common>
-uniform float uTime,uWind;varying vec2 vUv;varying float vDist;
-void main(){
-  vec3 ip=vec3(instanceMatrix[3][0],instanceMatrix[3][1],instanceMatrix[3][2]);
-  float top=smoothstep(0.5,1.0,uv.y);
-  float ph=ip.x*.31+ip.z*.17;
-  vec3 lp=mat3(instanceMatrix)*position;
-  lp.x+=sin(uTime*1.8+ph)*uWind*top;
-  lp.z+=cos(uTime*1.4+ph*.8)*uWind*.6*top;
-  vDist=length(cameraPosition-ip);
-  gl_Position=projectionMatrix*viewMatrix*vec4(ip+lp,1.);vUv=uv;}`;
-  const FS=`uniform sampler2D uTex;varying vec2 vUv;varying float vDist;
-void main(){vec4 c=texture2D(uTex,vUv);
-  float fade=1.-smoothstep(55.,90.,vDist);
-  if(c.a*fade<0.35)discard;
-  gl_FragColor=vec4(c.rgb*mix(0.88,1.0,vUv.y),c.a*fade);}`;
-  const dm=new THREE.Object3D();
-  for(const [name,cnt,S,ws,yMn,yMx,bot,cell] of TYPES){
-    const geo=makeCross(S,bot*S);
-    const mat=new THREE.ShaderMaterial({uniforms:{uTex:{value:_tl.load('./textures/texture_foliage.png')},uTime:{value:0},uWind:{value:ws}},
-      vertexShader:VS,fragmentShader:FS,side:THREE.DoubleSide,depthWrite:true,transparent:true});
-    window._grassMats.push(mat);
-    const mesh=new THREE.InstancedMesh(geo,mat,cnt);mesh.frustumCulled=false;
-    let n=0;
-    if(cell>0){
-      // 网格抖动排布：连成片
-      const cells=Math.ceil(250/cell);
-      outer:for(let ix=0;ix<cells;ix++){for(let iz=0;iz<cells;iz++){
-        if(n>=cnt)break outer;
-        const x=-125+ix*cell+(Math.random()-.5)*cell*.8;
-        const z=-125+iz*cell+(Math.random()-.5)*cell*.8;
-        const y=bh(x,z);if(y<yMn||y>yMx)continue;
-        dm.position.set(x,y-.05,z);dm.rotation.y=Math.random()*Math.PI*2;
-        dm.scale.setScalar(.85+Math.random()*.3);dm.updateMatrix();
-        mesh.setMatrixAt(n++,dm.matrix);
-      }}
-    } else {
-      let tries=0;
-      while(n<cnt&&tries++<cnt*6){
-        const x=(Math.random()-.5)*250,z=(Math.random()-.5)*250,y=bh(x,z);
-        if(y<yMn||y>yMx)continue;
-        dm.position.set(x,y-.05,z);dm.rotation.y=Math.random()*Math.PI*2;
-        dm.scale.setScalar(.8+Math.random()*.5);dm.updateMatrix();
-        mesh.setMatrixAt(n++,dm.matrix);
-      }
-    }
-    mesh.count=n;mesh.instanceMatrix.needsUpdate=true;scene.add(mesh);
-  }
-}
-buildGrass();
+const grassSystem = buildGrass({ THREE, scene, mapH: _mapH });
 
 // ============================================================
 //  练武木人桩
@@ -3159,8 +2924,8 @@ function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.
 addEventListener("resize",resize);resize();padStatus();
 document.getElementById("loading").style.display="none";
 function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);try{updateWolf(dt);}catch(e){console.error("wolf err:",e);}
-if(skyData) updateSky(dt, clock.getElapsedTime());updateWater(clock.getElapsedTime());updateCamera(dt);
-const _t=clock.getElapsedTime();if(window._grassMats)for(const m of window._grassMats)m.uniforms.uTime.value=_t;
+if(skyData) updateSky({ skyData, camera, dt });updateWater(clock.getElapsedTime());updateCamera(dt);
+const _t=clock.getElapsedTime();updateGrass({ grassMats: grassSystem.grassMats, time: _t });
 // ── 水面反射 pass ──────────────────────────────────────────
 const _rW=renderer.domElement.width,_rH=renderer.domElement.height;
 if(reflRT.width!==_rW||reflRT.height!==_rH){reflRT.setSize(_rW,_rH);sceneRT.setSize(_rW,_rH);if(typeof wSurfMat!=='undefined')wSurfMat.uniforms.uRes.value.set(_rW,_rH);}
