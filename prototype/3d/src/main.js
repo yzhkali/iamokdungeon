@@ -19,6 +19,7 @@ import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
 import { createGameLoop } from "./loop.js";
+import { installTestProbe } from "./debug/testProbe.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
 import { createSwordTrail } from "./combat/swordTrail.js";
 import { createSpaceSlash } from "./combat/spaceSlash.js";
@@ -872,35 +873,15 @@ const waterReflectionPass = createWaterReflectionPass({
   waterReflectionMeshes,
   getWaterSurfaceMaterial: () => (typeof wSurfMat !== 'undefined' ? wSurfMat : null)
 });
-if(globalThis.__IAMOK_ENABLE_TEST_PROBE__){
-  globalThis.__IAMOK_TEST_PROBE__ = {
-    camera: () => ({
-      x: camera.position.x,
-      y: camera.position.y,
-      z: camera.position.z,
-      yaw: cameraRig.yaw,
-      pitch: cameraRig.pitch,
-      targetYaw: cameraRig.targetYaw,
-      targetPitch: cameraRig.targetPitch,
-      minPitch: cameraRig.minPitch,
-      maxPitch: cameraRig.maxPitch,
-      playerTargetX: P.x,
-      playerTargetY: P.y + 1.7,
-      playerTargetZ: P.z
-    }),
-    render: () => ({
-      renderTargetIsNull: renderer.getRenderTarget ? renderer.getRenderTarget() === null : true,
-      clippingPlanes: renderer.clippingPlanes.length,
-      waterReflectionMeshesVisible: waterReflectionMeshes.every(mesh => mesh.visible !== false),
-      rendererWidth: renderer.domElement.width,
-      rendererHeight: renderer.domElement.height,
-      reflWidth: reflRT.width,
-      reflHeight: reflRT.height,
-      sceneRTWidth: sceneRT.width,
-      sceneRTHeight: sceneRT.height
-    })
-  };
-}
+installTestProbe({
+  camera,
+  cameraRig,
+  getPlayer: () => P,
+  renderer,
+  waterReflectionMeshes,
+  reflRT,
+  sceneRT
+});
 function updateFx(dt){
   attackBursts.update(dt);
   // 闪避残影淡出
