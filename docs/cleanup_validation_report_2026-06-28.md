@@ -55,6 +55,7 @@ Retained tool pages:
 - `prototype/3d/src/player/ghostAfterimages.js` owns dodge afterimage pool creation, snapshot timing, cadence, and fadeout.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/player/poseClipController.js` owns keyframe pose joint reset, transition snapshots, clip sampling/blending, and driven body pose state.
+- `prototype/3d/src/player/rig.js` owns the procedural player skeleton, physical left/right aliases, weapon socket, sword tip reference, charge aura, and static Jupiter-ball meshes.
 - `prototype/3d/src/player/state.js` owns player initial state and movement/jump/dodge/charge tuning constants.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
 - `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
@@ -75,6 +76,7 @@ Root scripts:
 - `npm run check:vendor-subset`
 - `npm run check:player-data`
 - `npm run check:player-state`
+- `npm run check:player-rig`
 - `npm run check:pose-clip-controller`
 - `npm run check:ghost-afterimages`
 - `npm run check:attack-bursts`
@@ -105,6 +107,7 @@ Coverage:
 - Vendor subset check parses retained `.gltf` files and verifies `.bin` and texture dependency closure.
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
+- Player rig check verifies the procedural hierarchy, physical side aliases, limb dimensions, right-wrist socket, sword tip reference, Jupiter-ball meshes, charge aura material, grip constants, and main-module integration.
 - Ghost afterimages check verifies pool size, capsule geometry/material setup, direct scene registration, live player/yaw snapshotting, pool wraparound, first-frame and 0.04s dodge cadence, fade math, hidden no-op behavior, and main-module integration.
 - Attack bursts check verifies yaw-local slash/heavy visual construction, geometry/material values, preserved dormant `startSlash` heavy-only semantics, `doSlash`, `burstCircle`, exact hitstop/shake writes, slash/heavy fade math, active `fireFx` behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.

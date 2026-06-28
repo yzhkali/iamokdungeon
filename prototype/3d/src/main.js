@@ -8,6 +8,7 @@ import { createWolfAiController } from "./enemies/wolfAi.js";
 import { createCameraController } from "./camera.js";
 import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
+import { createPlayerRig } from "./player/rig.js";
 import { createPlayerState, clonePlayerTuning } from "./player/state.js";
 import { createGhostAfterimages } from "./player/ghostAfterimages.js";
 import { createPoseClipController } from "./player/poseClipController.js";
@@ -676,125 +677,29 @@ function updateWolf(dt){ wolfController.updateWolf(dt); }
 // ============================================================
 //  角色：带关节 + 腰 的“老实人”
 // ============================================================
-const SKIN=0xf0c39a, HAIR=0x2b2018, GLASS=0x222222, SHIRT=0x3f6fb0, TANK=0xeaeaea,
-      SHORTS=0xf2f2f2, LIMB=0xe2b48c, FLIP=0x3a4a6b;
-function M(c,r=0.7){return new THREE.MeshStandardMaterial({color:c,roughness:r});}
-function box(w,h,d,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.castShadow=true;m.receiveShadow=true;return m;}
-
-const char=new THREE.Group(); scene.add(char);
-const yaw=new THREE.Group(); char.add(yaw);
-const body=new THREE.Group(); yaw.add(body);   // 整体姿态(前倾/翻滚)
-
-// 比例（加长肢体 + 加腰）
-const THIGH=0.78, SHIN=0.72, UPARM=0.6, FOREARM=0.56, ARM_W=0.26, LEG_W=0.3;
-const CHEST_H=1.0;
-const HIP_Y=THIGH+SHIN;                 // 1.5 胯高
-const SHO_LOCAL=CHEST_H-0.05;           // 肩(相对腰)
-const SHO_X=0.725;                      // 肩宽
-const TOTAL_H=HIP_Y+CHEST_H+0.8;        // 约3.3
-
-// —— 下半身（直接挂 body）——
-const pelvis=box(1.0,0.42,0.66,SHORTS); pelvis.position.y=HIP_Y; body.add(pelvis);
-
-// —— 腰/胸（waist 关节：chest 绕此旋转）——
-const chest=new THREE.Group(); chest.position.y=HIP_Y; body.add(chest);
-const torso=box(1.15,CHEST_H,0.7,SHIRT); torso.position.y=CHEST_H/2; chest.add(torso);
-const tank=box(0.6,CHEST_H*0.92,0.56,TANK); tank.position.set(0,CHEST_H/2,0.09); chest.add(tank);
-
-// 头 + 头发 + 眼镜（挂 chest）
-const headGrp=new THREE.Group(); headGrp.position.y=CHEST_H+0.05; chest.add(headGrp);
-const head=box(0.78,0.72,0.7,SKIN); head.position.y=0.36; headGrp.add(head);
-const hairTop=box(0.86,0.32,0.78,HAIR); hairTop.position.y=0.66; headGrp.add(hairTop);
-const hairBack=box(0.86,0.46,0.42,HAIR); hairBack.position.set(0,0.44,-0.22); headGrp.add(hairBack);
-function ring(x){const g=new THREE.Mesh(new THREE.TorusGeometry(0.14,0.038,8,18),M(GLASS,0.4));g.position.set(x,0.37,0.36);headGrp.add(g);}
-ring(-0.18); ring(0.18);
-const bridge=box(0.13,0.035,0.05,GLASS); bridge.position.set(0,0.37,0.38); headGrp.add(bridge);
-
-// —— 带关节肢体 —— upper/ lower 分色，避免额外套袖盒子(消除闪烁)
-function jointedLimb(parent,upLen,loLen,w,px,py,upColor,loColor,withFoot){
-  const root=new THREE.Group(); root.position.set(px,py,0); parent.add(root);
-  const upper=box(w,upLen,w,upColor); upper.position.y=-upLen/2; root.add(upper);
-  const j2=new THREE.Group(); j2.position.y=-upLen; root.add(j2);
-  // 小腿渲染盒子比关节实际长度略短(底部上收), 避免戳穿脚上的鞋子; 不改关节长度=不影响腿长/脚底补偿
-  const loShrink = withFoot ? 0.14 : 0;
-  const loVis = loLen - loShrink;
-  const lower=box(w*0.9,loVis,w*0.9,loColor); lower.position.y=-loShrink/2-loVis/2; j2.add(lower);
-  let foot=null;
-  if(withFoot){ foot=box(w+0.14,0.12,w+0.34,FLIP); foot.position.set(0,-loLen+0.1,0.12); j2.add(foot); }
-  return {root,j2};
-}
-// 手臂挂 chest（短袖=上臂蓝色, 小臂=肤色）
-const armScreenL=jointedLimb(chest,UPARM,FOREARM,ARM_W,-SHO_X,SHO_LOCAL,SHIRT,LIMB,false);
-const armScreenR=jointedLimb(chest,UPARM,FOREARM,ARM_W, SHO_X,SHO_LOCAL,SHIRT,LIMB,false);
-// 腿挂 body
-const legScreenL=jointedLimb(body,THIGH,SHIN,LEG_W,-0.3,HIP_Y,LIMB,LIMB,true);
-const legScreenR=jointedLimb(body,THIGH,SHIN,LEG_W, 0.3,HIP_Y,LIMB,LIMB,true);
-
-// —— 物理左右别名 ——（角色正面朝镜头时，物理右侧在屏幕左侧）
-// 以后代码里 RArm/RLeg = 角色物理右手/右腿，永不再错位
-const RArm=armScreenL, LArm=armScreenR, RLeg=legScreenL, LLeg=legScreenR;
-
-// 武器（握在角色物理右手）
-// 左手：直接挂小臂
-function addHand(parent,y){
-  const h=box(ARM_W+0.06,0.2,ARM_W+0.1,SKIN);
-  h.position.set(0,y,0.02); parent.add(h); return h;
-}
-addHand(LArm.j2,-FOREARM);
-
-// ============================================================
-//  右手腕关节 + 武器插槽（可替换握持物）
-//  手腕绕小臂长轴(y)滚转 = 旋前/旋后：
-//    内侧旋转(棍子贴向身体) = wristR.rotation.y 正值 +
-//    外侧旋转(棍子向外延展) = wristR.rotation.y 负值 -
-//    换算: 度数 × π/180  (内90°=+1.571, 外150°=-2.618)
-// ============================================================
-const rWrist=new THREE.Group();
-rWrist.position.set(0,-FOREARM,0);     // 手腕枢轴在手位置
-RArm.j2.add(rWrist);
-const rHand=box(ARM_W+0.06,0.2,ARM_W+0.1,SKIN); rHand.position.set(0,0,0.02); rWrist.add(rHand);
-
-const weaponSocket=new THREE.Group();
-weaponSocket.position.set(0,0,0.06);              // 手心
-weaponSocket.rotation.x = Math.PI*0.5 - 0.35;     // 握持朝向(已调好)
-rWrist.add(weaponSocket);
-
-function makeStick(){
-  const g=new THREE.Group();
-  const grip=box(0.11,0.32,0.11,0x4a3526); grip.position.y=0.02; g.add(grip);
-  const guard=box(0.2,0.06,0.2,0x6b5640); guard.position.y=0.2; g.add(guard);
-  const shaft=box(0.1,0.92,0.1,0x9a6a3b); shaft.position.y=0.68; g.add(shaft);
-  return g;
-}
-// 长剑：握把在原点，刃沿+y伸出，更长
-function makeSword(){
-  const g=new THREE.Group();
-  const grip=box(0.1,0.34,0.1,0x3a2a1c); grip.position.y=0.02; g.add(grip);          // 握把
-  const guard=box(0.42,0.08,0.14,0x8a7340); guard.position.y=0.2; g.add(guard);        // 护手(横)
-  const blade=box(0.12,1.5,0.05,0xcdd6e0); blade.position.y=0.98; g.add(blade);        // 剑身(长)
-  const tip=box(0.12,0.16,0.05,0xe6edf5); tip.position.y=1.78; g.add(tip);             // 剑尖高光
-  // 剑尖参考点(用于拖尾轨迹采样)
-  const tipRef=new THREE.Object3D(); tipRef.position.set(0,1.86,0); g.add(tipRef);
-  g.userData.tipRef=tipRef; g.userData.bladeLen=1.86;
-  return g;
-}
-let weapon=makeSword();
-weaponSocket.add(weapon);
-const weaponTip=weapon.userData.tipRef;   // 剑尖世界坐标采样点
-
-// 蓄满闪烁光环(挂在body中部)
-// ===== 木星球体变身系统 =====
-const jupiterBall=new THREE.Group();jupiterBall.visible=false;scene.add(jupiterBall);
-const _jOrb1=new THREE.Group();jupiterBall.add(_jOrb1);
-const _jSwd1=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.1,0.07),new THREE.MeshStandardMaterial({color:0xeaeaea,roughness:0.1,emissive:0x8888aa,emissiveIntensity:1.2}));
-_jOrb1.add(_jSwd1);
-const _jOrb2=new THREE.Group();jupiterBall.add(_jOrb2);
-const _jSwd2=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.1,0.07),new THREE.MeshStandardMaterial({color:0x3f6fb0,roughness:0.1,emissive:0x2244aa,emissiveIntensity:1.2}));
-_jOrb2.add(_jSwd2);
+const {
+  char,
+  yaw,
+  body,
+  chest,
+  headGrp,
+  RArm,
+  LArm,
+  RLeg,
+  LLeg,
+  rWrist,
+  weaponSocket,
+  weapon,
+  weaponTip,
+  jupiterBall,
+  chargeAura,
+  chargeAuraMat,
+  gripDefault: GRIP_DEFAULT,
+  gripSpear: GRIP_SPEAR
+} = createPlayerRig({ THREE });
+scene.add(char);
+scene.add(jupiterBall);
 let jupiterActive=false,_jSpin=0,_drillSpin=0;
-const chargeAuraMat=new THREE.MeshBasicMaterial({color:0xffe85a,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
-const chargeAura=new THREE.Mesh(new THREE.SphereGeometry(1.3,16,12),chargeAuraMat);
-chargeAura.position.y=1.6; chargeAura.visible=false; body.add(chargeAura);
 
 const spaceSlash = createSpaceSlash({ THREE, scene });
 // 命中钩子：带空间斩标记时，在命中点放空间斩并清除标记
@@ -1518,7 +1423,6 @@ function poseCharacter(dt){
   if(drivenPose.bodySide!==null) body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,drivenPose.bodySide,0.5);
 
   // 握剑姿态：gripMode 0=斜握默认 / 1=突刺枪式(剑沿小臂延长线)
-  const GRIP_DEFAULT=Math.PI*0.5-0.35, GRIP_SPEAR=Math.PI;
   const gm = (drivenPose.gripMode!==null)?drivenPose.gripMode:0;
   weaponSocket.rotation.x = GRIP_DEFAULT + (GRIP_SPEAR-GRIP_DEFAULT)*gm;
 

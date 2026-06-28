@@ -8,6 +8,7 @@
     "check:vendor-subset": "node scripts/check-vendor-subset.mjs",
     "check:player-data": "node scripts/check-player-data.mjs",
     "check:player-state": "node scripts/check-player-state.mjs",
+    "check:player-rig": "node scripts/check-player-rig.mjs",
     "check:pose-clip-controller": "node scripts/check-pose-clip-controller.mjs",
     "check:ghost-afterimages": "node scripts/check-ghost-afterimages.mjs",
     "check:attack-bursts": "node scripts/check-attack-bursts.mjs",
@@ -28,7 +29,7 @@
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:server": "node scripts/check-server.mjs",
     "check:browser": "node scripts/check-browser.mjs",
-    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:pose-clip-controller && npm run check:ghost-afterimages && npm run check:attack-bursts && npm run check:target-feedback && npm run check:hit-math && npm run check:hit-resolution && npm run check:space-slash && npm run check:spin-rings && npm run check:stomp-effects && npm run check:sword-beam && npm run check:sword-trail && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
+    "validate": "npm run check:assets && npm run check:vendor-subset && npm run check:player-data && npm run check:player-state && npm run check:player-rig && npm run check:pose-clip-controller && npm run check:ghost-afterimages && npm run check:attack-bursts && npm run check:target-feedback && npm run check:hit-math && npm run check:hit-resolution && npm run check:space-slash && npm run check:spin-rings && npm run check:stomp-effects && npm run check:sword-beam && npm run check:sword-trail && npm run check:input && npm run check:map-hud && npm run check:camera && npm run check:render-loop && npm run check:game-loop && npm run check:wolf-ai && npm run check:syntax && npm run check:server && npm run check:browser",
     "serve": "node scripts/static-server.mjs prototype/3d",
     "prepush": "git diff --check && npm run validate"
   }
