@@ -8,6 +8,7 @@ import { createWolfAiController } from "./enemies/wolfAi.js";
 import { createCameraController } from "./camera.js";
 import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
+import { createPlayerState, clonePlayerTuning } from "./player/state.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
@@ -1233,29 +1234,16 @@ const { Actions, mouse, pollInput, clearGameplayInputState, autoPad, toCameraRel
 // ============================================================
 //  玩家状态
 // ============================================================
-const P={x:0,z:0,y:0,vy:0,facing:0,jumping:false,
-  hp:5,hpMax:5,dead:false,
-  state:'idle',          // idle / attack / dodge / taunt
-  clip:null, clipT:0, clipDur:0,
-  // 连招机
-  move:null,             // 当前招式名(连招树节点) 或 null
-  moveT:0, phase:'startup', struck:false, blendT:0, blendDur:0.13, // startup→active→recovery
-  nextBuffer:null,       // 输入缓冲: 'light' | 'heavy'
-  lunge:0,
-  charging:false,chargeT:0,chargeHold:0,chargeLock:false,chargeFull:false,chargeFullT:0,
-  dodgeT:0,dodgeDir:new THREE.Vector3(),roll:0,iframe:0, airDodge:false, _drillBounce:0, _drillBounced:false,
-  spin:0,                // 空中旋转砸的角度进度
-  stamina:100,staminaMax:100, runPhase:0,moving:false,speed:0};
-
-const MOVE_SPEED=9.2, TURN_LERP=20, JUMP_V=15.5, GRAVITY=43;
+const P=createPlayerState({ makeVector3: () => new THREE.Vector3() });
+const {
+  MOVE_SPEED, TURN_LERP, JUMP_V, GRAVITY,
+  LIGHT_LUNGE, HEAVY_LUNGE, CHARGE_MAX, CHARGE_MOVE, CHARGE_AUTO,
+  HEAVY_CHARGE_TIME, HEAVY_CHARGE_HOLD, HEAVY_CHARGE_MINSPD,
+  DODGE_DUR, DODGE_SPEED, DODGE_IFRAME, DODGE_COST, STAM_REGEN,
+  HEAVY_R_MIN, HEAVY_R_MAX, PLAYER_R
+} = clonePlayerTuning();
 // 跳跃最高点≈2.8单位(高过2.7的柱子)，空中时间≈0.72s，上升/下落都更快一点
-const LIGHT_LUNGE=2.5, HEAVY_LUNGE=4.0, CHARGE_MAX=1.1, CHARGE_MOVE=0.38, CHARGE_AUTO=1.0;
-const HEAVY_CHARGE_TIME=1.0;      // 蓄满需要1.5秒
-const HEAVY_CHARGE_HOLD=1.0;      // 蓄满后保持1秒不松手则取消
-const HEAVY_CHARGE_MINSPD=0.2;    // 蓄满时移速降到20%
-const DODGE_DUR=0.20, DODGE_SPEED=17.0, DODGE_IFRAME=0.16, DODGE_COST=0, STAM_REGEN=10;
-const HEAVY_R_MIN=1.3, HEAVY_R_MAX=2.7;   // 重击圆圈半径(空蓄~满蓄)
-const PLAYER_R=0.55;
+// HEAVY_R_MIN/HEAVY_R_MAX 是重击圆圈半径(空蓄~满蓄)
 let shake=0,hitstop=0;
 
 // ============================================================

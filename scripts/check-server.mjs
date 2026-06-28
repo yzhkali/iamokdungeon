@@ -28,6 +28,7 @@ try {
   await expectStatus(origin, '/src/rendering/waterReflection.js', 200);
   await expectStatus(origin, '/src/player/clips.js', 200);
   await expectStatus(origin, '/src/player/moves.js', 200);
+  await expectStatus(origin, '/src/player/state.js', 200);
   await expectStatus(origin, '/src/ui/input.js', 200);
   await expectStatus(origin, '/src/ui/mapHud.js', 200);
   await expectStatus(origin, '/src/enemies/wolfAi.js', 200);
