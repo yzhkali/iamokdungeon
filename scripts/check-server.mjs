@@ -37,6 +37,7 @@ try {
   await expectStatus(origin, '/src/player/clips.js', 200);
   await expectStatus(origin, '/src/player/ghostAfterimages.js', 200);
   await expectStatus(origin, '/src/player/moves.js', 200);
+  await expectStatus(origin, '/src/player/poseClipController.js', 200);
   await expectStatus(origin, '/src/player/state.js', 200);
   await expectStatus(origin, '/src/ui/input.js', 200);
   await expectStatus(origin, '/src/ui/mapHud.js', 200);

@@ -11,6 +11,7 @@ import {
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const poseClipJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/poseClipController.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -78,7 +79,8 @@ nearly(angleDelta(-Math.PI + 0.1, Math.PI - 0.1), -0.2, 'angleDelta should wrap 
 }
 
 assert(mainJs.includes('import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";'), 'main.js must import hit math helpers');
-assert(mainJs.includes('sampleTrack(clip.tracks[jn],time,THREE.MathUtils.lerp)'), 'main.js must use hitMath sampleTrack with Three lerp');
+assert(/createPoseClipController\s*\(\s*\{[\s\S]*sampleTrack[\s\S]*lerp\s*:\s*THREE\.MathUtils\.lerp/.test(mainJs), 'main.js must inject hitMath sampleTrack with Three lerp into pose clips');
+assert(poseClipJs.includes('sampleTrack(clip.tracks[jointName], time, lerp)'), 'pose clip controller must use injected hitMath sampleTrack');
 assert(mainJs.includes('return isInThrustBox({ playerX:P.x, playerZ:P.z, facing:P.facing'), 'main.js must delegate thrust box math');
 assert(mainJs.includes('if(isInSpinSweepArc({ playerX:P.x, playerZ:P.z'), 'main.js must delegate spin sweep arc math');
 assert(!mainJs.includes('function sampleTrack(track,t)'), 'main.js should not retain inline sampleTrack');

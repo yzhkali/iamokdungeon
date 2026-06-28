@@ -10,6 +10,7 @@ import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
 import { createPlayerState, clonePlayerTuning } from "./player/state.js";
 import { createGhostAfterimages } from "./player/ghostAfterimages.js";
+import { createPoseClipController } from "./player/poseClipController.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
@@ -872,68 +873,12 @@ const stompEffects=createStompEffects({
 //  关键帧动画系统（加动作=加数据表）
 //  约定：肘=负值朝前弯；膝=正值朝后弯
 // ============================================================
-const JOINTS={ shoR:RArm.root, elbR:RArm.j2, shoL:LArm.root, elbL:LArm.j2,
-  hipR:RLeg.root, kneeR:RLeg.j2, hipL:LLeg.root, kneeL:LLeg.j2, chest:chest, head:headGrp, wristR:rWrist };
-function resetJoints(){ for(const k in JOINTS){ JOINTS[k].rotation.set(0,0,0); } }
-// 切招过渡：记录切招瞬间每个关节的实际旋转，作为补间起点
-const POSE_SNAP={};
-let clipBodyY=null, clipBodyLean=null, clipBodyYaw=null, clipBodySide=null, clipGripMode=null;   // 动作驱动的身体下沉/前倾/握剑姿态(null=不覆盖)
-function capturePoseSnapshot(){
-  for(const k in JOINTS){
-    const r=JOINTS[k].rotation;
-    POSE_SNAP[k]={x:r.x,y:r.y,z:r.z};
-  }
-  POSE_SNAP._bodyY = body.position.y;
-  POSE_SNAP._bodyLean = body.rotation.x;
-  POSE_SNAP._bodyYaw = body.rotation.y;
-  POSE_SNAP._bodySide = body.rotation.z;
-  POSE_SNAP._gripMode = (clipGripMode!==null)?clipGripMode:0;
-}
-function applyClip(name,time,blend){
-  const clip=CLIPS[name]; if(!clip)return;
-  // blend: 0→1，从切招快照过渡到新动作；>=1 或未传则直接套用
-  const b = (blend===undefined)?1:Math.min(1,blend);
-  for(const jn in clip.tracks){
-    const val=sampleTrack(clip.tracks[jn],time,THREE.MathUtils.lerp);
-    // 身体下沉 / 整体前倾（驱动下半身核心发力感）
-    if(jn==='bodyY'){
-      const tgt=val.v||0; const s=(POSE_SNAP._bodyY??0);
-      clipBodyY = (b<1)?THREE.MathUtils.lerp(s,tgt,b):tgt; continue;
-    }
-    if(jn==='bodyLean'){
-      const tgt=val.v||0; const s=(POSE_SNAP._bodyLean??0);
-      clipBodyLean = (b<1)?THREE.MathUtils.lerp(s,tgt,b):tgt; continue;
-    }
-    if(jn==='bodyYaw'){ clipBodyYaw=(b<1)?THREE.MathUtils.lerp(POSE_SNAP._bodyYaw??0,val.v||0,b):(val.v||0); continue; }
-    if(jn==='bodySide'){ clipBodySide=(b<1)?THREE.MathUtils.lerp(POSE_SNAP._bodySide??0,val.v||0,b):(val.v||0); continue; }
-    // 握剑姿态(0=斜握默认, 1=突刺枪式握法:剑沿小臂延长线)
-    if(jn==='gripMode'){
-      const tgt=val.v||0; const s=(POSE_SNAP._gripMode??0);
-      clipGripMode = (b<1)?THREE.MathUtils.lerp(s,tgt,b):tgt; continue;
-    }
-    // 目标关节与目标值
-    let joint, tx,ty,tz;
-    if(jn==='chestY'){ joint=chest; tx=chest.rotation.x; ty=val.v||0; tz=chest.rotation.z; }
-    else if(jn==='chestX'){ joint=chest; tx=val.v||0; ty=chest.rotation.y; tz=chest.rotation.z; }
-    else if(jn==='chestZ'){ joint=chest; tx=chest.rotation.x; ty=chest.rotation.y; tz=val.v||0; }
-    else {
-      joint=JOINTS[jn]; if(!joint)continue;
-      tx=(val.x!==undefined)?val.x:joint.rotation.x;
-      ty=(val.y!==undefined)?val.y:joint.rotation.y;
-      tz=(val.z!==undefined)?val.z:joint.rotation.z;
-    }
-    if(b<1){
-      // 从快照起点补间到目标
-      const snapKey = (jn==='chestX'||jn==='chestY'||jn==='chestZ')?'chest':jn;
-      const s=POSE_SNAP[snapKey]||{x:0,y:0,z:0};
-      joint.rotation.x=THREE.MathUtils.lerp(s.x,tx,b);
-      joint.rotation.y=THREE.MathUtils.lerp(s.y,ty,b);
-      joint.rotation.z=THREE.MathUtils.lerp(s.z,tz,b);
-    } else {
-      joint.rotation.x=tx; joint.rotation.y=ty; joint.rotation.z=tz;
-    }
-  }
-}
+const poseClipController=createPoseClipController({
+  CLIPS,
+  sampleTrack,
+  lerp:THREE.MathUtils.lerp,
+  rig:{ RArm,LArm,RLeg,LLeg,chest,headGrp,rWrist,body }
+});
 
 // ============================================================
 //  输入
@@ -1002,7 +947,7 @@ function startMove(name){
   P._spinSnd=false; SFX.spinStop();
   P._slideV=undefined; P._slideStarted=null;   // 重置滑行
   // 拍下当前姿势快照，用于切招过渡补间(消除"弹一下"的卡顿)
-  capturePoseSnapshot();
+  poseClipController.capturePoseSnapshot();
   P.blendT=0;
   P.blendDur=(name==='dRise'&&prevState==='dodge')?0.22:0.13;
   playClip(mv.clip);
@@ -1298,7 +1243,7 @@ function update(dt){
 
     // 进入收尾段：仅 useRecoverClip 的招式切到收尾动画(如蓄满大风车的晕眩)
     if(mv.useRecoverClip && mv.recoverClip && P.phase==='hold' && P.clip!==mv.recoverClip){
-      capturePoseSnapshot(); P.blendT=0; P.blendDur=0.12;
+      poseClipController.capturePoseSnapshot(); P.blendT=0; P.blendDur=0.12;
       P.clip=mv.recoverClip; P.clipT=0; P.clipDur=CLIPS[mv.recoverClip].dur;
     }
     if(P.clip===mv.recoverClip) P.clipT+=dt;
@@ -1345,7 +1290,7 @@ function update(dt){
     // 空中招自然落地泄力(升龙剑等)：没接招自然下落着地时，播 landClip 收势
     if(mv.landClip && !mv.plunge && onGround && P._launched && !P._plungeDone && P.moveT>0.30){
       P._plungeDone=true;
-      capturePoseSnapshot(); P.blendT=0; P.blendDur=0.10;
+      poseClipController.capturePoseSnapshot(); P.blendT=0; P.blendDur=0.10;
       P.clip=mv.landClip; P.clipDur=CLIPS[mv.landClip].dur; P.clipT=0;
       P.moveT=mv.total; P._customRecover=CLIPS[mv.landClip].dur;
     }
@@ -1522,9 +1467,9 @@ function updateFx(dt){
 function lerpRot(j,axis,target,k){ j.rotation[axis]=THREE.MathUtils.lerp(j.rotation[axis],target,k); }
 function poseCharacter(dt){
   char.position.set(P.x,P.y,P.z);
-  resetJoints();
+  poseClipController.resetJoints();
   body.rotation.set(0,0,0); body.position.set(0,0,0);
-  clipBodyY=null; clipBodyLean=null; clipBodyYaw=null; clipBodySide=null; clipGripMode=null;   // 每帧重置动作驱动的身体下沉/前倾/握剑
+  poseClipController.resetDrivenState();   // 每帧重置动作驱动的身体下沉/前倾/握剑
   let bob=0, lean=0;
   const ph=P.runPhase;
 
@@ -1591,7 +1536,7 @@ function poseCharacter(dt){
   if(P.clip){
     // 切招时从快照平滑过渡到新动作，消除"弹一下"的卡顿
     const blend = (P.move && P.blendDur>0) ? (P.blendT/P.blendDur) : 1;
-    applyClip(P.clip, P.clipT, blend);
+    poseClipController.applyClip(P.clip, P.clipT, blend);
   }
 
   // —— 空中旋转砸 aSpin：整体绕X轴翻转 ——
@@ -1678,18 +1623,19 @@ function poseCharacter(dt){
     chest.rotation.x=0.15*ease;
   }
 
+  const drivenPose=poseClipController.getDrivenState();
   // 动作驱动的身体下沉/前倾优先(弓步发力链)，否则用默认 bob/lean
-  body.position.y += (clipBodyY!==null)? clipBodyY : bob;
+  body.position.y += (drivenPose.bodyY!==null)? drivenPose.bodyY : bob;
   if(!spinning){
-    const targetLean = (clipBodyLean!==null)? clipBodyLean : lean;
+    const targetLean = (drivenPose.bodyLean!==null)? drivenPose.bodyLean : lean;
     body.rotation.x=THREE.MathUtils.lerp(body.rotation.x,targetLean,0.5);
   }
-  if(clipBodyYaw!==null) body.rotation.y=THREE.MathUtils.lerp(body.rotation.y,clipBodyYaw,0.5);
-  if(clipBodySide!==null) body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,clipBodySide,0.5);
+  if(drivenPose.bodyYaw!==null) body.rotation.y=THREE.MathUtils.lerp(body.rotation.y,drivenPose.bodyYaw,0.5);
+  if(drivenPose.bodySide!==null) body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,drivenPose.bodySide,0.5);
 
   // 握剑姿态：gripMode 0=斜握默认 / 1=突刺枪式(剑沿小臂延长线)
   const GRIP_DEFAULT=Math.PI*0.5-0.35, GRIP_SPEAR=Math.PI;
-  const gm = (clipGripMode!==null)?clipGripMode:0;
+  const gm = (drivenPose.gripMode!==null)?drivenPose.gripMode:0;
   weaponSocket.rotation.x = GRIP_DEFAULT + (GRIP_SPEAR-GRIP_DEFAULT)*gm;
 
   // —— 头部反向补偿：躯干猛转时头仍大致注视正前方，只微微跟随 ——

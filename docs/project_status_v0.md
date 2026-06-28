@@ -22,7 +22,7 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、闪避残影控制器、战斗/姿态纯数学辅助函数、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、闪避残影控制器、动作关键帧控制器、战斗/姿态纯数学辅助函数、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/combat/attackBursts.js`：轻击刀光/重击圆圈视觉对象、休眠 `startSlash` 语义、`doSlash`、`burstCircle` 和淡出更新。
 - `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
@@ -38,6 +38,7 @@ Windows 本地双击入口仍保留：
 - `prototype/3d/src/loop.js`：主帧循环调度器。
 - `prototype/3d/src/player/`：关键帧动画 `CLIPS`、连招 `MOVES`、玩家初始状态和调参数据。
 - `prototype/3d/src/player/ghostAfterimages.js`：闪避残影池、快照、计时和淡出。
+- `prototype/3d/src/player/poseClipController.js`：动作关键帧关节重置、切招快照、clip 采样补间和身体驱动值 staging。
 - `prototype/3d/src/ui/input.js`：键鼠/手柄输入控制器。
 - `prototype/3d/src/ui/mapHud.js`：体力/状态 HUD、小地图和展开地图控制器。
 - `prototype/3d/src/wolf.js`：程序化狼。
@@ -64,7 +65,7 @@ Windows 本地双击入口仍保留：
 ## Known Issues
 
 - 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
-- `main.js` 仍偏大，攻击视觉爆发、目标受击反馈、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理姿态执行、部分命中副作用和玩家 update 主流程边界。
+- `main.js` 仍偏大，攻击视觉爆发、目标受击反馈、动作关键帧应用、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理特殊姿态执行、部分命中副作用和玩家 update 主流程边界。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks

@@ -53,6 +53,7 @@ Retained tool pages:
 - `prototype/3d/src/player/clips.js` owns animation clip data.
 - `prototype/3d/src/player/ghostAfterimages.js` owns dodge afterimage pool creation, snapshot timing, cadence, and fadeout.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
+- `prototype/3d/src/player/poseClipController.js` owns keyframe pose joint reset, transition snapshots, clip sampling/blending, and driven body pose state.
 - `prototype/3d/src/player/state.js` owns player initial state and movement/jump/dodge/charge tuning constants.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
 - `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
@@ -73,6 +74,7 @@ Root scripts:
 - `npm run check:vendor-subset`
 - `npm run check:player-data`
 - `npm run check:player-state`
+- `npm run check:pose-clip-controller`
 - `npm run check:ghost-afterimages`
 - `npm run check:attack-bursts`
 - `npm run check:target-feedback`
