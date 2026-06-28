@@ -51,11 +51,11 @@
 <script type="module">
 const loadingEl=document.getElementById('loading');
 let THREE=null;
-const T_SRC=["three","https://unpkg.com/three@0.160.0/build/three.module.js"];
+const T_SRC=["three"];
 for(let i=0;i<T_SRC.length;i++){ try{ THREE=await import(T_SRC[i]); if(THREE&&THREE.Scene)break; }catch(e){} }
 if(!THREE){ loadingEl.textContent='引擎加载失败'; throw new Error('x'); }
 let GLTFLoader=null;
-const G_SRC=["three/addons/loaders/GLTFLoader.js","https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"];
+const G_SRC=["three/addons/loaders/GLTFLoader.js"];
 for(let i=0;i<G_SRC.length;i++){ try{ const m=await import(G_SRC[i]); GLTFLoader=m.GLTFLoader; if(GLTFLoader)break; }catch(e){} }
 
 const canvas=document.getElementById('c');

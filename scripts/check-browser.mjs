@@ -6,6 +6,16 @@ import path from 'node:path';
 import { createStaticServer } from './static-server.mjs';
 
 const repoRoot = process.cwd();
+const smokeTargets = [
+  { path: '/index.html', requireCanvas: true, requireNonBlank: true, settleMs: 1500 },
+  { path: '/editor3d.html', requireCanvas: true, requireNonBlank: false, settleMs: 1000 },
+  { path: '/gallery.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
+  { path: '/pose-editor.html', requireCanvas: true, requireNonBlank: false, settleMs: 1000 },
+  { path: '/sfx-editor.html', requireCanvas: true, requireNonBlank: false, settleMs: 500 },
+  { path: '/bones.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
+  { path: '/skeleton-demo.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
+  { path: '/quat-demo.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
+];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   '/root/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome',
@@ -178,6 +188,7 @@ function isAllowedRequest(url, origin) {
 async function smokePage(cdp, origin, pathname, {
   requireCanvas = true,
   requireNonBlank = true,
+  settleMs = 0,
   timeoutMs = 25000,
 } = {}) {
   const pageUrl = `${origin}${pathname}`;
@@ -308,7 +319,10 @@ async function smokePage(cdp, origin, pathname, {
       }
       const canvasOk = !requireCanvas || lastProbe?.canvas;
       const blankOk = !requireNonBlank || lastProbe?.nonBlank;
-      if (canvasOk && blankOk && lastProbe?.loadingHidden) break;
+      if (canvasOk && blankOk && lastProbe?.loadingHidden) {
+        if (settleMs > 0) await new Promise(resolve => setTimeout(resolve, settleMs));
+        break;
+      }
       await new Promise(resolve => setTimeout(resolve, 250));
     }
 
@@ -353,7 +367,9 @@ try {
   browser = await launchChromium();
   cdp = new CdpClient(browser.wsUrl);
   await cdp.connect();
-  await smokePage(cdp, origin, '/index.html');
+  for (const target of smokeTargets) {
+    await smokePage(cdp, origin, target.path, target);
+  }
 } catch (error) {
   if (browser?.stderr()) {
     console.error('Chromium stderr:');
@@ -362,11 +378,11 @@ try {
   throw error;
   } finally {
     cdp?.close();
-  if (browser?.child && !browser.child.killed) {
+  if (browser?.child && browser.child.exitCode === null) {
     const exited = new Promise(resolve => browser.child.once('exit', resolve));
     browser.child.kill('SIGTERM');
-    await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 3000))]);
-    if (!browser.child.killed) browser.child.kill('SIGKILL');
+    const didExit = await Promise.race([exited.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 3000))]);
+    if (!didExit && browser.child.exitCode === null) browser.child.kill('SIGKILL');
   }
   if (browser?.userDataDir) {
     for (let i = 0; i < 5; i++) {

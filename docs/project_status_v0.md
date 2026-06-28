@@ -1,141 +1,58 @@
-﻿# Project Status v0 - I am OK Dungeon / 没事地下城
+# Project Status v0 - I am OK Dungeon / 没事地下城
 
-> New Codex conversations should read this file after `READMEFIRST.md`.
+> 新会话应先读 `READMEFIRST.md`，再读 `HANDOFF.md` 和本文件。
 
-## Current Folder State
+## Current State
 
-Project folder:
+当前仓库已经有可运行 3D 原型，主入口是：
 
-- `D:\I am OK Dungeon\`
+- `prototype/3d/index.html`
 
-Current top-level contents:
+运行与验证：
 
-- `READMEFIRST.md`
-- `docs/`
-- `assets/`
+- `npm run serve`
+- `npm run validate`
+- `npm run check:browser`
+- `npm run prepush`
 
-There is currently no playable prototype project yet.
+Windows 本地双击入口仍保留：
 
-## What Has Been Established
+- `prototype/3d/START-GAME.bat`
+- `prototype/3d/启动游戏.bat`
 
-The project is a retro pixel ARPG / light roguelite prototype about Chinese internet relationship language and awkward intimacy-pressure satire.
+## Current Runtime Layout
 
-Current first playable character:
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体。
+- `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
+- `prototype/3d/src/world/`：天空和草。
+- `prototype/3d/src/wolf.js`：程序化狼。
+- `prototype/3d/maps/map15.json`：当前运行地图。
+- `prototype/3d/assets/vendor/`：保留运行子集，完整源包不入库。
+- `docs/archive/maps/`：旧地图归档。
+- `docs/animation_refs/`：动画参考归档。
 
-- 老实人 / Honest Man
-- Beginner-friendly, high-survivability character.
-- Visual identity: short chubby chibi man, thick round glasses, bowl cut, blue plaid open shirt, white tank top, white shorts, flip-flops.
-- Core passive: 忍耐槽 stores a small portion of damage, then releases as 忍无可忍 full-screen AOE and a short burst state.
+## Cleanup Status
 
-Current visual direction:
+已完成：
 
-- Retro Japanese ARPG pixel art.
-- Three-quarter top-down / isometric-feeling camera.
-- Cute chibi proportions with strong dark outline and readable pixel clusters.
-- Accepted anchor assets are in `assets/concepts/`.
+- 删除 `assets/packs/vendor/**` 完整源包。
+- 增加 `prototype/3d/assets/vendor/NOTICE.md`。
+- 增加 root `package.json` 和 `scripts/` 验证工具。
+- 删除 0 字节 test 文件。
+- 删除重复音效和重复泥土贴图。
+- 删除旧备份/离线 HTML。
+- 删除早期 2D `prototype/index.html` 和专用 `prototype/assets/honest_man/`。
+- 归档旧地图到 `docs/archive/maps/`。
+- 归档三连动画备份到 `docs/animation_refs/`。
 
-Current animation focus:
+## Known Issues
 
-- Do not expand to all directions yet.
-- First lock one run direction: front 45 degrees, 8-frame seamless run cycle.
-- Doubao reference is useful as a motion target, but should not be directly extracted as final sprites.
+- 工具页还需要最终本地化复查和 smoke 覆盖。
+- `main.js` 仍偏大，后续应继续拆 `CLIPS`、`MOVES`、输入、HUD、相机、循环。
+- 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
-## Existing Documents To Read
+## Next Tasks
 
-Priority order for a new conversation:
-
-1. `READMEFIRST.md`
-2. `docs/project_status_v0.md`
-3. `docs/character_honest_man_v0.md`
-4. `docs/art_style_guide_v0.md`
-5. `docs/input_design_v0.md`
-6. `docs/honest_man_run_animation_spec_v0.md`
-7. `docs/honest_man_run_frame_table_v0.md`
-8. `docs/doubao_run_reference_analysis_v0.md`
-9. `docs/image_generation_workflow_v0.md` only when generating new images.
-
-## Known Issues To Fix
-
-1. `docs/game_design_v0.md` does not exist yet.
-2. `docs/input_design_v0.md` has stray literal `` `r`n`` text in a few table rows.
-3. `docs/input_design_v0.md` has a control conflict:
-   - tables say Dodge = Left Shift,
-   - Dodge Rules say Dodge uses Space.
-   Recommended fix: Left Shift = dodge, Space = jump.
-4. Several documents contain encoding mojibake, such as `鑰佸疄浜?` for 老实人 and `I鈥檓` for I’m. These should be cleaned when editing those files.
-5. Some docs mention `D:\I’m OK Dungeon\`, but the actual folder currently being read is `D:\I am OK Dungeon\`.
-
-## Recommended Next Task
-
-Do this next:
-
-1. Create `docs/game_design_v0.md`.
-2. Make it a compact GDD for the first playable prototype.
-3. Lock the first prototype scope:
-   - 1 battle room.
-   - 1 playable character: 老实人.
-   - 3-6 word enemies.
-   - 1 first boss: “没事”.
-   - Player movement, facing, basic attack, heavy attack, dodge, jump.
-   - HP, death, enemy death, simple win state.
-   - One post-fight skill choice or result screen.
-4. Fix `docs/input_design_v0.md` control conflict and stray `` `r`n`` text.
-5. Create `prototype/` for the playable greybox.
-
-## Recommended Prototype Tech
-
-Use a simple browser prototype first.
-
-Suggested first implementation:
-
-- `prototype/index.html`
-- `prototype/src/main.js`
-- `prototype/src/style.css`
-
-Use pure HTML Canvas first if speed and low dependency risk matter most. Phaser can be introduced later if the prototype grows.
-
-## Scope Warning
-
-Do not expand into a full game yet. The next milestone is only a tiny playable combat room that can be opened, tested, tuned, and recorded.
-## Local Tool Paths
-
-Blender is installed as a portable build and launched through this desktop shortcut:
-
-- Shortcut: `C:\Users\Windows\Desktop\blender.exe.lnk`
-- Actual executable: `E:\blender-5.1.2-windows-x64\blender.exe`
-- Working directory: `E:\blender-5.1.2-windows-x64`
-
-Use the actual executable path for Blender Python scripts and automated exports.
-## Existing 3D Movement Prototype
-
-A movable 3D control prototype was found from the previous Codex conversation. It is not yet inside the main project folder.
-
-Prototype files:
-
-- Current playable page: `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\cone_player_3d_prototype.html`
-- Saved controls baseline: `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\cone_player_3d_prototype_v1_controls_saved.html`
-- Saved controls notes: `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\cone_player_3d_prototype_v1_controls_saved_notes.md`
-
-Related Blender / GLB files:
-
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_concept_v3_actor.blend`
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_concept_v3_actor.glb`
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_lowpoly_actor_v2.blend`
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_lowpoly_actor_v2.glb`
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_lowpoly_rig_v1.blend`
-- `C:\Users\Windows\Documents\Codex\2026-06-12\files-mentioned-by-the-user-i-2\outputs\blender\honest_man_lowpoly_rig_v1.glb`
-
-Controls in the saved baseline:
-
-- WASD / arrow keys: move
-- Space: jump
-- Left Shift: dodge
-- Left mouse: light attack
-- Right mouse: heavy attack
-- Xbox gamepad: left stick move, A jump, B dodge, X light attack, Y heavy attack
-
-To test in Codex Browser, serve the outputs folder over localhost, then open:
-
-- `http://127.0.0.1:8765/cone_player_3d_prototype.html`
-
-The current local server for this conversation was started from the previous outputs folder and is temporary. Future conversations may need to start a new localhost static server.
+1. 修保留工具页的 CDN/缺失资源引用，并纳入验证。
+2. 继续行为保持式模块化。
+3. 最终多子代理严格复查后再推送。

@@ -95,12 +95,11 @@ body{display:flex;flex-direction:column;height:100vh;background:#111;font-family
   </div>
 </div>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/loaders/GLTFLoader.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js","three/addons/objects/Sky.js":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/objects/Sky.js"}}
+{"imports":{"three":"./lib/three.module.js","three/addons/loaders/GLTFLoader.js":"./lib/GLTFLoader.js"}}
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Sky } from 'three/addons/objects/Sky.js';
 
 // ── Terrain fn (matches game) ─────────────────────────────────
 function terrainH(x,z){
@@ -121,8 +120,6 @@ const CATALOG=[
     {label:'Tree 2',path:'assets/vendor/kaykit_forest/Tree_2_B_Color1.gltf'},
     {label:'Tree 3',path:'assets/vendor/kaykit_forest/Tree_3_A_Color1.gltf'},
     {label:'Tree 4',path:'assets/vendor/kaykit_forest/Tree_4_A_Color1.gltf'},
-    {label:'Dead Tree',path:'assets/vendor/cube_world/Environment/glTF/DeadTree_1.gltf'},
-    {label:'Bamboo',path:'assets/vendor/cube_world/Environment/glTF/Bamboo.gltf'},
   ]},
   {cat:'岩石',items:[
     {label:'Rock 1',path:'assets/vendor/kaykit_forest/Rock_1_A_Color1.gltf'},
@@ -133,13 +130,13 @@ const CATALOG=[
     {label:'Bush 1',path:'assets/vendor/kaykit_forest/Bush_1_A_Color1.gltf'},
     {label:'Bush 2',path:'assets/vendor/kaykit_forest/Bush_2_A_Color1.gltf'},
     {label:'Bush 3',path:'assets/vendor/kaykit_forest/Bush_3_A_Color1.gltf'},
-    {label:'Mushroom',path:'assets/vendor/cube_world/Environment/glTF/Mushroom.gltf'},
-    {label:'Flowers',path:'assets/vendor/cube_world/Environment/glTF/Flowers_1.gltf'},
+    {label:'Bush 4',path:'assets/vendor/kaykit_forest/Bush_4_A_Color1.gltf'},
+    {label:'Grass 1',path:'assets/vendor/kaykit_forest/Grass_1_A_Color1.gltf'},
   ]},
   {cat:'其他',items:[
-    {label:'Crystal',path:'assets/vendor/cube_world/Environment/glTF/Crystal_Big.gltf'},
-    {label:'Fence',path:'assets/vendor/cube_world/Environment/glTF/Fence_Center.gltf'},
-    {label:'Block Stone',path:'assets/vendor/cube_world/Blocks/glTF/Block_Stone.gltf'},
+    {label:'Barrel',path:'assets/vendor/fantasy_props/Barrel.gltf'},
+    {label:'Crate',path:'assets/vendor/fantasy_props/Crate_Wooden.gltf'},
+    {label:'Bench',path:'assets/vendor/fantasy_props/Bench.gltf'},
   ]},
 ];
 
@@ -229,9 +226,9 @@ refreshTerrain();
 const _tl=new THREE.TextureLoader();
 const grassTex=_tl.load('./textures/texture_grass.png'),rockTex=_tl.load('./textures/texture_rock.png'),mountTex=_tl.load('./textures/texture_mountain.png'),mudTex=_tl.load('./textures/mud-riverbank-tile-512.png');
 [grassTex,rockTex,mountTex,mudTex].forEach(t=>{t.wrapS=t.wrapT=THREE.RepeatWrapping;});
-const roadStoneTex=new THREE.TextureLoader().load('./textures/cobblestone-road-image2-retry2-tile-512.png',()=>{if(roads.length)drawRoadsToCanvas();});
+const roadStoneTex=new THREE.TextureLoader().load('./textures/texture_road.png',()=>{if(roads.length)drawRoadsToCanvas();});
 roadStoneTex.wrapS=roadStoneTex.wrapT=THREE.RepeatWrapping;
-const roadGenTex=new THREE.TextureLoader().load('./textures/generated.png');
+const roadGenTex=new THREE.TextureLoader().load('./textures/texture_road.png');
 roadGenTex.wrapS=roadGenTex.wrapT=THREE.RepeatWrapping;
 const tMat=new THREE.MeshLambertMaterial({vertexColors:true});
 tMat.onBeforeCompile=s=>{
@@ -867,7 +864,7 @@ function _mkCloudBillboard(tex,angle,r,h,w,bh){
   return{mesh,angle,r,h,speed:.000008};
 }
 const _cloudTL=new THREE.TextureLoader();
-const _ct=[1,2,3,4].map(i=>{const t=_cloudTL.load(`./textures/cloud_cumulus_${i}.png?v=`+Date.now());t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
+const _ct=[1,2,3,4].map(()=>{const t=_cloudTL.load('./textures/cloud_cumulus.png?v='+Date.now());t.colorSpace=THREE.LinearSRGBColorSpace;return t;});
 const _cloudBillboards=[
   _mkCloudBillboard(_ct[0],.35,1000,330,1300,900),
   _mkCloudBillboard(_ct[2],1.80,1050,330,1300,900),
@@ -883,11 +880,6 @@ wMesh.visible=false;wSurfs.forEach(s=>{if(s.mesh)s.mesh.visible=false;});const _
 window.addEventListener('resize',resize);
 resize();
 document.getElementById('loading').style.display='none';
-loop();
-</script>
-</body>
-</html>
-display='none';
 loop();
 </script>
 </body>

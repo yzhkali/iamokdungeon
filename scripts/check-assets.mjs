@@ -4,7 +4,7 @@ import path from 'node:path';
 const repoRoot = process.cwd();
 const runtimeRoot = path.join(repoRoot, 'prototype/3d');
 const sourceFiles = [
-  'prototype/3d/index.html',
+  ...walk(runtimeRoot).filter(file => file.endsWith('.html')),
   ...walk(path.join(repoRoot, 'prototype/3d/src')).filter(file => file.endsWith('.js')),
 ].map(file => path.isAbsolute(file) ? file : path.join(repoRoot, file)).filter(fs.existsSync);
 
@@ -83,6 +83,7 @@ function checkGltf(file) {
 for (const file of sourceFiles) {
   const text = fs.readFileSync(file, 'utf8');
   const dir = path.dirname(file);
+  for (const match of text.matchAll(/["'](https?:\/\/[^"']+)["']/gi)) external.push(match[1]);
   for (const match of text.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) existsRuntime(match[1], dir);
   for (const match of text.matchAll(/\b(?:load|fetch|import)\(\s*["']([^"']+)["']/g)) existsRuntime(match[1], dir);
   for (const match of text.matchAll(/new URL\(\s*["']([^"']+)["']/g)) existsRuntime(match[1], dir);
