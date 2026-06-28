@@ -42,6 +42,7 @@ Retained tool pages:
 - `prototype/3d/src/player/clips.js` owns animation clip data.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
+- `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
 - `prototype/3d/src/main.js` is reduced from the original giant file and remains the startup/gameplay coordinator.
 - Map loading uses local `./maps/map15.json` and validates the HTTP response.
 - Wolf runtime state is active instead of leaving a hittable null wolf.
@@ -58,6 +59,7 @@ Root scripts:
 - `npm run check:vendor-subset`
 - `npm run check:player-data`
 - `npm run check:input`
+- `npm run check:map-hud`
 - `npm run check:syntax`
 - `npm run check:server`
 - `npm run check:browser`
@@ -71,9 +73,10 @@ Coverage:
 - Vendor subset check parses retained `.gltf` files and verifies `.bin` and texture dependency closure.
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
+- Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Syntax check covers runtime source files, validation scripts, and inline scripts in all top-level `prototype/3d/*.html` pages.
 - Static server check verifies normal runtime routes, rejects path traversal, rejects directory listing, and rejects unsupported methods.
-- Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, and requires the primary runtime canvas to render nonblank pixels.
+- Browser smoke opens the primary runtime and all retained tool pages, blocks external requests, fails on page errors and 4xx/5xx responses, requires the primary runtime canvas to render nonblank pixels, and probes mini-map/world-map canvas drawing plus map UI interactions on `/index.html`.
 
 ## Current Verification Evidence
 
@@ -83,11 +86,12 @@ Latest known passing gate before this report:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (63 runtime assets, 19 source files).`
+- `Asset check passed (64 runtime assets, 20 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Input controller check passed.`
-- `Syntax check passed (18 files plus 9 inline scripts).`
+- `Map HUD check passed.`
+- `Syntax check passed (20 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -108,7 +112,6 @@ The large `.git` size is expected while local history still contains removed ven
 ## Remaining Non-Blocking Work
 
 - Continue modularizing `prototype/3d/src/main.js` in small behavior-preserving slices:
-  - HUD/map rendering
   - camera behavior
   - main loop orchestration
 - Keep each slice covered by `npm run validate` or `npm run prepush`.

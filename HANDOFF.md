@@ -17,7 +17,7 @@
 ## 当前结构
 
 - `prototype/3d/index.html`：主入口、UI/CSS、importmap、本地 BGM。
-- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块。
+- `prototype/3d/src/main.js`：主编排和仍待进一步拆分的游戏主体，已抽出低风险核心模块和 UI 控制器。
 - `prototype/3d/src/core/threeLoader.js`：本地 Three.js / GLTFLoader 加载。没有 CDN 回退。
 - `prototype/3d/src/core/sfx.js`：SFX 封装。
 - `prototype/3d/src/core/modelLoader.js`：GLTF 缓存、预处理和放置。
@@ -26,6 +26,7 @@
 - `prototype/3d/src/player/clips.js`：角色关键帧动画数据。
 - `prototype/3d/src/player/moves.js`：连招树和招式时序数据。
 - `prototype/3d/src/ui/input.js`：键鼠/手柄输入状态、模式切换、相机输入和输入清空。
+- `prototype/3d/src/ui/mapHud.js`：体力/状态 HUD、小地图、展开地图绘制和地图开关。
 - `prototype/3d/src/wolf.js`：程序化狼模型。
 - `prototype/3d/maps/map15.json`：当前唯一运行地图。
 - `prototype/3d/assets/vendor/`：保留的第三方运行子集，来源见 `prototype/3d/assets/vendor/NOTICE.md`。
@@ -48,12 +49,12 @@ WASD 移动 / Q/E 旋转镜头 / R/F 俯仰 / 左键轻击 / 按住右键蓄力�
 
 ## 当前已知风险
 
-- `main.js` 已拆出低风险模块、玩家纯数据表和输入控制器，但玩家状态、战斗、姿态执行、HUD、相机和主循环仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
+- `main.js` 已拆出低风险模块、玩家纯数据表、输入控制器和 HUD/map 控制器，但玩家状态、战斗、姿态执行、相机和主循环仍在主文件中。继续拆分时先抽边界清晰的控制器，不要直接大改战斗循环。
 - 部分保留工具页仍是历史工具，但已经纳入资产检查、语法检查和浏览器 smoke；后续迁移或清理仍需保持这些验证通过。
 - 不要调整移动、攻击、闪避、相机、狼 AI、hitstop、shake、SFX 时序等手感常量，除非是在修明确 bug。
 
 ## 下一步建议
 
-1. 继续小步模块化：地图 HUD、相机和主循环。
+1. 继续小步模块化：相机和主循环。
 2. 每个模块化切片都跑 `npm run validate` 或 `npm run prepush`，再提交。
 3. 推送前读 `docs/cleanup_validation_report_2026-06-28.md`，重新跑最终验证并完成只读复查。

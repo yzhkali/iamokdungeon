@@ -7,7 +7,7 @@ import { createStaticServer } from './static-server.mjs';
 
 const repoRoot = process.cwd();
 const smokeTargets = [
-  { path: '/index.html', requireCanvas: true, requireNonBlank: true, settleMs: 1500 },
+  { path: '/index.html', requireCanvas: true, requireNonBlank: true, requireHudMap: true, settleMs: 1500 },
   { path: '/editor3d.html', requireCanvas: true, requireNonBlank: false, settleMs: 1000 },
   { path: '/gallery.html', requireCanvas: true, requireNonBlank: false, settleMs: 1500 },
   { path: '/pose-editor.html', requireCanvas: true, requireNonBlank: false, settleMs: 1000 },
@@ -189,6 +189,7 @@ function isAllowedRequest(url, origin) {
 async function smokePage(cdp, origin, pathname, {
   requireCanvas = true,
   requireNonBlank = true,
+  requireHudMap = false,
   settleMs = 0,
   timeoutMs = 25000,
 } = {}) {
@@ -291,18 +292,25 @@ async function smokePage(cdp, origin, pathname, {
           try {
             if (canvas) {
               canvasSize = { width: canvas.width, height: canvas.height, clientWidth: canvas.clientWidth, clientHeight: canvas.clientHeight };
-              const dataUrl = canvas.toDataURL('image/png');
-              nonBlank = typeof dataUrl === 'string' && dataUrl.length > 2000;
-              if (!nonBlank) {
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                if (gl && gl.readPixels) {
-                  const width = gl.drawingBufferWidth;
-                  const height = gl.drawingBufferHeight;
-                  const pixel = new Uint8Array(4);
+              const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+              if (gl && gl.readPixels) {
+                const width = gl.drawingBufferWidth;
+                const height = gl.drawingBufferHeight;
+                const pixel = new Uint8Array(4);
+                const points = [[0.5,0.5],[0.33,0.33],[0.67,0.62],[0.2,0.75],[0.8,0.25]];
+                for (const [px, py] of points) {
+                  gl.readPixels(Math.max(0, Math.floor(width * px)), Math.max(0, Math.floor(height * py)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                  if (pixel[0] > 4 || pixel[1] > 4 || pixel[2] > 4) { nonBlank = true; break; }
+                }
+              } else {
+                const ctx2d = canvas.getContext('2d');
+                if (ctx2d && ctx2d.getImageData) {
                   const points = [[0.5,0.5],[0.33,0.33],[0.67,0.62],[0.2,0.75],[0.8,0.25]];
                   for (const [px, py] of points) {
-                    gl.readPixels(Math.max(0, Math.floor(width * px)), Math.max(0, Math.floor(height * py)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-                    if (pixel[0] > 4 || pixel[1] > 4 || pixel[2] > 4) { nonBlank = true; break; }
+                    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(canvas.width * px)));
+                    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(canvas.height * py)));
+                    const data = ctx2d.getImageData(x, y, 1, 1).data;
+                    if (data[3] > 0 && (data[0] > 4 || data[1] > 4 || data[2] > 4)) { nonBlank = true; break; }
                   }
                 }
               }
@@ -338,6 +346,91 @@ async function smokePage(cdp, origin, pathname, {
     }
     if (requireNonBlank && !lastProbe?.nonBlank) {
       throw new Error(`${pathname} canvas stayed blank. Last probe: ${JSON.stringify(lastProbe)}`);
+    }
+    if (requireHudMap) {
+      const hudMapProbe = await cdp.send('Runtime.evaluate', {
+        awaitPromise: true,
+        returnByValue: true,
+        expression: `(() => new Promise(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            function canvasHasInk(canvas) {
+              try {
+                const ctx = canvas.getContext('2d');
+                const points = [[0.5,0.5],[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]];
+                for (const [px, py] of points) {
+                  const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(canvas.width * px)));
+                  const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(canvas.height * py)));
+                  const data = ctx.getImageData(x, y, 1, 1).data;
+                  if (data[3] > 0 && (data[0] > 4 || data[1] > 4 || data[2] > 4)) return true;
+                }
+                return false;
+              } catch (error) {
+                return false;
+              }
+            }
+            const mini = document.getElementById('miniMapCanvas');
+            const world = document.getElementById('worldMapCanvas');
+            const mode = document.getElementById('miniMapMode');
+            const compass = document.getElementById('compassLabel');
+            const dock = document.getElementById('mapDockBtn');
+            const overlay = document.getElementById('worldMapOverlay');
+            const close = document.getElementById('closeWorldMap');
+            const state = document.getElementById('state');
+            const stam = document.getElementById('stamBar');
+            const result = {
+              miniExists: !!mini,
+              worldExists: !!world,
+              miniSize: mini ? [mini.width, mini.height] : null,
+              worldSize: world ? [world.width, world.height] : null,
+              miniInk: mini ? canvasHasInk(mini) : false,
+              stateText: state?.textContent || '',
+              stamWidth: stam?.style.width || '',
+              modeBefore: mode?.textContent || '',
+              compassBefore: compass?.textContent || ''
+            };
+            mode?.click();
+            result.modeAfter = mode?.textContent || '';
+            result.compassAfter = compass?.textContent || '';
+            mode?.click();
+            result.modeRestored = mode?.textContent || '';
+            result.compassRestored = compass?.textContent || '';
+            dock?.click();
+            requestAnimationFrame(() => {
+              result.overlayOpen = overlay?.classList.contains('open') || false;
+              result.worldInk = world ? canvasHasInk(world) : false;
+              close?.click();
+              result.closeClosed = !(overlay?.classList.contains('open') || false);
+              dock?.click();
+              overlay?.click();
+              result.overlayClosed = !(overlay?.classList.contains('open') || false);
+              dock?.click();
+              window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+              result.escapeClosed = !(overlay?.classList.contains('open') || false);
+              resolve(result);
+            });
+          }));
+        }))()`,
+      }, sessionId);
+      if (hudMapProbe.exceptionDetails) {
+        throw new Error(`${pathname} HUD/map probe failed: ${hudMapProbe.exceptionDetails.text || 'Runtime.evaluate failed'}`);
+      }
+      const probe = hudMapProbe.result?.value || {};
+      const failures = [];
+      if (!probe.miniExists) failures.push('missing #miniMapCanvas');
+      if (!probe.worldExists) failures.push('missing #worldMapCanvas');
+      if (String(probe.miniSize) !== '608,608') failures.push(`miniMapCanvas size ${JSON.stringify(probe.miniSize)}`);
+      if (String(probe.worldSize) !== '1200,820') failures.push(`worldMapCanvas size ${JSON.stringify(probe.worldSize)}`);
+      if (!probe.miniInk) failures.push('miniMapCanvas has no sampled ink');
+      if (!probe.worldInk) failures.push('worldMapCanvas has no sampled ink after opening map');
+      if (probe.modeBefore !== 'N' || probe.modeAfter !== '↑' || probe.modeRestored !== 'N') failures.push(`mini map mode text flow ${probe.modeBefore}->${probe.modeAfter}->${probe.modeRestored}`);
+      if (probe.compassBefore !== 'N' || probe.compassAfter !== '' || probe.compassRestored !== 'N') failures.push(`compass text flow ${probe.compassBefore}->${probe.compassAfter}->${probe.compassRestored}`);
+      if (!probe.overlayOpen) failures.push('map dock did not open overlay');
+      if (!probe.closeClosed) failures.push('close button did not close overlay');
+      if (!probe.overlayClosed) failures.push('overlay click did not close overlay');
+      if (!probe.escapeClosed) failures.push('Escape did not close overlay');
+      if (!probe.stateText.startsWith('状态: ')) failures.push(`state text not populated: ${probe.stateText}`);
+      if (!probe.stamWidth.endsWith('%')) failures.push(`stamina width not populated: ${probe.stamWidth}`);
+      if (failures.length) throw new Error(`${pathname} HUD/map probe failed:\n${failures.map(item => `- ${item}`).join('\n')}\nProbe: ${JSON.stringify(probe)}`);
     }
     console.log(`Browser smoke passed: ${pathname}`);
   } finally {

@@ -26,6 +26,7 @@ try {
   await expectStatus(origin, '/src/player/clips.js', 200);
   await expectStatus(origin, '/src/player/moves.js', 200);
   await expectStatus(origin, '/src/ui/input.js', 200);
+  await expectStatus(origin, '/src/ui/mapHud.js', 200);
   await expectStatus(origin, '/maps/map15.json', 200);
   await expectStatus(origin, '/', 200);
   await expectStatus(origin, '/%2e%2e%2fREADMEFIRST.md', 403);
