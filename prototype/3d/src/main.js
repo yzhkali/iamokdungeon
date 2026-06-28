@@ -20,6 +20,7 @@ import { createSpaceSlash } from "./combat/spaceSlash.js";
 import { createSwordBeamController } from "./combat/swordBeam.js";
 import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
 import { createSpinRings } from "./combat/spinRings.js";
+import { createAttackBursts } from "./combat/attackBursts.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -807,24 +808,13 @@ function onHitTarget(ox,oy,oz){
 // ============================================================
 //  攻击特效（朝向 yaw 局部 +Z = 正前方）
 // ============================================================
-// 轻击：正前方的弧形刀光（弧心朝 +Z=正前方）；用 Y轴pivot做左扫
-const slashPivot=new THREE.Group(); slashPivot.position.set(0,0.06,0); yaw.add(slashPivot);
-const slashMat=new THREE.MeshBasicMaterial({color:0xffe08a,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
-const slashMesh=new THREE.Mesh(new THREE.RingGeometry(0.45,1.2,28,1, -Math.PI/2-0.95, 1.9),slashMat);
-slashMesh.rotation.x=-Math.PI/2; slashMesh.position.set(0,0,0.3); slashMesh.visible=false; slashPivot.add(slashMesh);
-
-// 重击：正前方地面圆圈判定（蓄力时实时显示、随蓄力变大）
-const heavyRingMat=new THREE.MeshBasicMaterial({color:0xff7b3a,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
-const heavyRing=new THREE.Mesh(new THREE.RingGeometry(0.86,1.0,40),heavyRingMat); // 比例缩放当作半径
-heavyRing.rotation.x=-Math.PI/2; heavyRing.position.set(0,0.05,0); heavyRing.visible=false; yaw.add(heavyRing);
-const heavyFillMat=new THREE.MeshBasicMaterial({color:0xff7b3a,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
-const heavyFill=new THREE.Mesh(new THREE.CircleGeometry(1,40),heavyFillMat);
-heavyFill.rotation.x=-Math.PI/2; heavyFill.position.set(0,0.04,0); heavyFill.visible=false; yaw.add(heavyFill);
-function setHeavyCircle(radius, alongFront){
-  // 圆心在正前方 alongFront 处
-  heavyRing.position.set(0,0.05,alongFront); heavyFill.position.set(0,0.04,alongFront);
-  heavyRing.scale.set(radius,radius,1); heavyFill.scale.set(radius,radius,1);
-}
+const attackBursts=createAttackBursts({
+  THREE,
+  yaw,
+  getHeavyRadiusMin:()=>HEAVY_R_MIN,
+  getHeavyRadiusMax:()=>HEAVY_R_MAX,
+  setImpact:(nextHitstop,nextShake)=>{ hitstop=nextHitstop; shake=nextShake; }
+});
 
 // 闪避残影池
 const ghostAfterimages=createGhostAfterimages({
@@ -963,22 +953,6 @@ const {
 // HEAVY_R_MIN/HEAVY_R_MAX 是重击圆圈半径(空蓄~满蓄)
 let shake=0,hitstop=0;
 
-// ============================================================
-function startSlash(type,ratio=0){
-  if(type==='heavy'){
-    // 正前方圆圈爆发
-    const radius=HEAVY_R_MIN+(HEAVY_R_MAX-HEAVY_R_MIN)*ratio;
-    const front=0.7+radius*0.55;
-    setHeavyCircle(radius,front);
-    heavyFill.visible=true; heavyFill._t=0; heavyFill._dur=0.22; heavyFillMat.opacity=0.55;
-    heavyRing.visible=true; heavyRing._burst=true; heavyRing._t=0;
-    hitstop=0.04+ratio*0.06; shake=0.12+ratio*0.2;
-  } else {
-    slashMesh.visible=true;slashMesh._t=0;slashMesh._dur=0.16;
-    slashMesh.scale.setScalar(0.85);
-    hitstop=0.02; shake=0.06;
-  }
-}
 function playClip(name){ P.clip=name; P.clipT=0; P.clipDur=CLIPS[name].dur; }
 
 // 触发某招特效
@@ -994,29 +968,17 @@ function fireFx(fx){
     case 'rise':   hitstop=0.09; shake=0.18; SFX.rise(); break;   // 升龙剑上挑：顿帧+震屏
     case 'thrust': SFX.thrust(); doThrust(); break;
     case 'spinSlash': hitstop=0.08; shake=0.22; break;
-    case 'heavyCircle':    burstCircle(1.7); break;
-    case 'heavyCircleBig': burstCircle(2.6); break;
+    case 'heavyCircle':    attackBursts.burstCircle(1.7); break;
+    case 'heavyCircleBig': attackBursts.burstCircle(2.6); break;
   }
 }
 function doSlash(from,to,heavy){
-  slashMesh.visible=true;slashMesh._t=0;slashMesh._dur=heavy?0.18:0.15;
-  slashMesh.scale.setScalar(heavy?1.7:1.4);   // 扇形半径×1.5(原0.95/1.15)
-  slashPivot._from=from; slashPivot._to=to;
-  if(!heavy){hitstop=0.08;shake=0.16;}
+  attackBursts.doSlash(from,to,heavy);
 }
 function doThrust(){
   // 去掉黄色刀光区域，只保留顿帧/震屏(剑的拖尾已表现突刺)
   hitstop=0.04; shake=0.12;
 }
-function burstCircle(radius){
-  const front=0.7+radius*0.55;
-  setHeavyCircle(radius,front);
-  heavyFill.visible=true; heavyFill._t=0; heavyFill._dur=0.22; heavyFillMat.opacity=0.6;
-  heavyFillMat.color.setHex(0xff7b3a); heavyRingMat.color.setHex(0xff7b3a);
-  heavyRing.visible=true; heavyRing._burst=true;
-  hitstop=0.06; shake=0.22;
-}
-
 // 开始一招
 function startMove(name){
   const mv=MOVES[name]; if(!mv)return;
@@ -1051,15 +1013,7 @@ function startDodgeCombo(kind){
 }
 
 function startSlash(type,ratio=0){
-  if(type==='heavy'){
-    const radius=HEAVY_R_MIN+(HEAVY_R_MAX-HEAVY_R_MIN)*ratio;
-    const front=0.7+radius*0.55;
-    setHeavyCircle(radius,front);
-    heavyFill.visible=true; heavyFill._t=0; heavyFill._dur=0.22; heavyFillMat.opacity=0.6;
-    heavyFillMat.color.setHex(0xff7b3a); heavyRingMat.color.setHex(0xff7b3a);
-    heavyRing.visible=true; heavyRing._burst=true; heavyRing._t=0;
-    hitstop=0.04+ratio*0.06; shake=0.12+ratio*0.2;
-  }
+  attackBursts.startSlash(type,ratio);
 }
 // 当前 (x,z) 处的支撑高度（地面0 或 站在某个平台顶）
 function groundHeightAt(x,z){
@@ -1549,21 +1503,7 @@ if(globalThis.__IAMOK_ENABLE_TEST_PROBE__){
   };
 }
 function updateFx(dt){
-  // 刀光横扫（_from→_to 由招式指定方向）
-  if(slashMesh.visible){
-    slashMesh._t+=dt;const k=slashMesh._t/slashMesh._dur;
-    slashMat.opacity=Math.max(0,0.85*(1-k));
-    const f=slashPivot._from??0.8, t=slashPivot._to??-0.9;
-    slashPivot.rotation.y=f+(t-f)*k;
-    if(k>=1){ slashMesh.visible=false; slashMesh.scale.setScalar(1); }
-  }
-  // 重击圆圈爆发淡出
-  if(heavyFill._dur){
-    heavyFill._t+=dt;const k=heavyFill._t/heavyFill._dur;
-    heavyFillMat.opacity=Math.max(0,0.55*(1-k));
-    heavyRingMat.opacity=Math.max(0,0.9*(1-k));
-    if(k>=1){ heavyFill._dur=0; heavyFill.visible=false; heavyRing.visible=false; heavyRing._burst=false; }
-  }
+  attackBursts.update(dt);
   // 闪避残影淡出
   ghostAfterimages.update(dt);
   // 柱子受击：红光闪烁 + 微微颤抖

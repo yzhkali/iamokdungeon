@@ -23,6 +23,7 @@ const origin = `http://127.0.0.1:${port}`;
 try {
   await expectStatus(origin, '/index.html', 200);
   await expectStatus(origin, '/src/main.js', 200);
+  await expectStatus(origin, '/src/combat/attackBursts.js', 200);
   await expectStatus(origin, '/src/combat/hitMath.js', 200);
   await expectStatus(origin, '/src/combat/spaceSlash.js', 200);
   await expectStatus(origin, '/src/combat/spinRings.js', 200);

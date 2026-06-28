@@ -38,6 +38,7 @@ Retained tool pages:
 - `prototype/3d/src/core/threeLoader.js` now loads only local Three.js and GLTFLoader.
 - `prototype/3d/src/core/sfx.js` owns SFX loading and fixes the `swosh-03.ogg` path.
 - `prototype/3d/src/core/modelLoader.js` owns GLTF cache/load/place behavior.
+- `prototype/3d/src/combat/attackBursts.js` owns slash/heavy burst visual meshes, dormant `startSlash` effective behavior, `doSlash`, `burstCircle`, and attack burst fade updates.
 - `prototype/3d/src/combat/hitMath.js` owns keyframe sampling, angle delta, thrust-box, and spin-sweep arc pure math helpers.
 - `prototype/3d/src/combat/spaceSlash.js` owns dodge-cancel space-slash readiness, radial line spawning, fadeout, and cleanup.
 - `prototype/3d/src/combat/spinRings.js` owns big-spin ring geometry, delayed expansion, opacity fade, and cleanup while preserving the current dormant spawn behavior.
@@ -72,6 +73,7 @@ Root scripts:
 - `npm run check:player-data`
 - `npm run check:player-state`
 - `npm run check:ghost-afterimages`
+- `npm run check:attack-bursts`
 - `npm run check:hit-math`
 - `npm run check:space-slash`
 - `npm run check:spin-rings`
@@ -98,6 +100,7 @@ Coverage:
 - Player data check verifies clip keyframe shape and move references to clips and chained moves.
 - Player state check verifies player default fields, vector factory use, tuning constants, frozen tuning source, cloned tuning behavior, and main-module integration.
 - Ghost afterimages check verifies pool size, capsule geometry/material setup, direct scene registration, live player/yaw snapshotting, pool wraparound, first-frame and 0.04s dodge cadence, fade math, hidden no-op behavior, and main-module integration.
+- Attack bursts check verifies yaw-local slash/heavy visual construction, geometry/material values, preserved dormant `startSlash` heavy-only semantics, `doSlash`, `burstCircle`, exact hitstop/shake writes, slash/heavy fade math, active `fireFx` behavior, and main-module integration.
 - Hit math check verifies keyframe easing/sampling, injected lerp behavior, angle wrapping, thrust-box boundaries, spin-sweep arc boundaries, and main-module integration.
 - Space slash check verifies ready-state consumption, line mesh/material/geometry setup, deterministic radial growth, offset handling, fadeout/removal, and main-module integration.
 - Spin rings check verifies ring geometry/material setup, delayed visibility, ease-out radius scaling, opacity fade, removal, five-ring saturn burst parameters, live player/radius dependency, dormant `spinSlash` behavior, and main-module integration.
@@ -122,11 +125,12 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (76 runtime assets, 32 source files).`
+- `Asset check passed (77 runtime assets, 33 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Player state check passed.`
 - `Ghost afterimages check passed.`
+- `Attack bursts check passed.`
 - `Hit math check passed.`
 - `Space slash check passed.`
 - `Spin rings check passed.`
@@ -139,7 +143,7 @@ Important passing lines from the latest run:
 - `Render loop check passed.`
 - `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (44 files plus 9 inline scripts).`
+- `Syntax check passed (46 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -169,6 +173,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 - Spin rings implementation review: no blocker. The reviewer confirmed geometry/material, `SPIN_RING_Y`, negative-delay timing, ease-out radius, opacity fade, reverse iteration, removal semantics, dormant `spinSlash` behavior, update order, and validation integration are preserved.
 - Ghost afterimages requirement/boundary review: no behavior blocker. The reviewer identified pool size/material/geometry, direct scene ownership, first-frame spawn, 0.04s cadence, spawn-before-movement/yaw update, snapshot values, fade math, and early-return/hitstop fade behavior as required preservation points.
 - Ghost afterimages testing-plan review: no blocker. The reviewer requested fake-Three coverage for pool construction, spawn snapshot/wraparound, dodge timer cadence, fade behavior, main-module integration, and static server route coverage; `scripts/check-ghost-afterimages.mjs` implements those checks and is included in `validate`.
+- Attack bursts requirement/boundary review: no behavior blocker. The reviewer identified yaw-local mesh ownership, exact slash/heavy geometry/material values, duplicate `startSlash` effective semantics, `fireFx` active behavior, `doSlash`, `burstCircle`, fade math, and hitstop/shake overwrite semantics as required preservation points.
+- Attack bursts testing-plan review: no blocker. The reviewer requested fake-Three coverage for construction, dormant `startSlash` behavior, `doSlash`, `burstCircle`, update fade behavior, `fireFx` wiring, static server coverage, and old inline removal; `scripts/check-attack-bursts.mjs` implements those checks and is included in `validate`.
 
 ## Repository Size Notes
 
