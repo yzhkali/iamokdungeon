@@ -22,10 +22,11 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草和玩家纯数据模块。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、玩家纯数据和输入控制器模块。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/world/`：天空和草。
 - `prototype/3d/src/player/`：关键帧动画 `CLIPS` 与连招 `MOVES` 数据。
+- `prototype/3d/src/ui/input.js`：键鼠/手柄输入控制器。
 - `prototype/3d/src/wolf.js`：程序化狼。
 - `prototype/3d/maps/map15.json`：当前运行地图。
 - `prototype/3d/assets/vendor/`：保留运行子集，完整源包不入库。
@@ -49,7 +50,7 @@ Windows 本地双击入口仍保留：
 ## Known Issues
 
 - 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
-- `main.js` 仍偏大，后续应继续拆输入、HUD、相机、循环。
+- `main.js` 仍偏大，后续应继续拆 HUD、相机、循环。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks
