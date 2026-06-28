@@ -33,6 +33,7 @@ try {
   await expectStatus(origin, '/src/combat/swordBeam.js', 200);
   await expectStatus(origin, '/src/combat/swordTrail.js', 200);
   await expectStatus(origin, '/src/combat/targetFeedback.js', 200);
+  await expectStatus(origin, '/src/combat/runtimeCombat.js', 200);
   await expectStatus(origin, '/src/camera.js', 200);
   await expectStatus(origin, '/src/core/renderScene.js', 200);
   await expectStatus(origin, '/src/core/runtimeServices.js', 200);

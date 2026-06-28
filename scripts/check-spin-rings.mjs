@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
 const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -168,8 +169,8 @@ function createFixture({ player = { x: 4, z: -2 }, spinRadius = 2.8 } = {}) {
   nearly(last.material.opacity, 0.7, 'last ring should start full ring opacity when delay elapses');
 }
 
-assert(mainJs.includes('import { createSpinRings } from "./combat/spinRings.js";'), 'main.js must import spin rings module');
-assert(/\bconst\s+spinRings\s*=\s*createSpinRings\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*,\s*getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS\s*\}\s*\)/.test(mainJs), 'main.js must create spin ring controller with live player and spin radius dependencies');
+assert(runtimeCombatJs.includes('import { createSpinRings } from "./spinRings.js";'), 'runtime combat must import spin rings module');
+assert(/\bconst\s+spinRings\s*=\s*createSpinRings\s*\(\s*\{[\s\S]*THREE[\s\S]*scene[\s\S]*getPlayer[\s\S]*getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS/.test(runtimeCombatJs), 'runtime combat must create spin ring controller with live player and spin radius dependencies');
 assert(/case\s+['"]spinSlash['"]\s*:\s*setImpact\s*\(\s*0\.08\s*,\s*0\.22\s*\)\s*;\s*break/.test(moveTriggersJs), 'spinSlash should preserve dormant ring behavior and only set hitstop/shake');
 assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;\s*spaceSlash\.update\s*\(\s*dt\s*\)\s*;/.test(updateControllerJs), 'effect update order must keep spin rings between sword beams and space slash');
 assert(!mainJs.includes('const spinRings=[]'), 'main.js should not retain inline spin ring state');

@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const modulePath = path.join(repoRoot, 'prototype/3d/src/combat/targetFeedback.js');
 const mainPath = path.join(repoRoot, 'prototype/3d/src/main.js');
 const mainJs = fs.readFileSync(mainPath, 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -136,9 +137,9 @@ function runExtractedModuleChecks(createTargetFeedback) {
 const createTargetFeedback = await loadCreateTargetFeedback();
 assert(createTargetFeedback, 'targetFeedback.js must exist and export createTargetFeedback');
 runExtractedModuleChecks(createTargetFeedback);
-assert(mainJs.includes('import { createTargetFeedback } from "./combat/targetFeedback.js";'), 'main.js must import target feedback module after extraction');
-assert(/\bconst\s+targetFeedback\s*=\s*createTargetFeedback\s*\(\s*\{[\s\S]*getHittables\s*:\s*\(\s*\)\s*=>\s*hittables[\s\S]*getDummies\s*:\s*\(\s*\)\s*=>\s*dummies[\s\S]*getMonsters\s*:\s*\(\s*\)\s*=>\s*monsters[\s\S]*\}\s*\)/.test(mainJs), 'main.js must create targetFeedback with live target collections');
-assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{\s*attackBursts\.update\s*\(\s*dt\s*\)\s*;\s*\/\/ 闪避残影淡出\s*ghostAfterimages\.update\s*\(\s*dt\s*\)\s*;\s*targetFeedback\.update\s*\(\s*dt\s*\)\s*;\s*\}/.test(mainJs), 'updateFx should update attack bursts, ghost afterimages, then target feedback');
+assert(runtimeCombatJs.includes('import { createTargetFeedback } from "./targetFeedback.js";'), 'runtime combat must import target feedback module after extraction');
+assert(/\bconst\s+targetFeedback\s*=\s*createTargetFeedback\s*\(\s*\{[\s\S]*getHittables[\s\S]*getDummies[\s\S]*getMonsters[\s\S]*\}\s*\)/.test(runtimeCombatJs), 'runtime combat must create targetFeedback with live target collections');
+assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{\s*attackBursts\.update\s*\(\s*dt\s*\)\s*;\s*ghostAfterimages\.update\s*\(\s*dt\s*\)\s*;\s*targetFeedback\.update\s*\(\s*dt\s*\)\s*;\s*\}/.test(runtimeCombatJs), 'updateFx should update attack bursts, ghost afterimages, then target feedback');
 assert(!/for\s*\(\s*const\s+o\s+of\s+hittables\s*\)\s*\{[\s\S]*?o\.mat\.emissive\.setHex\s*\(\s*0xff2a1a\s*\)/.test(mainJs), 'main.js should not retain inline hittable feedback update after extraction');
 assert(!/for\s*\(\s*const\s+d\s+of\s+dummies\s*\)\s*\{[\s\S]*?d\.tiltVel\s*\+=\s*\(\s*-38\s*\*\s*d\.tilt\s*-\s*6\s*\*\s*d\.tiltVel\s*\)/.test(mainJs), 'main.js should not retain inline dummy feedback update after extraction');
 assert(!/for\s*\(\s*const\s+m\s+of\s+monsters\s*\)\s*\{[\s\S]*?m\.tiltVel\s*\+=\s*\(\s*-30\s*\*\s*m\.tilt\s*-\s*5\s*\*\s*m\.tiltVel\s*\)/.test(mainJs), 'main.js should not retain inline monster feedback update after extraction');

@@ -7,6 +7,7 @@ const modulePath = path.join(repoRoot, 'prototype/3d/src/combat/hitResolution.js
 const mainPath = path.join(repoRoot, 'prototype/3d/src/main.js');
 const mainJs = fs.readFileSync(mainPath, 'utf8');
 const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -291,11 +292,8 @@ function runBehaviorChecks(createHitResolution, SPIN_RADIUS) {
 }
 
 function runMainIntegrationGuards() {
-  const importMatch = mainJs.match(/import\s*\{([^}]+)\}\s*from\s*["']\.\/combat\/hitResolution\.js["'];/);
-  assert(importMatch, 'main.js must import combat hit resolution module after extraction');
-  assert(/\bcreateHitResolution\b/.test(importMatch[1]), 'main.js hitResolution import must include createHitResolution');
-  assert(/\bSPIN_RADIUS\b/.test(importMatch[1]), 'main.js hitResolution import must include SPIN_RADIUS');
-  assert(/const\s+hitResolution\s*=\s*createHitResolution\s*\(\s*\{/.test(mainJs), 'main.js must create a hitResolution controller');
+  assert(runtimeCombatJs.includes('import { createHitResolution, SPIN_RADIUS } from "./hitResolution.js";'), 'runtime combat must import combat hit resolution module after extraction');
+  assert(/const\s+hitResolution\s*=\s*createHitResolution\s*\(\s*\{/.test(runtimeCombatJs), 'runtime combat must create a hitResolution controller');
   for (const required of [
     'getPlayer',
     'getHittables',
@@ -307,9 +305,9 @@ function runMainIntegrationGuards() {
     'isInThrustBox',
     'isInSpinSweepArc',
   ]) {
-    assert(new RegExp(`\\b${required}\\s*:`).test(mainJs), `main.js hitResolution setup must provide ${required}`);
+    assert(new RegExp(`\\b${required}\\b`).test(runtimeCombatJs), `runtime combat hitResolution setup must provide ${required}`);
   }
-  assert(/getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS/.test(mainJs), 'spin rings should continue to read the extracted SPIN_RADIUS');
+  assert(/getSpinRadius\s*:\s*\(\s*\)\s*=>\s*SPIN_RADIUS/.test(runtimeCombatJs), 'spin rings should continue to read the extracted SPIN_RADIUS');
   assert(/swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)/.test(updateControllerJs), 'player updater must pass extracted beamHitByBeam to sword beams');
   for (const name of ['tryThrustHit', 'tryRingHit', 'tryHitObjects', 'trySweepHit', 'tryJupiterHit']) {
     assert(new RegExp(`hitResolution\\.${name}\\s*\\(`).test(updateControllerJs), `player updater must call hitResolution.${name} after extraction`);

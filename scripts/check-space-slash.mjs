@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const hitTargetFeedbackJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/hitTargetFeedback.js'), 'utf8');
 const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -143,8 +144,8 @@ function createFixture(randomValues) {
   assert(removed.length === 0, 'removed space slash should not be removed again');
 }
 
-assert(mainJs.includes('import { createSpaceSlash } from "./combat/spaceSlash.js";'), 'main.js must import space slash module');
-assert(/\bconst\s+spaceSlash\s*=\s*createSpaceSlash\s*\(\s*\{\s*THREE\s*,\s*scene\s*\}\s*\)/.test(mainJs), 'main.js must create spaceSlash controller');
+assert(runtimeCombatJs.includes('import { createSpaceSlash } from "./spaceSlash.js";'), 'runtime combat must import space slash module');
+assert(/\bconst\s+spaceSlash\s*=\s*createSpaceSlash\s*\(\s*\{\s*THREE\s*,\s*scene\s*\}\s*\)/.test(runtimeCombatJs), 'runtime combat must create spaceSlash controller');
 assert(/spaceSlash\.consumeHit\s*\(\s*ox\s*,\s*oy\s*,\s*oz\s*\)/.test(hitTargetFeedbackJs), 'onHitTarget must consume space slash on target hit');
 assert(/boostImpact\s*\(\s*0\.06\s*,\s*0\.2\s*\)/.test(hitTargetFeedbackJs), 'onHitTarget must keep existing space slash hitstop and shake boosts');
 assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)\s*\)\s*\{\s*spaceSlash\.markReady\(\)/.test(updateControllerJs), 'dodge cancel must mark the next hit for space slash');

@@ -5,6 +5,7 @@ import { createPlayerRig } from '../prototype/3d/src/player/rig.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const characterPoseJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/characterPose.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -222,9 +223,9 @@ assert(mainJs.includes('import { createPlayerRig } from "./player/rig.js";'), 'm
 assert(mainJs.includes('} = createPlayerRig({ THREE });'), 'main.js must construct player rig through createPlayerRig');
 assert(/scene\.add\s*\(\s*char\s*\)\s*;\s*scene\.add\s*\(\s*jupiterBall\s*\)/.test(mainJs), 'main.js must add char and jupiterBall to the scene');
 assert(/const\s+\{[\s\S]*char[\s\S]*yaw[\s\S]*body[\s\S]*chest[\s\S]*headGrp[\s\S]*RArm[\s\S]*LArm[\s\S]*RLeg[\s\S]*LLeg[\s\S]*rWrist[\s\S]*weaponSocket[\s\S]*weapon[\s\S]*weaponTip[\s\S]*jupiterBall[\s\S]*chargeAura[\s\S]*chargeAuraMat[\s\S]*gripDefault\s*:\s*GRIP_DEFAULT[\s\S]*gripSpear\s*:\s*GRIP_SPEAR[\s\S]*\}\s*=\s*createPlayerRig/.test(mainJs), 'main.js must destructure the stable rig surface');
-assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*yaw\s*,/.test(mainJs), 'attack bursts should keep using rig yaw');
-assert(/getYawRotationY\s*:\s*\(\s*\)\s*=>\s*yaw\.rotation\.y/.test(mainJs), 'ghost afterimages should keep using rig yaw');
-assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(mainJs), 'sword trail should use rig weapon and weaponTip');
+assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{[\s\S]*THREE[\s\S]*yaw[\s\S]*getHeavyRadiusMin/.test(runtimeCombatJs), 'attack bursts should keep using rig yaw');
+assert(/getYawRotationY\s*:\s*\(\s*\)\s*=>\s*yaw\.rotation\.y/.test(runtimeCombatJs), 'ghost afterimages should keep using rig yaw');
+assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(runtimeCombatJs), 'sword trail should use rig weapon and weaponTip');
 assert(/rig\s*:\s*\{\s*RArm\s*,\s*LArm\s*,\s*RLeg\s*,\s*LLeg\s*,\s*chest\s*,\s*headGrp\s*,\s*rWrist\s*,\s*body\s*\}/.test(mainJs), 'pose clip controller should receive the rig joints');
 assert(/createCharacterPoseController\s*\(\s*\{[\s\S]*gripDefault\s*:\s*GRIP_DEFAULT[\s\S]*gripSpear\s*:\s*GRIP_SPEAR/.test(mainJs), 'main.js should pass rig grip constants to character pose');
 assert(/weaponSocket\.rotation\.x\s*=\s*gripDefault\s*\+\s*\(gripSpear\s*-\s*gripDefault\)\s*\*\s*gm/.test(characterPoseJs), 'character pose should use rig grip constants');

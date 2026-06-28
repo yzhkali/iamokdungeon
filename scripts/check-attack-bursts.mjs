@@ -5,6 +5,7 @@ import { createAttackBursts } from '../prototype/3d/src/combat/attackBursts.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -225,14 +226,14 @@ function createFixture({ min = 1.2, max = 3.2 } = {}) {
   assert(attackBursts.heavyRing._burst === false, 'heavy ring burst flag should clear at end');
 }
 
-assert(mainJs.includes('import { createAttackBursts } from "./combat/attackBursts.js";'), 'main.js must import attack bursts module');
-assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{\s*THREE\s*,\s*yaw\s*,\s*getHeavyRadiusMin\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MIN\s*,\s*getHeavyRadiusMax\s*:\s*\(\s*\)\s*=>\s*HEAVY_R_MAX\s*,\s*setImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{\s*runtimeState\.hitstop\s*=\s*nextHitstop\s*;\s*runtimeState\.shake\s*=\s*nextShake\s*;\s*\}\s*\}\s*\)/.test(mainJs), 'main.js must create attackBursts with yaw, heavy radius, and impact dependencies');
+assert(runtimeCombatJs.includes('import { createAttackBursts } from "./attackBursts.js";'), 'runtime combat must import attack bursts module');
+assert(/\bconst\s+attackBursts\s*=\s*createAttackBursts\s*\(\s*\{[\s\S]*THREE[\s\S]*yaw[\s\S]*getHeavyRadiusMin[\s\S]*getHeavyRadiusMax[\s\S]*setImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{[\s\S]*runtimeState\.hitstop\s*=\s*nextHitstop[\s\S]*runtimeState\.shake\s*=\s*nextShake/.test(runtimeCombatJs), 'runtime combat must create attackBursts with yaw, heavy radius, and impact dependencies');
 assert(mainJs.includes('attackBursts,'), 'main.js must pass attackBursts into move trigger wiring');
 assert(/function\s+startSlash\s*\(\s*type\s*,\s*ratio\s*=\s*0\s*\)\s*\{\s*attackBursts\.startSlash\s*\(\s*type\s*,\s*ratio\s*\)\s*;\s*\}/.test(moveTriggersJs), 'startSlash wrapper should delegate to the extracted effective behavior');
 assert(/function\s+doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*\{\s*attackBursts\.doSlash\s*\(\s*from\s*,\s*to\s*,\s*heavy\s*\)\s*;\s*\}/.test(moveTriggersJs), 'doSlash wrapper should delegate without wiring new gameplay');
 assert(/case\s+['"]heavyCircle['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*1\.7\s*\)\s*;\s*break/.test(moveTriggersJs), 'heavyCircle should delegate to attackBursts');
 assert(/case\s+['"]heavyCircleBig['"]\s*:\s*attackBursts\.burstCircle\s*\(\s*2\.6\s*\)\s*;\s*break/.test(moveTriggersJs), 'heavyCircleBig should delegate to attackBursts');
-assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{\s*attackBursts\.update\s*\(\s*dt\s*\)\s*;\s*\/\/ 闪避残影淡出\s*ghostAfterimages\.update\s*\(\s*dt\s*\)/.test(mainJs), 'updateFx should update attack bursts before ghost afterimages');
+assert(/function\s+updateFx\s*\(\s*dt\s*\)\s*\{\s*attackBursts\.update\s*\(\s*dt\s*\)\s*;\s*ghostAfterimages\.update\s*\(\s*dt\s*\)/.test(runtimeCombatJs), 'updateFx should update attack bursts before ghost afterimages');
 assert(!mainJs.includes('const slashPivot='), 'main.js should not retain inline slash pivot');
 assert(!mainJs.includes('const slashMat='), 'main.js should not retain inline slash material');
 assert(!mainJs.includes('const slashMesh='), 'main.js should not retain inline slash mesh');

@@ -4,6 +4,7 @@ import { createHitTargetFeedback } from '../prototype/3d/src/combat/hitTargetFee
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -70,9 +71,9 @@ function createFixture({ consume = false, dummies = [], monsters = [] } = {}) {
   same(trace, [['consumeHit', 0, 0, 0], 'hitFlesh'], 'distance threshold should stay strictly below 1.8');
 }
 
-assert(mainJs.includes('import { createHitTargetFeedback } from "./combat/hitTargetFeedback.js";'), 'main.js must import hit target feedback module');
-assert(/const\s+\{\s*onHitTarget\s*\}\s*=\s*createHitTargetFeedback\s*\(\s*\{[\s\S]*spaceSlash[\s\S]*getDummies\s*:\s*\(\s*\)\s*=>\s*dummies[\s\S]*getMonsters\s*:\s*\(\s*\)\s*=>\s*monsters[\s\S]*sfx\s*:\s*SFX[\s\S]*boostImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{[\s\S]*runtimeState\.hitstop\s*=\s*Math\.max\s*\(\s*runtimeState\.hitstop\s*,\s*nextHitstop\s*\)[\s\S]*runtimeState\.shake\s*=\s*Math\.max\s*\(\s*runtimeState\.shake\s*,\s*nextShake\s*\)[\s\S]*\}[\s\S]*\}\s*\)/.test(mainJs), 'main.js should wire hit target feedback with live dependencies');
-assert(/onHitTarget\s*:\s*onHitTarget/.test(mainJs), 'hit resolution should still receive onHitTarget');
+assert(runtimeCombatJs.includes('import { createHitTargetFeedback } from "./hitTargetFeedback.js";'), 'runtime combat must import hit target feedback module');
+assert(/const\s+\{\s*onHitTarget\s*\}\s*=\s*createHitTargetFeedback\s*\(\s*\{[\s\S]*spaceSlash[\s\S]*getDummies[\s\S]*getMonsters[\s\S]*sfx\s*:\s*SFX[\s\S]*boostImpact\s*:\s*\(\s*nextHitstop\s*,\s*nextShake\s*\)\s*=>\s*\{[\s\S]*runtimeState\.hitstop\s*=\s*Math\.max\s*\(\s*runtimeState\.hitstop,\s*nextHitstop\s*\)[\s\S]*runtimeState\.shake\s*=\s*Math\.max\s*\(\s*runtimeState\.shake,\s*nextShake\s*\)/.test(runtimeCombatJs), 'runtime combat should wire hit target feedback with live dependencies');
+assert(/onHitTarget\s*,/.test(runtimeCombatJs), 'hit resolution should still receive onHitTarget');
 assert(!/function\s+onHitTarget\s*\(/.test(mainJs), 'main.js should not keep inline onHitTarget');
 
 console.log('Hit target feedback check passed.');

@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const moveTriggersJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/moveTriggers.js'), 'utf8');
 const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -222,9 +223,9 @@ function createFixture({ player = { x: 4, z: -3, facing: 0 }, randomValues = [],
   assert(removed.length === 1 && removed[0] === beam.crack.mesh, 'crack should be removed after fadeout');
 }
 
-assert(mainJs.includes('import { createSwordBeamController } from "./combat/swordBeam.js";'), 'main.js must import sword beam module');
-assert(mainJs.includes('import { createHitResolution, SPIN_RADIUS } from "./combat/hitResolution.js";'), 'main.js must import hit resolution for beam hit behavior');
-assert(/\bconst\s+swordBeam\s*=\s*createSwordBeamController\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*:\s*\(\s*\)\s*=>\s*P\s*\}\s*\)/.test(mainJs), 'main.js must create swordBeam controller');
+assert(runtimeCombatJs.includes('import { createSwordBeamController } from "./swordBeam.js";'), 'runtime combat must import sword beam module');
+assert(runtimeCombatJs.includes('import { createHitResolution, SPIN_RADIUS } from "./hitResolution.js";'), 'runtime combat must import hit resolution for beam hit behavior');
+assert(/\bconst\s+swordBeam\s*=\s*createSwordBeamController\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*getPlayer\s*\}\s*\)/.test(runtimeCombatJs), 'runtime combat must create swordBeam controller');
 assert(/case\s+['"]chop['"]\s*:\s*setImpact\s*\(\s*0\.10\s*,\s*0\.22\s*\)\s*;\s*SFX\.chop\(\)\s*;\s*swordBeam\.spawnSwordBeam\(\)\s*;\s*break/.test(moveTriggersJs), 'chop effect must preserve hitstop, shake, SFX, and spawn order');
 assert(/swordTrail\.updateTrail\s*\(\s*dt\s*\)\s*;\s*swordBeam\.updateBeams\s*\(\s*dt\s*,\s*hitResolution\.beamHitByBeam\s*\)\s*;\s*spinRings\.updateSpinRings\s*\(\s*dt\s*\)\s*;/.test(updateControllerJs), 'player updater must update sword beams in the original effect slot');
 assert(!mainJs.includes('function beamHitByBeam(b){'), 'main.js should not retain inline beam hit behavior after hit resolution extraction');

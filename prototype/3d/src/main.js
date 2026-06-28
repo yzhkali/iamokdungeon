@@ -15,22 +15,14 @@ import { CLIPS } from "./player/clips.js";
 import { MOVES } from "./player/moves.js";
 import { createPlayerRig } from "./player/rig.js";
 import { createPlayerState, clonePlayerTuning } from "./player/state.js";
-import { createGhostAfterimages } from "./player/ghostAfterimages.js";
 import { createPoseClipController } from "./player/poseClipController.js";
 import { createMoveTriggers } from "./player/moveTriggers.js";
 import { createCharacterPoseController } from "./player/characterPose.js";
 import { createPlayerUpdater } from "./player/updateController.js";
 import { createInputController } from "./ui/input.js";
-import { isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
-import { createHitTargetFeedback } from "./combat/hitTargetFeedback.js";
-import { createSwordTrail } from "./combat/swordTrail.js";
-import { createSpaceSlash } from "./combat/spaceSlash.js";
-import { createSwordBeamController } from "./combat/swordBeam.js";
-import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
-import { createSpinRings } from "./combat/spinRings.js";
-import { createAttackBursts } from "./combat/attackBursts.js";
-import { createTargetFeedback } from "./combat/targetFeedback.js";
-import { createHitResolution, SPIN_RADIUS } from "./combat/hitResolution.js";
+import { sampleTrack } from "./combat/hitMath.js";
+import { createCombatRuntime } from "./combat/runtimeCombat.js";
+import { STOMP_RADIUS } from "./combat/stompEffects.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -198,88 +190,34 @@ const {
 scene.add(char);
 scene.add(jupiterBall);
 
-const spaceSlash = createSpaceSlash({ THREE, scene });
-const { onHitTarget } = createHitTargetFeedback({
+const STOMP_R=STOMP_RADIUS;                 // 践踏 AoE 半径
+const {
   spaceSlash,
+  hitResolution,
+  attackBursts,
+  ghostAfterimages,
+  targetFeedback,
+  spinRings,
+  swordTrail,
+  swordBeam,
+  stompEffects,
+  updateFx
+} = createCombatRuntime({
+  THREE,
+  scene,
+  yaw,
+  weapon,
+  weaponTip,
+  getPlayer: () => P,
+  getHittables: () => hittables,
   getDummies: () => dummies,
   getMonsters: () => monsters,
+  getMoves: () => MOVES,
   sfx: SFX,
-  boostImpact: (nextHitstop, nextShake) => {
-    runtimeState.hitstop = Math.max(runtimeState.hitstop, nextHitstop);
-    runtimeState.shake = Math.max(runtimeState.shake, nextShake);
-  }
-});
-const hitResolution=createHitResolution({
-  getPlayer:()=>P,
-  getHittables:()=>hittables,
-  getDummies:()=>dummies,
-  getMonsters:()=>monsters,
-  getMoves:()=>MOVES,
-  onHitTarget:onHitTarget,
-  boostImpact:(nextHitstop,nextShake)=>{ runtimeState.hitstop=Math.max(runtimeState.hitstop,nextHitstop); runtimeState.shake=Math.max(runtimeState.shake,nextShake); },
-  isInThrustBox:isInThrustBox,
-  isInSpinSweepArc:isInSpinSweepArc
-});
-
-// ============================================================
-//  攻击特效（朝向 yaw 局部 +Z = 正前方）
-// ============================================================
-const attackBursts=createAttackBursts({
-  THREE,
-  yaw,
-  getHeavyRadiusMin:()=>HEAVY_R_MIN,
-  getHeavyRadiusMax:()=>HEAVY_R_MAX,
-  setImpact:(nextHitstop,nextShake)=>{ runtimeState.hitstop=nextHitstop; runtimeState.shake=nextShake; }
-});
-
-// 闪避残影池
-const ghostAfterimages=createGhostAfterimages({
-  THREE,
-  scene,
-  getPlayer:()=>P,
-  getYawRotationY:()=>yaw.rotation.y
-});
-
-const targetFeedback=createTargetFeedback({
-  getHittables:()=>hittables,
-  getDummies:()=>dummies,
-  getMonsters:()=>monsters,
-  random:Math.random
-});
-
-// ============================================================
-//  大风车"土星环"特效：从剑轨迹往外发散的同心圆扩散环
-// ============================================================
-const spinRings=createSpinRings({
-  THREE,
-  scene,
-  getPlayer:()=>P,
-  getSpinRadius:()=>SPIN_RADIUS
-});
-
-const swordTrail = createSwordTrail({ THREE, scene, weapon, weaponTip });
-
-
-// ============================================================
-//  剑气弹幕（薄而立体的鲨鱼鳍，贴地飞 + 弹道追踪式裂缝）
-// ============================================================
-const swordBeam = createSwordBeamController({ THREE, scene, getPlayer: () => P });
-
-
-
-// ============================================================
-//  战争践踏(空中重击)：落地浅坑痕迹 + 溅射碎石 + 强震
-//  痕迹保持10秒 → 10~15秒淡出消失；碎石溅射弹跳后静置，随痕迹一同消失
-// ============================================================
-const STOMP_R=STOMP_RADIUS;                 // 践踏 AoE 半径
-const stompEffects=createStompEffects({
-  THREE,
-  scene,
-  getPlayer:()=>P,
-  getHittables:()=>hittables,
-  getDummies:()=>dummies,
-  playStomp:()=>SFX.stomp(),
-  boostImpact:()=>{ runtimeState.hitstop=Math.max(runtimeState.hitstop,0.12); runtimeState.shake=Math.max(runtimeState.shake,0.45); }
+  runtimeState,
+  getHeavyRadiusMin: () => HEAVY_R_MIN,
+  getHeavyRadiusMax: () => HEAVY_R_MAX,
+  random: Math.random
 });
 
 // ============================================================
@@ -397,12 +335,6 @@ const { mapHud, waterReflectionPass } = createRuntimeServices({
   waterReflectionMeshes,
   getWaterSurfaceMaterial
 });
-function updateFx(dt){
-  attackBursts.update(dt);
-  // 闪避残影淡出
-  ghostAfterimages.update(dt);
-  targetFeedback.update(dt);
-}
 const { update } = createPlayerUpdater({
   player: P,
   runtimeState,

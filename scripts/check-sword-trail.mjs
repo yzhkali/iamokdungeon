@@ -5,6 +5,7 @@ import { createSwordTrail } from '../prototype/3d/src/combat/swordTrail.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const updateControllerJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/player/updateController.js'), 'utf8');
+const runtimeCombatJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/combat/runtimeCombat.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -229,8 +230,8 @@ function createFixture() {
   nearly(trail.mesh.geometry.attributes.position.array[6], 7, 'reset history should not retain prior samples');
 }
 
-assert(mainJs.includes('import { createSwordTrail } from "./combat/swordTrail.js";'), 'main.js must import sword trail module');
-assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(mainJs), 'main.js must create swordTrail after weapon setup');
+assert(runtimeCombatJs.includes('import { createSwordTrail } from "./swordTrail.js";'), 'runtime combat must import sword trail module');
+assert(/\bconst\s+swordTrail\s*=\s*createSwordTrail\s*\(\s*\{\s*THREE\s*,\s*scene\s*,\s*weapon\s*,\s*weaponTip\s*\}\s*\)/.test(runtimeCombatJs), 'runtime combat must create swordTrail after weapon setup');
 assert(/P\.move\s*&&\s*swordTrail\.mesh\.visible\s*&&\s*swordTrail\.isActive\(\)/.test(updateControllerJs), 'space slash dodge gate must use swordTrail state');
 assert(/swordTrail\.startTrail\s*\(\s*mv\.trailSegs\s*\|\|\s*\(\s*mv\.spinY\s*\?\s*26\s*:\s*4\s*\)\s*\)/.test(updateControllerJs), 'move update must start sword trail with existing segment expression');
 assert(updateControllerJs.includes('swordTrail.stopTrail()'), 'move update must stop sword trail through the module');
