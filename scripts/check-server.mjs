@@ -24,6 +24,7 @@ try {
   await expectStatus(origin, '/index.html', 200);
   await expectStatus(origin, '/src/main.js', 200);
   await expectStatus(origin, '/src/camera.js', 200);
+  await expectStatus(origin, '/src/loop.js', 200);
   await expectStatus(origin, '/src/rendering/waterReflection.js', 200);
   await expectStatus(origin, '/src/player/clips.js', 200);
   await expectStatus(origin, '/src/player/moves.js', 200);

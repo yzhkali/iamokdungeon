@@ -11,6 +11,7 @@ import { MOVES } from "./player/moves.js";
 import { createInputController } from "./ui/input.js";
 import { createMapHud } from "./ui/mapHud.js";
 import { createWaterReflectionPass } from "./rendering/waterReflection.js";
+import { createGameLoop } from "./loop.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -2142,13 +2143,21 @@ function poseCharacter(dt){
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
 addEventListener("resize",resize);resize();padStatus();
 document.getElementById("loading").style.display="none";
-function loop(){let dt=clock.getDelta();if(dt>0.05)dt=0.05;update(dt);try{updateWolf(dt);}catch(e){console.error("wolf err:",e);}
-if(skyData) updateSky({ skyData, camera, dt });updateWater(clock.getElapsedTime());cameraController.updateCamera(dt);
-mapHud.updateHUD();
-const _t=clock.getElapsedTime();updateGrass({ grassMats: grassSystem.grassMats, time: _t });
-// ── 水面反射 pass ──────────────────────────────────────────
-waterReflectionPass.render();
-// ── 最终渲染 ────────────────────────────────────
-renderer.render(scene,camera);requestAnimationFrame(loop);}
-loop();
+const gameLoop = createGameLoop({
+  clock,
+  update,
+  updateWolf,
+  updateSky,
+  getSkyData: () => skyData,
+  camera,
+  updateWater,
+  cameraController,
+  mapHud,
+  updateGrass,
+  getGrassMats: () => grassSystem.grassMats,
+  waterReflectionPass,
+  renderer,
+  scene
+});
+gameLoop.start();
 }

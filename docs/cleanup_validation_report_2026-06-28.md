@@ -41,6 +41,7 @@ Retained tool pages:
 - `prototype/3d/src/world/sky.js` and `prototype/3d/src/world/grass.js` own low-risk world rendering pieces.
 - `prototype/3d/src/rendering/waterReflection.js` owns the water reflection render pass and restores renderer/water visibility state after the pass.
 - `prototype/3d/src/camera.js` owns camera offset, yaw/pitch smoothing, pitch clamp, shake offset, and lookAt updates.
+- `prototype/3d/src/loop.js` owns the main frame loop schedule, delta clamp, wolf error isolation, world/camera/HUD/grass/reflection/final-render order, and RAF rescheduling.
 - `prototype/3d/src/player/clips.js` owns animation clip data.
 - `prototype/3d/src/player/moves.js` owns move/combo timing data.
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
@@ -65,6 +66,7 @@ Root scripts:
 - `npm run check:map-hud`
 - `npm run check:camera`
 - `npm run check:render-loop`
+- `npm run check:game-loop`
 - `npm run check:wolf-ai`
 - `npm run check:syntax`
 - `npm run check:server`
@@ -82,6 +84,7 @@ Coverage:
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
 - Render loop check verifies water reflection RT sizing, `uRes` sync, reflection camera/clip setup, water mesh hide/restore, render-target/clipping reset order, and cleanup on reflection render errors with lightweight fakes.
+- Game loop check verifies frame delta clamping, main/wolf/sky/water/camera/HUD/grass/reflection/render/RAF call order, skipped sky updates, wolf error logging isolation, and elapsed-time usage with lightweight fakes.
 - Wolf AI check verifies patrol timing, vision/look/chase transitions, attack cooldown and damage/iframe/death handling, territory border/return behavior, hittable removal, finite knockback, and final hittable position sync with lightweight fakes.
 - Syntax check covers runtime source files, validation scripts, and inline scripts in all top-level `prototype/3d/*.html` pages.
 - Static server check verifies normal runtime routes, rejects path traversal, rejects directory listing, and rejects unsupported methods.
@@ -95,15 +98,16 @@ Latest passing gate for the current cleanup/modularization slice:
 
 Important passing lines from the latest run:
 
-- `Asset check passed (67 runtime assets, 23 source files).`
+- `Asset check passed (68 runtime assets, 24 source files).`
 - `Vendor subset check passed (prototype/3d/assets/vendor).`
 - `Player data check passed (37 clips, 24 moves).`
 - `Input controller check passed.`
 - `Map HUD check passed.`
 - `Camera controller check passed.`
 - `Render loop check passed.`
+- `Game loop check passed.`
 - `Wolf AI check passed.`
-- `Syntax check passed (26 files plus 9 inline scripts).`
+- `Syntax check passed (28 files plus 9 inline scripts).`
 - `Static server check passed.`
 - Browser smoke passed for `/index.html`, `/editor3d.html`, `/gallery.html`, `/pose-editor.html`, `/sfx-editor.html`, `/bones.html`, `/skeleton-demo.html`, `/quat-demo.html`, and `/角色展示厅.html`.
 
@@ -113,6 +117,8 @@ The final handoff should rerun `npm run prepush` after any document or code chan
 
 - Implementation/behavior review: no blocker. The reviewer confirmed the wolf AI extraction preserves the previous state machine shape and noted only that `prototype/3d/src/enemies/wolfAi.js` must be included in the commit.
 - Validation/docs/repository-hygiene review: no blocker and no non-blocker findings. The reviewer confirmed `check:wolf-ai`, server route coverage, docs, and temporary-file state are consistent.
+- Game loop implementation review: no blocker and no non-blocker findings. The reviewer confirmed the extracted loop preserves the frame order and keeps wolf error isolation.
+- Game loop validation review: one commit-hygiene blocker was raised because `prototype/3d/src/loop.js` and `scripts/check-game-loop.mjs` were still untracked during review; this slice stages both files. The reviewer also requested tighter unit coverage, which was added for sky/camera clamped dt, exact event count, repeated RAF rescheduling, and second-frame elapsed-time use.
 
 ## Repository Size Notes
 
@@ -129,7 +135,8 @@ The large `.git` size is expected while local history still contains removed ven
 ## Remaining Non-Blocking Work
 
 - Continue modularizing `prototype/3d/src/main.js` in small behavior-preserving slices:
-  - main loop local orchestration
+  - player/combat state boundaries
+  - pose execution boundaries
 - Keep each slice covered by `npm run validate` or `npm run prepush`.
 - Do not retune movement, combat, dodge, camera, wolf AI, hitstop, shake, or SFX timing unless fixing a confirmed bug.
 
