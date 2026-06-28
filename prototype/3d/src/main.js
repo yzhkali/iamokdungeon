@@ -3,6 +3,7 @@ import { createSfx } from "./core/sfx.js";
 import { createModelLoader } from "./core/modelLoader.js";
 import { buildGrass, updateGrass } from "./world/grass.js";
 import { buildSky, updateSky } from "./world/sky.js";
+import { makeTrainingDummy } from "./world/trainingDummy.js";
 import { makeWolf } from "./wolf.js";
 import { createWolfAiController } from "./enemies/wolfAi.js";
 import { createCameraController } from "./camera.js";
@@ -590,29 +591,10 @@ const grassSystem = buildGrass({ THREE, scene, mapH: _mapH });
 // ============================================================
 //  练武木人桩
 // ============================================================
-const WOOD=0x9a6b3e, WOOD_D=0x6e4a28;
-function Mwood(c){return new THREE.MeshStandardMaterial({color:c,roughness:0.85});}
-function woodBox(w,h,d,c){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),Mwood(c));m.castShadow=true;m.receiveShadow=true;return m;}
-function makeDummy(dx,dz,face){
-  const root=new THREE.Group(); root.position.set(dx,0,dz); root.rotation.y=face; scene.add(root);
-  registerMapFeature({type:'training',name:'木桩',x:dx,z:dz,w:1.2,d:1.2,rot:face});
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.4,16),Mwood(WOOD_D));
-  base.position.y=0.2; base.castShadow=true; base.receiveShadow=true; root.add(base);
-  const pivot=new THREE.Group(); pivot.position.y=0.4; root.add(pivot);
-  const mats=[];
-  function reg(mesh){ mats.push(mesh.material); return mesh; }
-  const post=woodBox(0.42,2.4,0.42,WOOD); post.position.y=1.2; pivot.add(reg(post));
-  for(const yy of [0.5,1.0,2.0]){ const r=woodBox(0.46,0.1,0.46,WOOD_D); r.position.y=yy; pivot.add(reg(r)); }
-  const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,16,12),Mwood(WOOD)); head.position.y=2.6; head.castShadow=true; pivot.add(reg(head));
-  const armT=woodBox(1.7,0.22,0.22,WOOD); armT.position.set(0,1.9,0.0); pivot.add(reg(armT));
-  const armDiagL=woodBox(0.22,0.22,1.1,WOOD); armDiagL.position.set(-0.5,1.5,0.3); armDiagL.rotation.x=0.5; pivot.add(reg(armDiagL));
-  const armDiagR=woodBox(0.22,0.22,1.1,WOOD); armDiagR.position.set(0.5,1.5,0.3); armDiagR.rotation.x=0.5; pivot.add(reg(armDiagR));
-  const armMid=woodBox(0.2,0.2,0.9,WOOD); armMid.position.set(0,1.15,0.45); pivot.add(reg(armMid));
-  addCollider(dx,dz,0.6,0.6,terrainYAt(dx,dz),terrainYAt(dx,dz)+3.0);
-  const dummy={root,pivot,mats, x:dx,z:dz, r:1.2, face, flashT:0, tilt:0, tiltVel:0};
-  dummies.push(dummy);
-}
 const dummies=[];
+function makeDummy(dx,dz,face){
+  return makeTrainingDummy({ THREE, scene, registerMapFeature, addCollider, terrainYAt, dummies }, dx, dz, face);
+}
 //makeDummy(0,5,Math.PI);
 const monsters=[];
 
