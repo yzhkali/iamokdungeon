@@ -17,6 +17,7 @@ import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./comb
 import { createSwordTrail } from "./combat/swordTrail.js";
 import { createSpaceSlash } from "./combat/spaceSlash.js";
 import { createSwordBeamController } from "./combat/swordBeam.js";
+import { createStompEffects, STOMP_RADIUS } from "./combat/stompEffects.js";
 
 const loadingEl = document.getElementById('loading');
 const { THREE, GLTFLoader } = await loadThreeRuntime({ loadingEl });
@@ -875,98 +876,16 @@ const swordBeam = createSwordBeamController({ THREE, scene, getPlayer: () => P }
 //  战争践踏(空中重击)：落地浅坑痕迹 + 溅射碎石 + 强震
 //  痕迹保持10秒 → 10~15秒淡出消失；碎石溅射弹跳后静置，随痕迹一同消失
 // ============================================================
-const STOMP_R=3.2;                 // 践踏 AoE 半径
-const stompMarks=[];               // {grp, mats:[{m,base}], bits:[...], age}
-// 不规则坑形：抖动半径的闭合多边形(星形单调，不自交)
-function irregularShape(baseR, jitter, n){
-  const s=new THREE.Shape();
-  for(let i=0;i<n;i++){
-    const a=(i/n)*Math.PI*2, r=baseR*(1+(Math.random()-0.5)*jitter);
-    const x=Math.sin(a)*r, z=Math.cos(a)*r;
-    if(i===0) s.moveTo(x,z); else s.lineTo(x,z);
-  }
-  s.closePath(); return s;
-}
-// 一条不规则裂纹：从(x0,z0)沿ang走的折线，做成平铺地面的薄带(末端渐细)
-function addCrack(grp, mat, x0, z0, ang, len){
-  const segs=4+Math.floor(Math.random()*3);   // 4~6 段折线
-  const pts=[]; let x=x0, z=z0, a=ang; const step=len/segs;
-  for(let i=0;i<=segs;i++){ pts.push([x,z]); a+=(Math.random()-0.5)*0.9; x+=Math.sin(a)*step; z+=Math.cos(a)*step; }
-  const pos=[], idx=[];
-  for(let i=0;i<pts.length;i++){
-    const px=pts[i][0], pz=pts[i][1];
-    let dx,dz; if(i<pts.length-1){ dx=pts[i+1][0]-px; dz=pts[i+1][1]-pz; } else { dx=px-pts[i-1][0]; dz=pz-pts[i-1][1]; }
-    const dl=Math.hypot(dx,dz)||1, nx=-dz/dl, nz=dx/dl;
-    const w=(0.055+Math.random()*0.03)*(1-i/pts.length*0.55);   // 越往末端越细
-    pos.push(px+nx*w,0.035,pz+nz*w, px-nx*w,0.035,pz-nz*w);
-    if(i>0){ const a0=(i-1)*2; idx.push(a0,a0+1,a0+2, a0+1,a0+3,a0+2); }
-  }
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3));
-  geo.setIndex(idx);
-  grp.add(new THREE.Mesh(geo,mat));
-}
-function spawnCrater(cx,cz){
-  const grp=new THREE.Group(); grp.position.set(cx,0,cz); scene.add(grp);
-  const mats=[]; const reg=m=>{ mats.push({m,base:m.opacity}); return m; };
-  // 外缘不规则坑(较大较亮：被震松的土)
-  const rimMat=reg(new THREE.MeshBasicMaterial({color:0x3a2a1c,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false}));
-  rimMat.polygonOffset=true; rimMat.polygonOffsetFactor=-1; rimMat.polygonOffsetUnits=-1;
-  const rim=new THREE.Mesh(new THREE.ShapeGeometry(irregularShape(1.7,0.45,16)),rimMat); rim.rotation.x=-Math.PI/2; rim.position.y=0.03; grp.add(rim);
-  // 内坑不规则(较小较暗：砸出的坑)
-  const discMat=reg(new THREE.MeshBasicMaterial({color:0x120d0a,transparent:true,opacity:0.62,side:THREE.DoubleSide,depthWrite:false}));
-  discMat.polygonOffset=true; discMat.polygonOffsetFactor=-2; discMat.polygonOffsetUnits=-2;
-  const disc=new THREE.Mesh(new THREE.ShapeGeometry(irregularShape(1.1,0.5,16)),discMat); disc.rotation.x=-Math.PI/2; disc.position.y=0.032; grp.add(disc);
-  // (裂痕线已按需求去掉；addCrack 函数保留备用，以后想要再调回来)
-  return {grp,mats};
-}
-function spawnDebris(cx,cz){
-  const bits=[];
-  for(let i=0;i<11;i++){
-    const s=0.07+Math.random()*0.13;
-    const geo=(Math.random()<0.5)? new THREE.TetrahedronGeometry(s) : new THREE.BoxGeometry(s,s*0.8,s*1.1);
-    const mat=new THREE.MeshStandardMaterial({color:0x6b5a44,roughness:0.95,transparent:true,opacity:1});
-    const m=new THREE.Mesh(geo,mat); m.castShadow=true;
-    const ang=Math.random()*Math.PI*2, sp=2.2+Math.random()*4.5;
-    m.position.set(cx+Math.sin(ang)*0.3, 0.25, cz+Math.cos(ang)*0.3);
-    m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); scene.add(m);
-    bits.push({mesh:m,mat, vx:Math.sin(ang)*sp, vy:4.5+Math.random()*4.5, vz:Math.cos(ang)*sp,
-      sx:(Math.random()-0.5)*12, sy:(Math.random()-0.5)*12, sz:(Math.random()-0.5)*12, rest:s*0.5+0.02, settled:false});
-  }
-  return bits;
-}
-function doStomp(){
-  SFX.stomp();
-  hitstop=Math.max(hitstop,0.12); shake=Math.max(shake,0.45);     // 强顿帧 + 大震屏
-  const cr=spawnCrater(P.x,P.z); const bits=spawnDebris(P.x,P.z);
-  stompMarks.push({grp:cr.grp, mats:cr.mats, bits, age:0});
-  // 周身 radial AoE 判定
-  for(const o of hittables){ const dx=o.x-P.x, dz=o.z-P.z; if(Math.hypot(dx,dz)<STOMP_R+o.r){ o.flashT=0.2; o.shakeT=0.28; } }
-  for(const d of dummies){ const dx=d.x-P.x, dz=d.z-P.z; if(Math.hypot(dx,dz)<STOMP_R+d.r){ d.flashT=0.3; d.tiltVel+=12; } }
-}
-function updateStomps(dt){
-  for(let i=stompMarks.length-1;i>=0;i--){
-    const s=stompMarks[i]; s.age+=dt;
-    // 碎石物理：溅射 → 弹跳 → 静置
-    for(const b of s.bits){
-      if(!b.settled){
-        b.vy-=22*dt;
-        b.mesh.position.x+=b.vx*dt; b.mesh.position.y+=b.vy*dt; b.mesh.position.z+=b.vz*dt;
-        b.mesh.rotation.x+=b.sx*dt; b.mesh.rotation.y+=b.sy*dt; b.mesh.rotation.z+=b.sz*dt;
-        if(b.mesh.position.y<=b.rest){
-          b.mesh.position.y=b.rest;
-          if(Math.abs(b.vy)<1.6){ b.settled=true; b.vx=b.vz=0; b.sx=b.sy=b.sz=0; }
-          else { b.vy=-b.vy*0.4; b.vx*=0.55; b.vz*=0.55; b.sx*=0.5; b.sy*=0.5; b.sz*=0.5; }
-        }
-      }
-    }
-    // 痕迹 + 碎石淡出：10秒保持，10~15秒渐隐
-    let op=1; if(s.age>=10) op=Math.max(0,1-(s.age-10)/5);
-    for(const e of s.mats) e.m.opacity=e.base*op;
-    for(const b of s.bits) b.mat.opacity=op;
-    if(s.age>=15){ scene.remove(s.grp); for(const b of s.bits) scene.remove(b.mesh); stompMarks.splice(i,1); }
-  }
-}
+const STOMP_R=STOMP_RADIUS;                 // 践踏 AoE 半径
+const stompEffects=createStompEffects({
+  THREE,
+  scene,
+  getPlayer:()=>P,
+  getHittables:()=>hittables,
+  getDummies:()=>dummies,
+  playStomp:()=>SFX.stomp(),
+  boostImpact:()=>{ hitstop=Math.max(hitstop,0.12); shake=Math.max(shake,0.45); }
+});
 
 // ============================================================
 //  关键帧动画系统（加动作=加数据表）
@@ -1086,8 +1005,8 @@ function fireFx(fx){
     case 'slashL': hitstop=0.07; shake=0.14; SFX.swing(); break;
     case 'chop':   hitstop=0.10; shake=0.22; SFX.chop(); swordBeam.spawnSwordBeam(); break;
     case 'slam':   hitstop=0.14; shake=0.32; break;   // 落地砸地：顿帧+震屏(更重)，不发剑气
-    case 'stomp':  doStomp(); break;
-    case 'drill':  hitstop=0.14; shake=0.6; doStomp(); P._drillBounce=4.5; break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
+    case 'stomp':  stompEffects.doStomp(); break;
+    case 'drill':  hitstop=0.14; shake=0.6; stompEffects.doStomp(); P._drillBounce=4.5; break;                  // 战争践踏：浅坑+碎石+强震+周身AoE
     case 'kick':   hitstop=0.10; shake=0.20; SFX.kick(); break;   // 飞踹：顿帧+震屏(暂不击飞)
     case 'rise':   hitstop=0.09; shake=0.18; SFX.rise(); break;   // 升龙剑上挑：顿帧+震屏
     case 'thrust': SFX.thrust(); doThrust(); break;
@@ -1589,7 +1508,7 @@ function update(dt){
   yaw.rotation.y+=angleDelta(yaw.rotation.y,P.facing)*Math.min(1,TURN_LERP*dt);
   if(shake>0)shake=Math.max(0,shake-dt*0.6);
   updateFx(dt); poseCharacter(dt);
-  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); updateSpinRings(dt); spaceSlash.update(dt); updateStomps(dt);
+  swordTrail.updateTrail(dt); swordBeam.updateBeams(dt, beamHitByBeam); updateSpinRings(dt); spaceSlash.update(dt); stompEffects.updateStomps(dt);
 }
 
 // ============================================================
