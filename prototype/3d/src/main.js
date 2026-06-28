@@ -600,47 +600,6 @@ const monsters=[];
 
 // ─── WOLF ──────────────────────────────────────────────
 let wolf=null;
-// ── CUBE WOLF GLTF 加载（异步替换程序化狼）──────────────
-function makeCubeWolfObj(gltfScene, clips, loader_THREE){
-  const root = gltfScene;
-  root.scale.setScalar(1.35);
-  root.rotation.y = Math.PI; // 修正朝向
-  root.position.set(5, 0, -5);
-  scene.add(root);
-  root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-  const mixer = new loader_THREE.AnimationMixer(root);
-  const clipMap = {};
-  for(const c of clips) clipMap[c.name] = c;
-  const STATE_MAP = {idle:'Idle',wander:'Walk',run:'Run',pounce:'Jump_Start',
-    bite:'Headbutt',hurt:'Idle',death:'Death',howl:'Idle'};
-  let curAction = null, curState = 'idle';
-  function playClip(name, loop=true){
-    const clip = clipMap[name]; if(!clip) return;
-    const newAction = mixer.clipAction(clip);
-    newAction.setLoop(loop?loader_THREE.LoopRepeat:loader_THREE.LoopOnce, Infinity);
-    newAction.clampWhenFinished = !loop;
-    if(curAction && curAction !== newAction){ curAction.fadeOut(0.2); }
-    newAction.reset().fadeIn(0.2).play();
-    curAction = newAction;
-  }
-  mixer.addEventListener('finished', ()=>{ curState='idle'; });
-  playClip('Idle', true);
-  // 材质 flash 用第一个mesh
-  const firstMesh = (() => { let m=null; root.traverse(o=>{if(!m&&o.isMesh)m=o;}); return m; })();
-  return {
-    root,
-    J: { body: { children: [firstMesh||{material:{emissive:{setHex:()=>{}},emissiveIntensity:0}}] } },
-    get state(){ return curState; },
-    setState(name){
-      curState = name;
-      const clipName = STATE_MAP[name]||'Idle';
-      const loop = !['pounce','bite','hurt','death'].includes(name);
-      playClip(clipName, loop);
-    },
-    update(dt){ mixer.update(dt); }
-  };
-}
-
 
 // ── WOLF AI ─────────────────────────────────────────
 wolf=makeWolf(THREE, scene, 0, 0.72, -40);

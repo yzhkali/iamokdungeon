@@ -22,7 +22,7 @@ Windows 本地双击入口仍保留：
 
 ## Current Runtime Layout
 
-- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、训练木人桩构建器、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、主循环调度器、玩家状态/调参模块、玩家程序化 rig、闪避残影控制器、动作关键帧控制器、战斗/姿态纯数学辅助函数、命中判定控制器、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
+- `prototype/3d/src/main.js`：主编排和仍未完全拆分的游戏主体，已抽出核心加载、SFX、模型、天空、草、训练木人桩构建器、相机、水面反射 pass、玩家纯数据、输入控制器、HUD/map 控制器、狼 AI 控制器、GLTF 狼适配器、主循环调度器、玩家状态/调参模块、玩家程序化 rig、闪避残影控制器、动作关键帧控制器、战斗/姿态纯数学辅助函数、命中判定控制器、攻击视觉爆发控制器、目标受击反馈控制器、剑拖尾控制器、空间斩控制器、剑气/裂缝控制器、践踏特效控制器和大风车同心环控制器。
 - `prototype/3d/src/core/`：Three 加载、SFX、模型加载。
 - `prototype/3d/src/combat/attackBursts.js`：轻击刀光/重击圆圈视觉对象、休眠 `startSlash` 语义、`doSlash`、`burstCircle` 和淡出更新。
 - `prototype/3d/src/combat/hitMath.js`：关键帧采样、角度差、突刺盒和旋转扫掠弧等纯数学辅助函数。
@@ -45,6 +45,7 @@ Windows 本地双击入口仍保留：
 - `prototype/3d/src/ui/mapHud.js`：体力/状态 HUD、小地图和展开地图控制器。
 - `prototype/3d/src/wolf.js`：程序化狼。
 - `prototype/3d/src/enemies/wolfAi.js`：狼 AI 状态机和命中/受伤逻辑。
+- `prototype/3d/src/enemies/cubeWolfAdapter.js`：保留的 GLTF 狼适配器，用于把外部动画狼模型映射到当前狼 AI 契约；当前运行路径仍使用程序化狼。
 - `prototype/3d/maps/map15.json`：当前运行地图。
 - `prototype/3d/assets/vendor/`：保留运行子集，完整源包不入库。
 - `docs/archive/maps/`：旧地图归档。
@@ -67,7 +68,7 @@ Windows 本地双击入口仍保留：
 ## Known Issues
 
 - 保留工具页已经纳入资产检查、语法检查和浏览器 smoke；继续改动时必须保持验证通过。
-- `main.js` 仍偏大，玩家程序化 rig、训练木人桩构建器、命中判定、攻击视觉爆发、目标受击反馈、动作关键帧应用、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理特殊姿态执行和玩家 update 主流程边界。
+- `main.js` 仍偏大，玩家程序化 rig、训练木人桩构建器、GLTF 狼适配器、命中判定、攻击视觉爆发、目标受击反馈、动作关键帧应用、剑拖尾、空间斩、剑气/裂缝、践踏特效、大风车同心环和闪避残影已拆出；后续应继续整理特殊姿态执行和玩家 update 主流程边界。
 - 文档中早期像素原型路线仍可作为设计背景，但不再代表当前运行目标。
 
 ## Next Tasks

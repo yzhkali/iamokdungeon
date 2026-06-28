@@ -61,6 +61,7 @@ Retained tool pages:
 - `prototype/3d/src/ui/input.js` owns keyboard, mouse, gamepad, camera-stick, and input-clear state.
 - `prototype/3d/src/ui/mapHud.js` owns stamina/status HUD, mini map, world map drawing, and map open/close state.
 - `prototype/3d/src/enemies/wolfAi.js` owns wolf patrol/look/chase/border/return/death state, wolf hittable callbacks, and wolf-to-player damage.
+- `prototype/3d/src/enemies/cubeWolfAdapter.js` owns the retained GLTF wolf adapter that maps animated model clips to the existing wolf AI contract.
 - `prototype/3d/src/main.js` is reduced from the original giant file and remains the startup/gameplay coordinator.
 - Map loading uses local `./maps/map15.json` and validates the HTTP response.
 - Wolf runtime state is active instead of leaving a hittable null wolf.
@@ -95,6 +96,7 @@ Root scripts:
 - `npm run check:camera`
 - `npm run check:render-loop`
 - `npm run check:game-loop`
+- `npm run check:cube-wolf-adapter`
 - `npm run check:wolf-ai`
 - `npm run check:syntax`
 - `npm run check:server`
@@ -120,6 +122,7 @@ Coverage:
 - Sword beam check verifies beam material/geometry setup, one-grid spawn offset, direction snapshot, movement before hit callback, crack growth/index stitching, beam removal, crack fadeout/removal, and main-module integration while preserving main-owned hit behavior.
 - Sword trail check verifies mesh/material/geometry setup, default and explicit segment caps, root/tip sampling order, hidden-update no-op behavior, stopped-trail fadeout, history reset, and main-module integration.
 - Input controller check verifies keyboard, mouse, gamepad, camera-stick, and input-clear behavior with a lightweight fake DOM.
+- Cube wolf adapter check verifies root transforms, scene registration, mesh shadow flags, clip/state mapping, fade transitions, one-shot loop modes, finished-listener fallback, mixer update forwarding, first-mesh material mapping, fallback material safety, and removal of the unused inline main-module adapter.
 - Map HUD check verifies required DOM ids/canvas drawing sizes, module integration, stamina/status text, mini-map mode toggling, world-map open/close/Escape handling, input clearing, and map redraw cadence with a lightweight fake DOM/canvas.
 - Camera controller check verifies camera offset math, yaw/pitch stick consumption, pitch clamp, smoothing, player lookAt target, minimum camera height, and shake offset with lightweight fakes.
 - Render loop check verifies water reflection RT sizing, `uRes` sync, reflection camera/clip setup, water mesh hide/restore, render-target/clipping reset order, and cleanup on reflection render errors with lightweight fakes.
