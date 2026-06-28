@@ -35,6 +35,7 @@ try {
   await expectStatus(origin, '/src/combat/targetFeedback.js', 200);
   await expectStatus(origin, '/src/camera.js', 200);
   await expectStatus(origin, '/src/core/renderScene.js', 200);
+  await expectStatus(origin, '/src/core/runtimeServices.js', 200);
   await expectStatus(origin, '/src/debug/testProbe.js', 200);
   await expectStatus(origin, '/src/loop.js', 200);
   await expectStatus(origin, '/src/enemies/wolfRuntime.js', 200);

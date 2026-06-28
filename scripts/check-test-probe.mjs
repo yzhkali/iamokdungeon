@@ -4,6 +4,7 @@ import { installTestProbe } from '../prototype/3d/src/debug/testProbe.js';
 
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
+const runtimeServicesJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/core/runtimeServices.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -163,11 +164,12 @@ delete globalThis.__IAMOK_ENABLE_TEST_PROBE__;
   assert(h.probe.render().renderTargetIsNull === true, 'missing getRenderTarget should preserve true fallback');
 }
 
-assert(mainJs.includes('import { installTestProbe } from "./debug/testProbe.js";'), 'main.js must import installTestProbe');
-assert(/installTestProbe\s*\(\s*\{[\s\S]*camera[\s\S]*cameraRig[\s\S]*getPlayer\s*:\s*\(\s*\)\s*=>\s*P[\s\S]*renderer[\s\S]*waterReflectionMeshes[\s\S]*reflRT[\s\S]*sceneRT[\s\S]*\}\s*\)/.test(mainJs), 'main.js should install the probe with live runtime dependencies');
+assert(runtimeServicesJs.includes('import { installTestProbe } from "../debug/testProbe.js";'), 'runtime services must import installTestProbe');
+assert(/installTestProbeFn\s*\(\s*\{[\s\S]*globalRef[\s\S]*camera[\s\S]*cameraRig[\s\S]*getPlayer[\s\S]*renderer[\s\S]*waterReflectionMeshes[\s\S]*reflRT[\s\S]*sceneRT[\s\S]*\}\s*\)/.test(runtimeServicesJs), 'runtime services should install the probe with live runtime dependencies');
 assert(!/globalThis\.__IAMOK_TEST_PROBE__\s*=/.test(mainJs), 'main.js should not inline the global probe assignment');
-const installCallIndex = mainJs.indexOf('installTestProbe({');
-assert(mainJs.indexOf('const waterReflectionPass = createWaterReflectionPass') < installCallIndex, 'probe should be installed after water reflection pass setup');
-assert(installCallIndex < mainJs.indexOf('const gameLoop = createGameLoop'), 'probe should be installed before game loop setup');
+const reflectionCallIndex = runtimeServicesJs.indexOf('createWaterReflectionPassFn({');
+const installCallIndex = runtimeServicesJs.indexOf('installTestProbeFn({');
+assert(reflectionCallIndex < installCallIndex, 'probe should be installed after water reflection pass setup');
+assert(mainJs.indexOf('createRuntimeServices({') < mainJs.indexOf('startRuntimeLoop({'), 'runtime services should be created before the game loop starts');
 
 console.log('Test probe check passed.');

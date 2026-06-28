@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 const indexHtml = fs.readFileSync(path.join(repoRoot, 'prototype/3d/index.html'), 'utf8');
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const loopJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/loop.js'), 'utf8');
+const runtimeServicesJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/core/runtimeServices.js'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -38,10 +39,10 @@ for (const id of [
 
 assert(/<canvas\b[^>]*\bid=["']miniMapCanvas["'][^>]*\bwidth=["']608["'][^>]*\bheight=["']608["'][^>]*>/i.test(indexHtml), 'miniMapCanvas must keep 608x608 drawing size');
 assert(/<canvas\b[^>]*\bid=["']worldMapCanvas["'][^>]*\bwidth=["']1200["'][^>]*\bheight=["']820["'][^>]*>/i.test(indexHtml), 'worldMapCanvas must keep 1200x820 drawing size');
-assert(mainJs.includes('import { createMapHud } from "./ui/mapHud.js";'), 'main.js must import mapHud module');
+assert(runtimeServicesJs.includes('import { createMapHud } from "../ui/mapHud.js";'), 'runtime services must import mapHud module');
 assert(mainJs.includes('mapHud.isWorldMapOpen()'), 'main.js update loop must use mapHud.isWorldMapOpen()');
-assert(mainJs.includes('import { createGameLoop } from "./loop.js";'), 'main.js must import game loop module');
-assert(/\bcreateGameLoop\s*\(\s*\{[\s\S]*\bmapHud\s*,/.test(mainJs), 'main.js must pass mapHud into the game loop');
+assert(runtimeServicesJs.includes('import { createGameLoop } from "../loop.js";'), 'runtime services must import game loop module');
+assert(/\bstartRuntimeLoop\s*\(\s*\{[\s\S]*\bmapHud\s*,/.test(mainJs), 'main.js must pass mapHud into the runtime loop');
 assert(loopJs.includes('mapHud.updateHUD();'), 'game loop must call mapHud.updateHUD()');
 
 class FakeTarget {

@@ -2,6 +2,7 @@ import { loadThreeRuntime } from "./core/threeLoader.js";
 import { createSfx } from "./core/sfx.js";
 import { createModelLoader } from "./core/modelLoader.js";
 import { createRenderScene } from "./core/renderScene.js";
+import { createRuntimeServices, startRuntimeLoop, startRuntimeView } from "./core/runtimeServices.js";
 import { buildGrass, updateGrass } from "./world/grass.js";
 import { buildSky, updateSky } from "./world/sky.js";
 import { buildTerrainWater } from "./world/terrainWater.js";
@@ -19,10 +20,6 @@ import { createPoseClipController } from "./player/poseClipController.js";
 import { createMoveTriggers } from "./player/moveTriggers.js";
 import { createCharacterPoseController } from "./player/characterPose.js";
 import { createInputController } from "./ui/input.js";
-import { createMapHud } from "./ui/mapHud.js";
-import { createWaterReflectionPass } from "./rendering/waterReflection.js";
-import { createGameLoop } from "./loop.js";
-import { installTestProbe } from "./debug/testProbe.js";
 import { angleDelta, isInSpinSweepArc, isInThrustBox, sampleTrack } from "./combat/hitMath.js";
 import { createHitTargetFeedback } from "./combat/hitTargetFeedback.js";
 import { createSwordTrail } from "./combat/swordTrail.js";
@@ -646,7 +643,7 @@ function update(dt){
 // ============================================================
 //  自动地图：同一份场景登记数据生成小地图和展开地图
 // ============================================================
-const mapHud = createMapHud({
+const { mapHud, waterReflectionPass } = createRuntimeServices({
   THREE,
   roomSize: ROOM,
   mapFeatures,
@@ -654,12 +651,12 @@ const mapHud = createMapHud({
   heavyChargeTime: HEAVY_CHARGE_TIME,
   clearGameplayInputState,
   documentRef: document,
-  windowRef: window
-});
-const waterReflectionPass = createWaterReflectionPass({
+  windowRef: window,
+  globalRef: globalThis,
   renderer,
   scene,
   camera,
+  cameraRig,
   reflRT,
   sceneRT,
   reflCam,
@@ -668,26 +665,20 @@ const waterReflectionPass = createWaterReflectionPass({
   waterReflectionMeshes,
   getWaterSurfaceMaterial
 });
-installTestProbe({
-  camera,
-  cameraRig,
-  getPlayer: () => P,
-  renderer,
-  waterReflectionMeshes,
-  reflRT,
-  sceneRT
-});
 function updateFx(dt){
   attackBursts.update(dt);
   // 闪避残影淡出
   ghostAfterimages.update(dt);
   targetFeedback.update(dt);
 }
-// HUD/渲染
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
-addEventListener("resize",resize);resize();padStatus();
-document.getElementById("loading").style.display="none";
-const gameLoop = createGameLoop({
+startRuntimeView({
+  renderer,
+  camera,
+  documentRef: document,
+  windowRef: window,
+  padStatus
+});
+startRuntimeLoop({
   clock,
   update,
   updateWolf,
@@ -703,5 +694,4 @@ const gameLoop = createGameLoop({
   renderer,
   scene
 });
-gameLoop.start();
 }

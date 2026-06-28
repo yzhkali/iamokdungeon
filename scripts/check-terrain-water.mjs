@@ -5,6 +5,7 @@ import { buildTerrainWater } from '../prototype/3d/src/world/terrainWater.js';
 const repoRoot = process.cwd();
 const mainJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/main.js'), 'utf8');
 const terrainWaterJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/world/terrainWater.js'), 'utf8');
+const runtimeServicesJs = fs.readFileSync(path.join(repoRoot, 'prototype/3d/src/core/runtimeServices.js'), 'utf8');
 const mapData = JSON.parse(fs.readFileSync(path.join(repoRoot, 'prototype/3d/maps/map15.json'), 'utf8'));
 const mapHeights = new Float32Array(mapData.terrain);
 
@@ -463,8 +464,8 @@ assert(mainJs.includes('const updateWater = terrainWater.updateWater;'), 'main.j
 assert(mainJs.includes('const waterReflectionMeshes = terrainWater.waterReflectionMeshes;'), 'main.js should consume returned water reflection meshes');
 assert(mainJs.includes('const getWaterSurfaceMaterial = terrainWater.getWaterSurfaceMaterial;'), 'main.js should consume returned material getter');
 assert(/createWorldCollision\s*\(\s*\{\s*terrainHeightAt\s*:\s*terrainH\s*\}\s*\)/.test(mainJs), 'collision should still use terrainH');
-assert(/createWaterReflectionPass\s*\(\s*\{[\s\S]*waterReflectionMeshes[\s\S]*getWaterSurfaceMaterial[\s\S]*\}\s*\)/.test(mainJs), 'reflection pass should use returned water dependencies');
-assert(/createGameLoop\s*\(\s*\{[\s\S]*updateWater[\s\S]*waterReflectionPass[\s\S]*\}\s*\)/.test(mainJs), 'game loop should still receive updateWater');
+assert(/createWaterReflectionPassFn\s*\(\s*\{[\s\S]*waterReflectionMeshes[\s\S]*getWaterSurfaceMaterial[\s\S]*\}\s*\)/.test(runtimeServicesJs), 'reflection pass should use returned water dependencies');
+assert(/startRuntimeLoop\s*\(\s*\{[\s\S]*updateWater[\s\S]*waterReflectionPass[\s\S]*\}\s*\)/.test(mainJs), 'game loop should still receive updateWater');
 assert(!mainJs.includes('function terrainH(x,z)'), 'main.js should not retain inline terrainH');
 assert(!mainJs.includes('function updateWater(t)'), 'main.js should not retain inline updateWater');
 assert(!mainJs.includes('function _buildRoadMask'), 'main.js should not retain inline road mask builder');
